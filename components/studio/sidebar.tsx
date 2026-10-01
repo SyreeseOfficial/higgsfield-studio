@@ -2,14 +2,7 @@
 "use client"
 
 import type { ReactNode } from "react"
-import {
-  House,
-  Images,
-  KeyRound,
-  PanelLeftClose,
-  PanelLeftOpen,
-  Plus,
-} from "lucide-react"
+import { Heart, House, Images, PanelLeftClose, PanelLeftOpen, Plus } from "lucide-react"
 
 import {
   Tooltip,
@@ -21,13 +14,17 @@ import { cn } from "@/lib/utils"
 import { IconTile } from "./icon-tile"
 import type { MyProjectsProject } from "./my-projects"
 import { ProjectActions, ProjectCreateModal } from "./project-dialogs"
+import { SidebarSettings } from "./sidebar-settings"
 
 /**
- * StudioSidebar — the projects-first left rail: Home, All Generations, then the
- * project list with hover actions. Collapses to a 56px icon rail.
+ * StudioSidebar — the projects-first left rail: Home, Assets, Favorites, then
+ * the project list with hover actions. Collapses to a 56px icon rail.
  */
 export type StudioView =
-  { kind: "home" } | { kind: "all" } | { kind: "project"; projectId: string }
+  | { kind: "home" }
+  | { kind: "all" }
+  | { kind: "favorites" }
+  | { kind: "project"; projectId: string }
 
 export interface StudioSidebarProps {
   title: string
@@ -42,6 +39,7 @@ export interface StudioSidebarProps {
   onCollapsedChange: (collapsed: boolean) => void
   keyConfigured: boolean
   onOpenKey: () => void
+  onClearHistory: () => void
 }
 
 function Row({
@@ -128,6 +126,7 @@ export function StudioSidebar({
   onCollapsedChange,
   keyConfigured,
   onOpenKey,
+  onClearHistory,
 }: StudioSidebarProps) {
   return (
     <aside
@@ -179,8 +178,16 @@ export function StudioSidebar({
             selected={view.kind === "all"}
             onClick={() => onViewChange({ kind: "all" })}
             start={<IconTile as={Images} gradient="purple" />}
-            title="All Generations"
-            ariaLabel="All Generations"
+            title="Assets"
+            ariaLabel="Assets"
+          />
+          <Row
+            collapsed={collapsed}
+            selected={view.kind === "favorites"}
+            onClick={() => onViewChange({ kind: "favorites" })}
+            start={<IconTile as={Heart} gradient="pink" />}
+            title="Favorites"
+            ariaLabel="Favorites"
           />
         </div>
 
@@ -253,23 +260,11 @@ export function StudioSidebar({
       </nav>
 
       <div className="pt-2">
-        <Row
+        <SidebarSettings
           collapsed={collapsed}
-          onClick={onOpenKey}
-          ariaLabel={keyConfigured ? "Manage API key" : "Connect API key"}
-          start={
-            <span className="relative flex size-6 items-center justify-center rounded-md border border-white/10 bg-white/5 text-muted-foreground">
-              <KeyRound className="size-3.5" />
-              <span
-                className={cn(
-                  "absolute -top-0.5 -right-0.5 size-2 rounded-full ring-2 ring-sidebar",
-                  keyConfigured ? "bg-primary" : "bg-destructive"
-                )}
-                aria-hidden
-              />
-            </span>
-          }
-          title={keyConfigured ? "API key saved" : "Connect API key"}
+          keyConfigured={keyConfigured}
+          onOpenKey={onOpenKey}
+          onClearHistory={onClearHistory}
         />
       </div>
     </aside>

@@ -3,7 +3,7 @@
 
 import { memo, useEffect, useRef, useState } from "react"
 import type { CSSProperties } from "react"
-import { Copy, Download, Share2, Trash2 } from "lucide-react"
+import { Copy, Download, Heart, Share2, Trash2 } from "lucide-react"
 
 import {
   GenerationTile,
@@ -25,6 +25,7 @@ export interface GalleryTileProps {
   tier: LoadTier
   reducedMotion: boolean
   onDelete?: (item: GalleryItem) => void
+  onToggleFavorite?: (item: GalleryItem) => void
 }
 
 function rectStyle(rect: TileRect, top: number): CSSProperties {
@@ -122,6 +123,7 @@ function GalleryTileComponent({
   tier,
   reducedMotion,
   onDelete,
+  onToggleFavorite,
 }: GalleryTileProps) {
   const [hovered, setHovered] = useState(false)
   const style = rectStyle(rect, top)
@@ -169,6 +171,16 @@ function GalleryTileComponent({
 
   const actions: CardAction[] = [
     { id: "download", label: "Download", icon: Download },
+    ...(onToggleFavorite
+      ? [
+          {
+            id: "favorite",
+            label: item.favorite ? "Unfavorite" : "Favorite",
+            icon: Heart,
+            onSelect: () => onToggleFavorite(item),
+          },
+        ]
+      : []),
     {
       id: "copy",
       label: "Copy prompt",

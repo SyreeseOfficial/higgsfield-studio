@@ -164,7 +164,7 @@ export function ProjectActions({
           </DialogHeader>
           <DialogBody>
             <p className="text-q-body-sm-regular text-q-text-secondary">
-              The project goes away. Its generations stay in All Generations.
+              The project goes away. Its generations stay in Assets.
             </p>
           </DialogBody>
           <DialogFooter>

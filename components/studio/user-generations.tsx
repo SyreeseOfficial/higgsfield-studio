@@ -20,6 +20,7 @@ export interface UserGenerationsProps {
   loadingMore?: boolean
   onLoadMore?: () => void | Promise<unknown>
   onDelete?: (item: GalleryItem) => void
+  onToggleFavorite?: (item: GalleryItem) => void
 }
 
 export function UserGenerations(props: UserGenerationsProps) {

@@ -16,6 +16,7 @@ export interface RunRecord {
   settings: Record<string, unknown>
   /** Owning project, when generated from a project view. */
   projectId?: string
+  favorite?: boolean
   /** Aspect ratio as width / height, used by the justified feed before media loads. */
   aspect: number
   status: RunStatus

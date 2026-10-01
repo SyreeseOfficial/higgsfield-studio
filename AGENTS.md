@@ -55,9 +55,9 @@ end. Rendering the shipped examples is not completion.
 
 - Copy, presets, metadata, navigation and errors describe the user's product
   rather than this scaffold.
-- Every `/presets/placeholder-*.svg` and mock template in
-  `components/studio/template-picker.tsx` is replaced with real, on-brand
-  media at the component's aspect ratio, then the placeholders are deleted.
+- Remaining `/presets/placeholder-*.svg` hero fallbacks are replaced with
+  real, on-brand media at the component's aspect ratio, then deleted. (Home
+  has no preset/template picker in this app.)
 - Every visible control performs its named action or is removed. No inert
   buttons, empty menus or `onClick={() => {}}`.
 - Dark theme only. No app header, no theme toggle, no `dark:` classes.

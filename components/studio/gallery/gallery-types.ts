@@ -22,6 +22,7 @@ export interface GalleryItem {
   settings: Record<string, unknown>
   groupId: string
   groupLabel: string
+  favorite: boolean
 }
 
 /** How near a tile is to the viewport — drives eager vs lazy loading. */

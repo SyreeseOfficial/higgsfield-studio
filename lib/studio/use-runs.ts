@@ -118,9 +118,28 @@ export function useRuns() {
     setRecords((current) => current.filter((r) => r.id !== id))
   }, [])
 
+  const toggleFavorite = useCallback((id: string) => {
+    setRecords((current) =>
+      current.map((r) => (r.id === id ? { ...r, favorite: !r.favorite } : r))
+    )
+  }, [])
+
+  const clearAll = useCallback(() => setRecords([]), [])
+
   const running = records.filter((r) => r.status === "running")
 
-  return { records, running, loaded, error, submit, cancel, remove, setError }
+  return {
+    records,
+    running,
+    loaded,
+    error,
+    submit,
+    cancel,
+    remove,
+    toggleFavorite,
+    clearAll,
+    setError,
+  }
 }
 
 function settle(status: GenerationStatus): Partial<RunRecord> {

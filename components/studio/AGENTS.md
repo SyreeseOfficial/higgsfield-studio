@@ -26,9 +26,8 @@ the component here, backward compatible.
   `gallery/` is its private internals — never import it directly.
 - **`ScreenEmptyState`** for every empty screen: dot-fade backdrop, three
   representative images, real title/description and an optional action.
-- **`ExamplePresets` / `TemplateCard`** for pick-one preset grids. Each
-  `TemplateItem` carries the prompt (and optional model/settings) it applies.
-- **`MyProjects`, `ProjectCreateModal`, `ProjectActions`** own project UI.
+- **`ProjectCreateModal`, `ProjectActions`** own project UI (sidebar only; Home
+  has no project grid or preset picker).
 - **`KeyDialog`** is the only place that collects the platform key.
 
 Design invariants: dark only; lime `bg-primary` is reserved for the generation

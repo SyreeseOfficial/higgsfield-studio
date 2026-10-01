@@ -28,6 +28,7 @@ export interface JustifiedGalleryProps {
   onLoadMore?: () => void | Promise<unknown>
   emptyState: ScreenEmptyStateContent
   onDelete?: (item: GalleryItem) => void
+  onToggleFavorite?: (item: GalleryItem) => void
 }
 
 export function JustifiedGallery({
@@ -39,6 +40,7 @@ export function JustifiedGallery({
   onLoadMore,
   emptyState,
   onDelete,
+  onToggleFavorite,
 }: JustifiedGalleryProps) {
   const reducedMotion = useReducedMotion()
   const { viewportRef, ...gallery } = useJustifiedGallery(items, grouped, {
@@ -103,6 +105,7 @@ export function JustifiedGallery({
                   tier={tier}
                   reducedMotion={reducedMotion}
                   onDelete={onDelete}
+                  onToggleFavorite={onToggleFavorite}
                 />
               ))
             })}

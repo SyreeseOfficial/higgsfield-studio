@@ -17,6 +17,7 @@ export function runToGalleryItems(run: RunRecord): GalleryItem[] {
     settings: run.settings,
     groupId: "all",
     groupLabel: "",
+    favorite: run.favorite ?? false,
   }
   if (run.status !== "completed") {
     return [

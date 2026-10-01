@@ -2,24 +2,14 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import type { ComponentProps } from "react"
-import { Compass, Folder } from "lucide-react"
 
 import { StudioPromptBox } from "@/components/studio/studio-prompt-box"
-import {
-  ExamplePresets,
-  TEMPLATES,
-  type TemplateItem,
-} from "@/components/studio/template-picker"
 import { HeroComposition } from "@/components/studio/hero-composition"
 import { KeyDialog } from "@/components/studio/key-dialog"
-import {
-  MyProjects,
-  type MyProjectsProject,
-} from "@/components/studio/my-projects"
+import { type MyProjectsProject } from "@/components/studio/my-projects"
 import { StudioSidebar, type StudioView } from "@/components/studio/sidebar"
 import { UserGenerations } from "@/components/studio/user-generations"
 import type { GalleryItem } from "@/components/studio/gallery/gallery-types"
-import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { hasPlatformCredentials } from "@/generation/actions"
 import { MODELS, getModel, parseSettings } from "@/generation/catalog"
 import type {
@@ -53,13 +43,13 @@ import { useRuns } from "@/lib/studio/use-runs"
 
 /**
  * StudioTemplate — the full creative workspace: projects-first sidebar, hero,
- * the floating prompt dock, Explore / My Projects, and the edge-to-edge
- * generations feed. Generation goes through the model catalog and the
- * platform server actions; history and projects live in the browser.
+ * the floating prompt dock, and the edge-to-edge generations feed.
+ * Generation goes through the model catalog and the platform server
+ * actions; history and projects live in the browser.
  *
- * Keep the six structural parts when adapting (see AGENTS.md): sidebar,
- * glow + dot-field atmosphere, HeroComposition, StudioPromptBox, the
- * Explore / My Projects section, and the UserGenerations feed.
+ * Keep these structural parts when adapting (see AGENTS.md): sidebar,
+ * glow + dot-field atmosphere, HeroComposition, StudioPromptBox, and the
+ * UserGenerations feed.
  */
 
 // PLACEHOLDER ASSETS — replaced by the app's real outputs as soon as there are three.
@@ -95,24 +85,12 @@ function heroImages(items: GalleryItem[]): readonly [string, string, string] {
 function HomeState({
   title,
   items,
-  projects,
   dock,
-  onCreateProject,
-  onOpenAll,
-  onOpenProject,
-  onUseTemplate,
 }: {
   title: string
   items: GalleryItem[]
-  projects: MyProjectsProject[]
   dock: DockProps
-  onCreateProject: (name: string) => void
-  onOpenAll: () => void
-  onOpenProject: (project: MyProjectsProject) => void
-  onUseTemplate: (template: TemplateItem) => void
 }) {
-  const [tab, setTab] = useState("explore")
-  const promptRef = useRef<HTMLDivElement>(null)
   const images = useMemo(() => heroImages(items), [items])
 
   return (
@@ -134,10 +112,7 @@ function HomeState({
       />
 
       <div className="relative flex w-full flex-col items-center gap-12 px-6 pt-16 pb-16">
-        <div
-          ref={promptRef}
-          className="flex w-full min-w-0 flex-col items-center gap-8"
-        >
+        <div className="flex w-full min-w-0 flex-col items-center gap-8">
           <div className="flex flex-col items-center gap-5">
             <HeroComposition images={images} alt="Recent Studio outputs" />
             <h1 className="max-w-[640px] text-center text-q-accent-lg-bold uppercase">
@@ -145,47 +120,6 @@ function HomeState({
             </h1>
           </div>
           <StudioPromptBox {...dock} />
-        </div>
-
-        <div className="flex w-full max-w-[900px] flex-col items-start gap-5">
-          <Tabs
-            variant="segmented"
-            shape="pill"
-            value={tab}
-            onValueChange={(v) => setTab(String(v))}
-          >
-            <TabsList>
-              <TabsTrigger value="explore" start={<Compass />}>
-                Explore
-              </TabsTrigger>
-              <TabsTrigger value="projects" start={<Folder />}>
-                My Projects
-              </TabsTrigger>
-            </TabsList>
-          </Tabs>
-          <div key={tab} className="w-full animate-in duration-300 fade-in-0">
-            {tab === "projects" ? (
-              <MyProjects
-                projects={projects}
-                generations={items}
-                onCreateProject={onCreateProject}
-                onOpenAllGenerations={onOpenAll}
-                onOpenProject={onOpenProject}
-              />
-            ) : (
-              <ExamplePresets
-                items={TEMPLATES}
-                onUse={(t) => {
-                  onUseTemplate(t)
-                  promptRef.current?.scrollIntoView({
-                    behavior: "smooth",
-                    block: "center",
-                  })
-                }}
-                className="w-full"
-              />
-            )}
-          </div>
         </div>
       </div>
     </div>
@@ -198,12 +132,14 @@ function FeedState({
   title,
   dock,
   onDelete,
+  onToggleFavorite,
 }: {
   items: GalleryItem[]
   previewItems: GalleryItem[]
   title: string
   dock: DockProps
   onDelete: (item: GalleryItem) => void
+  onToggleFavorite: (item: GalleryItem) => void
 }) {
   const images = useMemo(() => heroImages(previewItems), [previewItems])
   const dockRef = useRef<HTMLDivElement>(null)
@@ -227,14 +163,19 @@ function FeedState({
           items={items}
           title={title}
           onDelete={onDelete}
+          onToggleFavorite={onToggleFavorite}
           emptyState={{
             images,
             title:
-              title === "All Generations"
-                ? "No generations yet"
-                : `No generations in ${title}`,
+              title === "Favorites"
+                ? "No favorites yet"
+                : title === "Assets"
+                  ? "No generations yet"
+                  : `No generations in ${title}`,
             description:
-              "Describe an idea below, then generate the first result.",
+              title === "Favorites"
+                ? "Favorite a generation from its ⋯ menu to pin it here."
+                : "Describe an idea below, then generate the first result.",
           }}
         />
       </div>
@@ -372,7 +313,9 @@ export function StudioTemplate({
   const visibleItems =
     view.kind === "project"
       ? (byProject.get(view.projectId) ?? [])
-      : galleryItems
+      : view.kind === "favorites"
+        ? galleryItems.filter((item) => item.favorite)
+        : galleryItems
 
   const generating = runs.running.length > 0
   const canGenerate =
@@ -412,17 +355,6 @@ export function StudioTemplate({
       setCanceling(false)
     )
   }, [canceling, generating, runs])
-
-  const handleUseTemplate = (t: TemplateItem) => {
-    setPrompt(t.prompt)
-    if (t.modelId && MODELS.some((m) => m.id === t.modelId)) {
-      const target = getModel(t.modelId)
-      setActiveModel(target.id)
-      if (t.settings) setSetting(target.id, t.settings)
-    } else if (t.kind !== surface && surfaces.includes(t.kind)) {
-      changeSurface(t.kind)
-    }
-  }
 
   // setModel derives the surface from the model, so switching surface = picking its first model.
   const changeSurface = (next: Surface) => {
@@ -516,31 +448,22 @@ export function StudioTemplate({
         onCollapsedChange={setCollapsed}
         keyConfigured={keyConfigured}
         onOpenKey={() => setKeyOpen(true)}
+        onClearHistory={runs.clearAll}
       />
       <main className="relative flex min-w-0 flex-1 flex-col">
         {view.kind === "home" ? (
-          <HomeState
-            title={headline}
-            items={galleryItems}
-            projects={projects}
-            dock={dock}
-            onCreateProject={(name) =>
-              setView({
-                kind: "project",
-                projectId: projectsStore.create(name).id,
-              })
-            }
-            onOpenAll={() => setView({ kind: "all" })}
-            onOpenProject={(p) => setView({ kind: "project", projectId: p.id })}
-            onUseTemplate={handleUseTemplate}
-          />
+          <HomeState title={headline} items={galleryItems} dock={dock} />
         ) : (
           <FeedState
             items={visibleItems}
             previewItems={galleryItems}
-            title={selectedProject?.name ?? "All Generations"}
+            title={
+              selectedProject?.name ??
+              (view.kind === "favorites" ? "Favorites" : "Assets")
+            }
             dock={dock}
             onDelete={(item) => runs.remove(item.runId)}
+            onToggleFavorite={(item) => runs.toggleFavorite(item.runId)}
           />
         )}
       </main>
