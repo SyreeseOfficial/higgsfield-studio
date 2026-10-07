@@ -34,7 +34,6 @@ function css(s: string): React.CSSProperties {
 // comes from the network and from TODO.md's P0 backend work, not from here.
 const SHOW_WALKTHROUGH = true;
 const DEFAULT_MODE: 'image' | 'video' = 'image';
-const START_EMPTY = false;
 const FAILURE_RATE: 'never' | 'sometimes' | 'always' = 'sometimes';
 
 const TAG_TIPS: Record<string, string> = { Start: 'Start frame: the video opens on this image', End: 'End frame: the video ends on this image' };
@@ -72,20 +71,6 @@ const OPTS = { image: { res: ['1K', '2K', '4K'], fmt: ['PNG', 'JPG', 'WEBP'] }, 
 const MAX_REFS = 10;
 const PAGE = 24;
 const FEED_PAGE = 20;
-const ARCHIVE: [string, string, string, string][] = [
-  ['image', 'soul', '3:4', 'Close portrait under red neon, rain on the window glass'], ['image', 'flux', '1:1', 'Stack of linen napkins on oak, morning side light'],
-  ['video', 'kling', '16:9', 'Drone push over salt flats at sunrise'], ['image', 'seedream', '16:9', 'Desert motel at dusk, pastel sky, lone car'],
-  ['image', 'soul', '3:4', 'Dancer mid-leap in a white studio, motion blur on fabric'], ['video', 'seedance', '9:16', 'Ink blooming in water, macro, black background'],
-  ['image', 'flux', '1:1', 'Glass perfume bottle on wet black stone'], ['image', 'seedream', '16:9', 'Alpine lake with mirror reflections, overcast'],
-  ['image', 'soul', '3:4', 'Fisherman in a yellow slicker on a foggy pier'], ['video', 'kling', '16:9', 'Night tram passing through a snowy city street'],
-  ['image', 'flux', '1:1', 'Citrus slices on a terracotta plate, top-down'], ['image', 'seedream', '16:9', 'Rice terraces in mist, aerial view'],
-  ['image', 'soul', '3:4', 'Elderly tailor at his workbench, warm tungsten light'], ['video', 'seedance', '16:9', 'Waves folding over black sand, slow motion'],
-  ['image', 'flux', '1:1', 'Leather sneaker floating on a pastel gradient'], ['image', 'seedream', '16:9', 'Abandoned greenhouse overgrown with ferns'],
-  ['image', 'soul', '3:4', 'Twins in matching knitwear, flat studio light'], ['video', 'kling', '9:16', 'Candle flame flickering in a dark room'],
-  ['image', 'flux', '1:1', 'Ceramic mugs in a row, soft shadows, beige set'], ['image', 'seedream', '16:9', 'Lighthouse in a winter storm, long exposure'],
-  ['image', 'soul', '3:4', 'Cyclist portrait at golden hour, shallow depth of field'], ['video', 'seedance', '16:9', 'Timelapse of clouds rolling over a mountain ridge'],
-  ['image', 'flux', '1:1', 'Wristwatch on folded wool, hard rim light'], ['image', 'seedream', '16:9', 'Neon arcade interior, empty, cinematic wide'],
-];
 const ERRORS: Record<string, { title: string; detail: string }> = {
   timeout: { title: 'The model timed out', detail: "Higgsfield didn't return a result within 2 minutes. Your credits were refunded." },
   server: { title: "Higgsfield couldn't finish this run", detail: 'The server returned an error (502). This is usually temporary. Your credits were refunded.' },
@@ -181,7 +166,7 @@ export default class App extends ReactComponent<Record<string, never>, AnyState>
     res: { image: '2K', video: '720p' }, fmt: { image: 'PNG', video: 'MP4' },
     duration: 5, audio: true, batch: 2,
     refs: { start: null, end: null, list: [] },
-    projects: [{ id: 'p1', name: 'Spring campaign', emoji: '🌸' }, { id: 'p2', name: 'Tide — short film', emoji: '🌊' }, { id: 'p3', name: 'Product stills', emoji: '📦' }],
+    projects: [] as unknown[],
     newEmoji: null,
     uploads: [] as unknown[],
     gens: [] as unknown[],
@@ -194,49 +179,6 @@ export default class App extends ReactComponent<Record<string, never>, AnyState>
     online: typeof navigator === 'undefined' ? true : navigator.onLine !== false, rateUntil: null, copied: null,
     ...loadDraft(),
   };
-
-  constructor(props: Record<string, never>) {
-    super(props);
-    this.state.gens = START_EMPTY ? [] : this.seedGens();
-    this.state.session = START_EMPTY ? [] : ['g5', 'g4', 'g3', 'g2', 'g1'];
-    this.state.failed = START_EMPTY ? [] : this.seedFailed();
-    this.state.uploads = this.seedUploads();
-  }
-
-  // ── Seed data (TODO(backend): replace with real persistence, see TODO.md) ──
-  seedGens() {
-    const now = Date.now(), m = 60000;
-    const g = (id: string, project: string | null, type: string, model: string, prompt: string, ratio: string, n: number, x: any, ago: number, favs: number[] = []) => ({
-      id, project, type, model, prompt, ratio, res: x.res, fmt: x.fmt, duration: x.duration || 5, audio: !!x.audio, refs: x.refs || [], t: now - ago * m,
-      items: Array.from({ length: n }, (_, i) => ({ id: id + '-' + i, seed: 'studio' + id + i, fav: favs.includes(i) })),
-    });
-    return [
-      g('g1', 'p1', 'image', 'soul', 'Editorial portrait of a woman in a sculptural white coat on an overcast rooftop, soft film grain', '3:4', 4, { res: '2K', fmt: 'PNG', refs: [{ url: 'https://picsum.photos/seed/ref-coat/240/240', kind: 'image', name: 'coat-moodboard.jpg' }, { url: 'https://picsum.photos/seed/ref-roof/240/240', kind: 'image', name: 'rooftop-scout.jpg' }] }, 2900, [1]),
-      g('g2', 'p2', 'video', 'seedance', 'Slow dolly through a fog-filled pine forest at dawn, light rays cutting through the canopy', '16:9', 2, { res: '1080p', fmt: 'MP4', duration: 10, audio: true }, 1500, [0]),
-      g('g3', 'p3', 'image', 'flux', 'Matte ceramic bottle on a travertine plinth, hard noon shadows, minimal set', '1:1', 2, { res: '2K', fmt: 'PNG' }, 400),
-      g('g4', 'p1', 'video', 'kling', 'Skateboarder carving an empty pool at golden hour, low angle, slow motion', '9:16', 1, { res: '720p', fmt: 'MP4', duration: 5, refs: [{ url: 'https://picsum.photos/seed/ref-pool/240/240', kind: 'image', tag: 'Start', name: 'pool-start.jpg' }] }, 95, [0]),
-      g('g5', 'p2', 'image', 'seedream', 'Brutalist concrete house on a cliff above a stormy sea, wide establishing shot', '16:9', 3, { res: '4K', fmt: 'JPG' }, 12),
-      ...ARCHIVE.map(([type, model, ratio, prompt], i) => g('a' + i, ['p1', 'p2', 'p3', null][i % 4], type, model, prompt, ratio, 2 + (i % 3),
-        type === 'video' ? { res: '1080p', fmt: 'MP4', duration: i % 2 ? 10 : 5 } : { res: '2K', fmt: 'PNG' }, 3200 + i * 900, i % 5 === 0 ? [0] : [])),
-    ];
-  }
-  seedFailed() {
-    return [{ id: 'f1', type: 'image', model: 'soul', ratio: '3:4', batch: 2, res: '2K', fmt: 'PNG', refs: [], project: 'p1', t: Date.now() - 40 * 60000, err: ERRORS.timeout,
-      prompt: 'Full-length fashion portrait of a model in an oversized charcoal wool coat walking across a wet cobblestone square at blue hour, tungsten shop windows reflecting in the puddles, shallow depth of field, 85mm lens, subtle film grain, muted teal and amber palette, editorial magazine styling, natural pose mid-stride, wind catching the hem of the coat' }];
-  }
-  seedUploads() {
-    const now = Date.now(), d = 86400000, P = (s: string) => `https://picsum.photos/seed/${s}/480/480`;
-    return [
-      { id: 'up1', kind: 'image', name: 'coat-moodboard.jpg', url: 'https://picsum.photos/seed/ref-coat/240/240', size: 2.4e6, w: 2400, h: 3000, t: now - 2.1 * d },
-      { id: 'up2', kind: 'image', name: 'rooftop-scout.jpg', url: 'https://picsum.photos/seed/ref-roof/240/240', size: 3.1e6, w: 4032, h: 3024, t: now - 2.1 * d },
-      { id: 'up3', kind: 'image', name: 'pool-start.jpg', url: 'https://picsum.photos/seed/ref-pool/240/240', size: 1.8e6, w: 1080, h: 1920, t: now - 0.07 * d },
-      { id: 'up4', kind: 'image', name: 'label-front.png', url: P('up-label'), size: 0.9e6, w: 1600, h: 1600, t: now - 6 * d },
-      { id: 'up5', kind: 'image', name: 'model-test-03.jpg', url: P('up-model3'), size: 4.6e6, w: 3000, h: 4000, t: now - 34 * d },
-      { id: 'up6', kind: 'image', name: 'texture-travertine.jpg', url: P('up-trav'), size: 31.4e6, w: 8000, h: 8000, t: now - 41 * d },
-      { id: 'up7', kind: 'image', name: 'location-pier-wide.jpg', url: P('up-pier'), size: 5.2e6, w: 6000, h: 4000, t: now - 52 * d },
-      { id: 'up8', kind: 'image', name: 'palette-ref.png', url: P('up-palette'), size: 0.4e6, w: 1200, h: 800, t: now - 60 * d },
-    ];
-  }
 
   // ── Composer helpers ────────────────────────────────────────────────────
   autosize() { const el = this.promptRef.current; if (!el) return; el.style.height = 'auto'; el.style.height = Math.min(el.scrollHeight, 240) + 'px'; }
