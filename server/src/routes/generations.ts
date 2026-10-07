@@ -119,6 +119,16 @@ generationsRouter.get("/:id", async (req, res) => {
   res.json(fullGen(row));
 });
 
+// Path is /items/fav, not /:id/fav, since a favorite is per-item, not per-generation, and a bulk
+// toggle (Assets/Favorites multi-select) hits several items across different generations at once.
+generationsRouter.patch("/items/fav", (req, res) => {
+  const ids: string[] = Array.isArray(req.body?.ids) ? req.body.ids : [];
+  const fav = !!req.body?.fav;
+  const stmt = db.prepare("UPDATE items SET fav = ? WHERE id = ?");
+  db.transaction(() => ids.forEach((id) => stmt.run(fav ? 1 : 0, id)))();
+  res.status(204).end();
+});
+
 generationsRouter.delete("/:id", async (req, res) => {
   const cred = readStoredKey();
   const items = db.prepare("SELECT * FROM items WHERE generation_id = ?").all(req.params.id) as ItemRow[];

@@ -80,6 +80,8 @@ function loadDraft(): Record<string, unknown> {
     return o;
   } catch { return {}; }
 }
+function loadTheme(): 'dark' | 'light' { try { return localStorage.getItem('studio.theme') === 'light' ? 'light' : 'dark'; } catch { return 'dark'; } }
+function loadDefMode(): 'image' | 'video' { try { return localStorage.getItem('studio.defaultMode') === 'video' ? 'video' : DEFAULT_MODE; } catch { return DEFAULT_MODE; } }
 function wait(ms: number) { return new Promise((r) => setTimeout(r, ms)); }
 function zip(files: { name: Uint8Array; data: Uint8Array }[]): Blob {
   const T = Array.from({ length: 256 }, (_, n) => { let c = n; for (let k = 0; k < 8; k++) c = c & 1 ? 0xEDB88320 ^ (c >>> 1) : c >>> 1; return c >>> 0; });
@@ -148,8 +150,8 @@ export default class App extends ReactComponent<Record<string, never>, AnyState>
   dragDepth = 0;
 
   state: AnyState = {
-    theme: 'dark',
-    view: 'create', mode: DEFAULT_MODE, defMode: DEFAULT_MODE,
+    theme: loadTheme(),
+    view: 'create', mode: loadDefMode(), defMode: loadDefMode(),
     projectId: null, projectsOpen: true, popover: null, menuPage: 'main',
     collapsed: (() => { try { return localStorage.getItem('studio.sidebarCollapsed') === '1'; } catch { return false; } })(),
     hasKey: false, keyLast4: '', checking: false, keyErr: '',
@@ -287,6 +289,11 @@ export default class App extends ReactComponent<Record<string, never>, AnyState>
   }
   persistProjects(list: AnyState[]) {
     fetch('/api/projects', { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(list) }).catch(() => {});
+  }
+  setTheme(theme: string) { this.setState({ theme }); try { localStorage.setItem('studio.theme', theme); } catch { /* ignore */ } }
+  setDefMode(mode: string) { this.setState({ defMode: mode }); try { localStorage.setItem('studio.defaultMode', mode); } catch { /* ignore */ } }
+  persistFav(ids: string[], fav: boolean) {
+    fetch('/api/generations/items/fav', { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ ids, fav }) }).catch(() => {});
   }
   async loadGenerations() {
     try {
@@ -495,7 +502,7 @@ export default class App extends ReactComponent<Record<string, never>, AnyState>
   progress(p: any, i: number) { const x = Math.min(1, Math.max(0, (Date.now() - p.t - i * 250) / (p.dur || 5000))); return Math.min(99, Math.round(100 * (1 - Math.pow(1 - x, 1.8)))); }
   spinner() { return <span style={{ width: 14, height: 14, border: '1.5px solid currentColor', borderTopColor: 'transparent', borderRadius: '50%', display: 'inline-block', animation: 'spin .7s linear infinite' }} />; }
 
-  // ── Generation (TODO(backend): still an in-memory fake, see TODO.md) ───
+  // ── Generation (real: server/src/routes/generations.ts) ─────────────────
   genBlock(): any {
     const s = this.state, cost = this.costOf({ type: s.mode, model: s.model[s.mode], batch: s.batch }) ?? 0, rl = this.rateLeft();
     void cost;
@@ -590,7 +597,13 @@ export default class App extends ReactComponent<Record<string, never>, AnyState>
     if (this.runGen(p)) this.setState((s: AnyState) => ({ failed: s.failed.filter((x: any) => x.id !== id) }));
   }
   toggleFav(id: string) {
-    this.setState((s: AnyState) => ({ gens: s.gens.map((g: any) => ({ ...g, items: g.items.map((it: any) => (it.id === id ? { ...it, fav: !it.fav } : it)) })) }));
+    let next = false;
+    this.setState((s: AnyState) => ({
+      gens: s.gens.map((g: any) => ({
+        ...g,
+        items: g.items.map((it: any) => { if (it.id !== id) return it; next = !it.fav; return { ...it, fav: next }; }),
+      })),
+    }), () => this.persistFav([id], next));
   }
   reuse(g: AnyState) {
     this.setState((s: AnyState) => ({
@@ -806,8 +819,8 @@ export default class App extends ReactComponent<Record<string, never>, AnyState>
   bulkItems(ids: string[]) { const set = new Set(ids), out: AnyState[] = []; this.state.gens.forEach((g: any) => g.items.forEach((it: any) => { if (set.has(it.id)) out.push({ it, g }); })); return out; }
   bulkFav(ids: string[], on: boolean) {
     const set = new Set(ids), n = ids.length, sn = this.snap();
-    this.setState((s: AnyState) => ({ gens: s.gens.map((g: any) => ({ ...g, items: g.items.map((it: any) => (set.has(it.id) ? { ...it, fav: on } : it)) })), selected: s.view === 'favorites' && !on ? [] : s.selected }));
-    this.notify(`${n} ${n > 1 ? 'items' : 'item'} ${on ? 'added to' : 'removed from'} Favorites`, { undo: () => this.restore(sn) });
+    this.setState((s: AnyState) => ({ gens: s.gens.map((g: any) => ({ ...g, items: g.items.map((it: any) => (set.has(it.id) ? { ...it, fav: on } : it)) })), selected: s.view === 'favorites' && !on ? [] : s.selected }), () => this.persistFav(ids, on));
+    this.notify(`${n} ${n > 1 ? 'items' : 'item'} ${on ? 'added to' : 'removed from'} Favorites`, { undo: () => { this.restore(sn); this.persistFav(ids, !on); } });
   }
   bulkMove(ids: string[], pid: string | null) {
     const set = new Set(ids), n = ids.length, sn = this.snap();
@@ -1322,7 +1335,7 @@ export default class App extends ReactComponent<Record<string, never>, AnyState>
         const onP = (s.newEmoji || null) === c;
         return { char: c || '', isNone: !c, title: c ? c : 'No emoji', border: onP ? 'var(--text3)' : 'transparent', bg: onP ? 'var(--active)' : 'var(--hover)', onPick: () => this.setState({ newEmoji: c }) };
       }),
-      toggleTheme: set({ theme: s.theme === 'dark' ? 'light' : 'dark' }),
+      toggleTheme: () => this.setTheme(s.theme === 'dark' ? 'light' : 'dark'),
       hasKey: s.hasKey, noKey: !s.hasKey,
       openKey: set({ modal: s.hasKey ? 'manage' : 'connect', keyInput: '', keyErr: '', replacing: false }),
       ...this.keyVals(), ...this.walkVals(samples, feedEmpty), samples,
@@ -1445,8 +1458,8 @@ export default class App extends ReactComponent<Record<string, never>, AnyState>
       deleteSelected: () => this.askDelete(s.selected, true), selDelOpacity: s.selected.length ? 1 : 0.4,
 
       keyButton: s.hasKey ? 'Manage API key' : 'Connect API key',
-      themeOpts: seg(['dark', 'light'], s.theme, (v: string) => this.setState({ theme: v }), ['Dark', 'Light']),
-      defModeOpts: seg(['image', 'video'], s.defMode, (v: string) => this.setState({ defMode: v }), ['Image', 'Video']),
+      themeOpts: seg(['dark', 'light'], s.theme, (v: string) => this.setTheme(v), ['Dark', 'Light']),
+      defModeOpts: seg(['image', 'video'], s.defMode, (v: string) => this.setDefMode(v), ['Image', 'Video']),
 
       lbz: (() => { const z = this.lbZ(), m = f && this.lbMetrics(), act = 'rgba(255,255,255,.16)';
         return { s: z.s, x: z.x, y: z.y, dur: z.anim ? 0.18 : 0, cursor: z.s > 1 ? (s.lbDrag ? 'grabbing' : 'grab') : 'default',
@@ -2591,6 +2604,12 @@ export default class App extends ReactComponent<Record<string, never>, AnyState>
             <div style={css('font-size:12px;color:var(--text3)')}>Assets</div>
             <div style={css('display:grid;grid-template-columns:minmax(0,1fr) auto;gap:8px 16px;align-items:center;font-size:13px;color:var(--text2)')}>
               {row('Search prompts', '/')}
+            </div>
+          </div>
+          <div style={css('display:flex;flex-direction:column;gap:8px')}>
+            <div style={css('font-size:12px;color:var(--text3)')}>Uploads</div>
+            <div style={css('display:grid;grid-template-columns:minmax(0,1fr) auto;gap:8px 16px;align-items:center;font-size:13px;color:var(--text2)')}>
+              {row('Search', '/')}{row('Previous / next in preview', '← →')}{row('Delete', '⌫')}{row('Select all', '⌘A')}
             </div>
           </div>
           <div style={css('display:flex;flex-direction:column;gap:8px')}>
