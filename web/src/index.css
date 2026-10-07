@@ -1,111 +1,128 @@
-:root {
-  --text: #6b6375;
-  --text-h: #08060d;
-  --bg: #fff;
-  --border: #e5e4e7;
-  --code-bg: #f4f3ec;
-  --accent: #aa3bff;
-  --accent-bg: rgba(170, 59, 255, 0.1);
-  --accent-border: rgba(170, 59, 255, 0.5);
-  --social-bg: rgba(244, 243, 236, 0.5);
-  --shadow:
-    rgba(0, 0, 0, 0.1) 0 10px 15px -3px, rgba(0, 0, 0, 0.05) 0 4px 6px -2px;
-
-  --sans: system-ui, 'Segoe UI', Roboto, sans-serif;
-  --heading: system-ui, 'Segoe UI', Roboto, sans-serif;
-  --mono: ui-monospace, Consolas, monospace;
-
-  font: 18px/145% var(--sans);
-  letter-spacing: 0.18px;
-  color-scheme: light dark;
-  color: var(--text);
-  background: var(--bg);
-  font-synthesis: none;
-  text-rendering: optimizeLegibility;
-  -webkit-font-smoothing: antialiased;
-  -moz-osx-font-smoothing: grayscale;
-
-  @media (max-width: 1024px) {
-    font-size: 16px;
-  }
+:root,
+[data-theme="dark"] {
+  --app: #08080a;
+  --panel: #0f0f11;
+  --raised: #151518;
+  --border: rgba(255, 255, 255, 0.07);
+  --border2: rgba(255, 255, 255, 0.11);
+  --text: #ededef;
+  --text2: #a0a0a8;
+  --text3: #6c6c75;
+  --hover: rgba(255, 255, 255, 0.045);
+  --active: rgba(255, 255, 255, 0.08);
+  --seg: rgba(255, 255, 255, 0.1);
+  --accent: #cffb18;
+  --on-accent: #0c0f00;
+  --accent-fg: #cffb18;
+  --overlay: rgba(0, 0, 0, 0.6);
+  --shadow: 0 12px 40px rgba(0, 0, 0, 0.45), 0 2px 8px rgba(0, 0, 0, 0.3);
+  --danger: #f87171;
+  --on-danger: #1a0505;
+  --warn: #fbbf24;
 }
-
-@media (prefers-color-scheme: dark) {
-  :root {
-    --text: #9ca3af;
-    --text-h: #f3f4f6;
-    --bg: #16171d;
-    --border: #2e303a;
-    --code-bg: #1f2028;
-    --accent: #c084fc;
-    --accent-bg: rgba(192, 132, 252, 0.15);
-    --accent-border: rgba(192, 132, 252, 0.5);
-    --social-bg: rgba(47, 48, 58, 0.5);
-    --shadow:
-      rgba(0, 0, 0, 0.4) 0 10px 15px -3px, rgba(0, 0, 0, 0.25) 0 4px 6px -2px;
-  }
-
-  #social .button-icon {
-    filter: invert(1) brightness(2);
-  }
+[data-theme="light"] {
+  --app: #f2f2f3;
+  --panel: #ffffff;
+  --raised: #ffffff;
+  --border: rgba(0, 0, 0, 0.07);
+  --border2: rgba(0, 0, 0, 0.12);
+  --text: #17171a;
+  --text2: #55555d;
+  --text3: #8b8b93;
+  --hover: rgba(0, 0, 0, 0.035);
+  --active: rgba(0, 0, 0, 0.06);
+  --seg: #ffffff;
+  --accent: #cffb18;
+  --on-accent: #0c0f00;
+  --accent-fg: #4f6300;
+  --overlay: rgba(20, 20, 24, 0.35);
+  --shadow: 0 12px 40px rgba(0, 0, 0, 0.12), 0 2px 8px rgba(0, 0, 0, 0.06);
+  --danger: #dc2626;
+  --on-danger: #ffffff;
+  --warn: #b45309;
 }
-
+html,
+body,
 #root {
-  width: 1126px;
-  max-width: 100%;
-  margin: 0 auto;
-  text-align: center;
-  border-inline: 1px solid var(--border);
-  min-height: 100svh;
-  display: flex;
-  flex-direction: column;
-  box-sizing: border-box;
+  margin: 0;
+  height: 100%;
+  background: #08080a;
 }
-
 body {
-  margin: 0;
+  font-family: Geist, ui-sans-serif, system-ui, sans-serif;
+  -webkit-font-smoothing: antialiased;
+  font-size: 13px;
+}
+button,
+input,
+textarea {
+  font: inherit;
+  color: inherit;
+}
+a {
+  color: var(--accent-fg);
+  text-decoration: none;
+}
+a:hover {
+  text-decoration: underline;
+}
+textarea::placeholder,
+input::placeholder {
+  color: var(--text3);
+}
+textarea:focus,
+input:focus {
+  outline: none;
 }
 
-h1,
-h2 {
-  font-family: var(--heading);
-  font-weight: 500;
-  color: var(--text-h);
-}
-
-h1 {
-  font-size: 56px;
-  letter-spacing: -1.68px;
-  margin: 32px 0;
-  @media (max-width: 1024px) {
-    font-size: 36px;
-    margin: 20px 0;
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
   }
 }
-h2 {
-  font-size: 24px;
-  line-height: 118%;
-  letter-spacing: -0.24px;
-  margin: 0 0 8px;
-  @media (max-width: 1024px) {
-    font-size: 20px;
+@keyframes skel {
+  from {
+    transform: translateX(-100%);
+  }
+  to {
+    transform: translateX(100%);
   }
 }
-p {
-  margin: 0;
+@keyframes toastCountdown {
+  from {
+    transform: scaleX(1);
+  }
+  to {
+    transform: scaleX(0);
+  }
+}
+@keyframes tilePulse {
+  0% {
+    box-shadow: inset 0 0 0 2px var(--accent), 0 0 0 0 color-mix(in srgb, var(--accent) 55%, transparent);
+  }
+  55% {
+    box-shadow: inset 0 0 0 2px var(--accent), 0 0 0 7px transparent;
+  }
+  100% {
+    box-shadow: inset 0 0 0 2px transparent, 0 0 0 7px transparent;
+  }
 }
 
-code,
-.counter {
-  font-family: var(--mono);
-  display: inline-flex;
-  border-radius: 4px;
-  color: var(--text-h);
-}
-
-code {
-  font-size: 15px;
-  line-height: 135%;
-  padding: 4px 8px;
-  background: var(--code-bg);
-}
+/* Hover/focus utilities: ponytail — CSS :hover/:focus with !important beats the
+   inline `style` attribute in the cascade (normal tier), so these reproduce the
+   .dc.html template's style-hover/style-focus bindings without any JS or extra
+   per-element abstraction. Add a class here instead of inventing a new one. */
+.u-hov-active:hover { background: var(--active) !important; }
+.u-hov-active-text:hover { background: var(--active) !important; color: var(--text) !important; }
+.u-hov-surface:hover { background: var(--hover) !important; }
+.u-hov-surface-text:hover { background: var(--hover) !important; color: var(--text) !important; }
+.u-hov-text:hover { color: var(--text) !important; }
+.u-hov-danger:hover { color: var(--danger) !important; }
+.u-hov-danger-surface:hover { background: var(--hover) !important; color: var(--danger) !important; }
+.u-hov-border2:hover { border-color: var(--border2) !important; }
+.u-hov-border3:hover { border-color: var(--text3) !important; }
+.u-hov-bright:hover { filter: brightness(1.05) !important; }
+.u-hov-w16:hover { background: rgba(255, 255, 255, 0.16) !important; }
+.u-hov-w12:hover { background: rgba(255, 255, 255, 0.12) !important; }
+.u-foc-border2:focus { border-color: var(--border2) !important; }
+.u-foc-border3:focus { border-color: var(--text3) !important; }
