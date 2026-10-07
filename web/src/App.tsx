@@ -163,6 +163,7 @@ export default class App extends ReactComponent<Record<string, never>, AnyState>
     duration: 5, audio: true, batch: 2,
     refs: { start: null, end: null, list: [] },
     projects: [] as unknown[],
+    counts: { assets: 0, favorites: 0, uploads: 0, projects: {} as Record<string, number> },
     newEmoji: null,
     uploads: [] as unknown[],
     gens: [] as unknown[],
@@ -307,6 +308,21 @@ export default class App extends ReactComponent<Record<string, never>, AnyState>
       pending.forEach((g) => this.pollGen(g.id, g));
     } catch { /* server not reachable yet */ }
   }
+  // Sidebar totals used to be computed client-side from the (already fully hydrated) `gens` array —
+  // that was already correct, just not routed through a real endpoint. This moves the same numbers
+  // server-side per TODO.md's checklist; it's a parity swap, not a behavior fix.
+  async loadCounts() {
+    try {
+      const r = await fetch('/api/counts');
+      if (r.ok) this.setState({ counts: await r.json() });
+    } catch { /* server not reachable yet */ }
+  }
+  async loadUploads() {
+    try {
+      const r = await fetch('/api/uploads');
+      if (r.ok) this.setState({ uploads: (await r.json()).items });
+    } catch { /* server not reachable yet */ }
+  }
 
   // ── Lifecycle ────────────────────────────────────────────────────────────
   // ponytail: this used to be defined but never called anywhere — nothing wired
@@ -381,6 +397,8 @@ export default class App extends ReactComponent<Record<string, never>, AnyState>
     this.loadKey();
     this.loadProjects();
     this.loadGenerations();
+    this.loadCounts();
+    this.loadUploads();
     window.addEventListener('paste', this.onPaste);
     this.onNet = () => { const on = navigator.onLine !== false; if (on === this.state.online) return; this.setState({ online: on }); if (on) this.notify('Back online', { kind: 'info' }); };
     window.addEventListener('online', this.onNet); window.addEventListener('offline', this.onNet);
@@ -510,6 +528,7 @@ export default class App extends ReactComponent<Record<string, never>, AnyState>
     if (rl) return { reason: 'Rate limited · ' + this.clock(rl), title: 'Higgsfield is limiting requests from this key' };
     if (!s.hasKey) return { reason: 'Connect key', title: 'Connect your Higgsfield API key to generate', action: () => this.setState({ modal: 'connect', keyInput: '', keyErr: '', replacing: false, popover: null }) };
     if (!s.catalog) return { reason: s.catalogErr ? 'Models unavailable' : 'Loading models', title: s.catalogErr ? "Couldn't load the model list. Reload to try again." : 'Loading the model list…' };
+    if (s.refs.start?.uploading || s.refs.end?.uploading || s.refs.list.some((x: any) => x.uploading)) return { reason: 'Uploading…', title: 'Waiting for a reference to finish uploading' };
     if (!s.prompt.trim()) return { reason: 'Add a prompt', title: 'Describe what you want to make' };
     return null;
   }
@@ -518,7 +537,7 @@ export default class App extends ReactComponent<Record<string, never>, AnyState>
     if (b) { if (b.action) b.action(); return; }
     if (this.runGen({ type: m, model: s.model[m], prompt: s.prompt.trim(), negative: s.negOn ? s.negPrompt.trim() : '', ratio: s.ratio[m], res: s.res[m], fmt: s.fmt[m], duration: s.duration, audio: s.audio, batch: s.batch, project: s.projectId,
       refs: [...(m === 'video' && s.refs.start ? [{ ...s.refs.start, kind: 'image', tag: 'Start' }] : []), ...(m === 'video' && s.refs.end ? [{ ...s.refs.end, kind: 'image', tag: 'End' }] : []),
-        ...s.refs.list.filter((x: any) => x.mode === m).map((x: any) => ({ url: x.url, kind: x.kind, name: x.name, tag: '' }))] })) this.setState({ prompt: '' });
+        ...s.refs.list.filter((x: any) => x.mode === m).map((x: any) => ({ url: x.url, kind: x.kind, name: x.name, tag: '', uploadId: x.uploadId }))] })) this.setState({ prompt: '' });
   };
   // Real submission below (server/src/routes/generations.ts). The synchronous guards stay up front so
   // `generate()`'s `if (this.runGen(p)) clearPrompt()` contract is unchanged; the network round trip
@@ -539,17 +558,13 @@ export default class App extends ReactComponent<Record<string, never>, AnyState>
   }
   async submitGen(tempId: string, p: AnyState) {
     try {
-      const fd = new FormData();
-      const refMeta: AnyState[] = [];
-      for (const r of p.refs || []) {
-        const blob = await fetch(r.url).then((x) => x.blob());
-        fd.append('files', blob, r.name || 'ref');
-        refMeta.push({ kind: r.kind, name: r.name, tag: r.tag || '' });
-      }
-      fd.append('refMeta', JSON.stringify(refMeta));
+      // Refs are already real by now (genBlock() blocks Generate while any are still uploading) —
+      // just an uploadId (library/composer-attached files) or a bare local url (an existing Assets
+      // output reused as a reference, from addRef()). The server resolves either to bytes and
+      // relays them through Higgsfield itself; no file bytes need to cross this request at all.
+      const jsonRefs = (p.refs || []).map((x: any) => (x.uploadId ? { uploadId: x.uploadId, kind: x.kind, tag: x.tag } : { url: x.url, kind: x.kind, name: x.name, tag: x.tag }));
       const { refs, ...meta } = p;
-      fd.append('meta', JSON.stringify(meta));
-      const r = await fetch('/api/generations', { method: 'POST', body: fd });
+      const r = await fetch('/api/generations', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ ...meta, refs: jsonRefs }) });
       const d = await r.json();
       if (!r.ok) {
         this.setState((s: AnyState) => ({ pending: s.pending.filter((x: any) => x.id !== tempId) }));
@@ -578,6 +593,7 @@ export default class App extends ReactComponent<Record<string, never>, AnyState>
       if (d.status === 'completed') {
         const ids = d.items.map((it: AnyState) => it.id); ids.forEach((x: string, i: number) => { this._fresh[x] = { d: i * 90 }; }); setTimeout(() => { ids.forEach((x: string) => delete this._fresh[x]); this.forceUpdate(); }, 6000);
         this.setState((s: AnyState) => ({ gens: [...s.gens, { ...p, id, t: d.t, items: d.items }], session: [id, ...s.session], walkResult: s.walkResult || s.walkGen }));
+        this.loadCounts();
       } else {
         this.setState((s: AnyState) => ({ failed: [{ ...p, id, t: Date.now(), err: d.error }, ...s.failed] }));
         this.toastMsg('A generation failed', 'error');
@@ -603,7 +619,7 @@ export default class App extends ReactComponent<Record<string, never>, AnyState>
         ...g,
         items: g.items.map((it: any) => { if (it.id !== id) return it; next = !it.fav; return { ...it, fav: next }; }),
       })),
-    }), () => this.persistFav([id], next));
+    }), () => { this.persistFav([id], next); this.loadCounts(); });
   }
   reuse(g: AnyState) {
     this.setState((s: AnyState) => ({
@@ -663,22 +679,59 @@ export default class App extends ReactComponent<Record<string, never>, AnyState>
     (s.uploads || []).forEach((u: any) => used.add(u.url));
     this._blobs.forEach((u) => { if (!used.has(u)) { URL.revokeObjectURL(u); this._blobs.delete(u); } });
   };
+  // Local-preview-only blob url while the real upload is in flight (see realUpload/swapUpload below)
+  // — revoked by sweepBlobs() once nothing references it anymore.
   uploadRec(f: File, now: number, i: number) {
     const kind = f.type.startsWith('video') ? 'video' : f.type.startsWith('audio') ? 'audio' : 'image';
-    return { id: 'up' + now.toString(36) + i + Math.random().toString(36).slice(2, 5), kind, name: f.name, url: this.blobUrl(f), size: f.size, t: now };
+    return { id: 'tmp' + now.toString(36) + i + Math.random().toString(36).slice(2, 5), kind, name: f.name, url: this.blobUrl(f), size: f.size, t: now, uploading: true, _file: f };
+  }
+  // POST /api/uploads with the real bytes; w/h/dur come from the client's own imgDims()/mediaMeta()
+  // read of the (already-created) preview blob url — no image/video processing library needed
+  // server-side just to re-derive them. Returns the real record, or null on failure.
+  async realUpload(rec: AnyState): Promise<AnyState | null> {
+    const meta = await mediaMeta(rec.url, rec.kind).catch(() => null);
+    const fd = new FormData();
+    fd.append('file', rec._file, rec.name);
+    if (meta?.w) fd.append('w', String(meta.w));
+    if (meta?.h) fd.append('h', String(meta.h));
+    if (meta?.dur) fd.append('dur', String(meta.dur));
+    try {
+      const r = await fetch('/api/uploads', { method: 'POST', body: fd });
+      return r.ok ? await r.json() : null;
+    } catch { return null; }
+  }
+  // Swaps a temp (uploading) record for its real server record everywhere it might appear: the
+  // Uploads library list, and any of refs.start/end/list that referenced it by tmpId. null `real`
+  // means the upload failed — the temp record/ref is dropped instead.
+  swapUpload(tempId: string, real: AnyState | null) {
+    this.setState((st: AnyState) => {
+      const fix = (x: any) => (x && x.tmpId === tempId ? (real ? { url: real.url, name: real.name, uploadId: real.id } : null) : x);
+      return {
+        uploads: real ? st.uploads.map((u: any) => (u.id === tempId ? real : u)) : st.uploads.filter((u: any) => u.id !== tempId),
+        refs: {
+          start: fix(st.refs.start), end: fix(st.refs.end),
+          list: st.refs.list
+            .map((x: any) => (x.tmpId === tempId ? (real ? { ...x, url: real.url, uploadId: real.id, uploading: false, tmpId: undefined } : null) : x))
+            .filter(Boolean),
+        },
+      };
+    }, () => { this.sweepBlobs(); if (!real) this.toastMsg('A reference failed to upload', 'error'); });
   }
   addFiles(files: File[], k?: string) {
     let skipped = 0;
     const s = this.state, m = s.mode, now = Date.now(), r = { ...s.refs, list: [...s.refs.list] }, recs: AnyState[] = [];
-    if (k === 'start' || k === 'end') { const rec = this.uploadRec(files[0], now, 0); recs.push(rec); r[k] = { url: rec.url, name: rec.name }; }
+    if (k === 'start' || k === 'end') { const rec = this.uploadRec(files[0], now, 0); recs.push(rec); r[k] = { url: rec.url, name: rec.name, uploading: true, tmpId: rec.id }; }
     else files.forEach((f, i) => {
       const kind = k || (f.type.startsWith('video') ? 'video' : f.type.startsWith('audio') ? 'audio' : 'image');
       if (m === 'image' && kind !== 'image') { skipped++; return; }
       if (r.list.filter((x: any) => x.mode === m && x.kind === kind).length >= MAX_REFS) { skipped++; return; }
       const rec = this.uploadRec(f, now, i); recs.push(rec);
-      r.list.push({ id: Math.random().toString(36).slice(2), mode: m, kind, url: rec.url, name: f.name });
+      r.list.push({ id: Math.random().toString(36).slice(2), mode: m, kind, url: rec.url, name: f.name, uploading: true, tmpId: rec.id });
     });
-    this.setState((st: AnyState) => ({ refs: r, uploads: [...recs, ...st.uploads] }), () => { this.fillMeta(recs); this.sweepBlobs(); if (skipped) this.toastMsg(`Skipped ${skipped} file${skipped > 1 ? 's' : ''}: ${this.state.mode === 'image' ? 'up to 10 images' : 'up to 10 of each type'}`, 'error'); });
+    this.setState((st: AnyState) => ({ refs: r, uploads: [...recs, ...st.uploads] }), () => {
+      if (skipped) this.toastMsg(`Skipped ${skipped} file${skipped > 1 ? 's' : ''}: ${this.state.mode === 'image' ? 'up to 10 images' : 'up to 10 of each type'}`, 'error');
+      recs.forEach((rec) => this.realUpload(rec).then((real) => this.swapUpload(rec.id, real)));
+    });
   }
   pendingKind?: string;
   pick(kind: string) {
@@ -717,20 +770,20 @@ export default class App extends ReactComponent<Record<string, never>, AnyState>
       })();
     }
   }
-  async fillMeta(recs: AnyState[]) {
-    if (!recs.length) return;
-    const metas = await Promise.all(recs.map((r) => mediaMeta(r.url, r.kind))), by = new Map(recs.map((r, i) => [r.id, metas[i]]));
-    this.setState((st: AnyState) => ({ uploads: st.uploads.map((u: any) => (by.get(u.id) ? { ...u, ...by.get(u.id) } : u)) }));
-  }
   libraryUpload(files: File[]) {
     const ok = files.filter((f) => /^(image|video|audio)\//.test(f.type)), skipped = files.length - ok.length;
     if (skipped) this.toastMsg(`Skipped ${skipped} file${skipped > 1 ? 's' : ''}: only images, videos and audio`, 'error');
     if (!ok.length) return;
     const now = Date.now(), recs = ok.map((f, i) => this.uploadRec(f, now, i)), ids = new Set(recs.map((r) => r.id));
-    this.setState((st: AnyState) => ({ uploads: [...recs, ...st.uploads], upType: 'all', upUse: 'all', upQ: '', upSort: 'new' }));
-    this.fillMeta(recs);
+    this.setState((st: AnyState) => ({ uploads: [...recs, ...st.uploads], upType: 'all', upUse: 'all', upQ: '', upSort: 'new' }), () => {
+      recs.forEach((rec) => this.realUpload(rec).then((real) => this.swapUpload(rec.id, real)));
+    });
     const n = recs.length;
-    this.notify(`Uploaded ${n} file${n > 1 ? 's' : ''} · ${this.fmtSize(recs.reduce((a, r) => a + r.size, 0))}`, { undo: () => this.setState((st: AnyState) => ({ uploads: st.uploads.filter((u: any) => !ids.has(u.id)) })) });
+    // ponytail: undo here only removes local state — if a file already finished uploading by the
+    // time undo is clicked, its real row/file stays on the server (same as any other orphaned-but-
+    // harmless unused upload; the existing "select unused" cleanup catches it). TODO.md's undo ask
+    // was specifically about DELETE (see deleteUploads), not this.
+    this.notify(`Uploading ${n} file${n > 1 ? 's' : ''} · ${this.fmtSize(recs.reduce((a, r) => a + r.size, 0))}`, { undo: () => this.setState((st: AnyState) => ({ uploads: st.uploads.filter((u: any) => !ids.has(u.id)) })) });
   }
   useUploads(ids: string[]) {
     const s = this.state, ups = s.uploads.filter((u: any) => ids.includes(u.id) && u.url);
@@ -740,7 +793,7 @@ export default class App extends ReactComponent<Record<string, never>, AnyState>
     ups.forEach((u: any) => {
       if (list.some((x: any) => x.mode === m && x.url === u.url)) return;
       if (list.filter((x: any) => x.mode === m && x.kind === u.kind).length >= MAX_REFS) { skipped++; return; }
-      list.push({ id: Math.random().toString(36).slice(2), mode: m, kind: u.kind, url: u.url, name: u.name }); added++;
+      list.push({ id: Math.random().toString(36).slice(2), mode: m, kind: u.kind, url: u.url, name: u.name, uploadId: u.id }); added++;
     });
     this.setState({ refs: { ...s.refs, list }, mode: m, view: 'create', projectId: null, upSelect: false, upSel: [], upPv: null, popover: null });
     if (added) this.notify(`Added ${added} reference${added > 1 ? 's' : ''}${skipped ? ` · skipped ${skipped} (10 of each type max)` : ''}`);
@@ -756,8 +809,15 @@ export default class App extends ReactComponent<Record<string, never>, AnyState>
       refs: { start: keep(st.refs.start), end: keep(st.refs.end), list: st.refs.list.filter((x: any) => !urls.has(x.url)) },
       gens: aids.size ? st.gens.filter((g: any) => !aids.has(g.id)) : st.gens, session: st.session.filter((id: string) => !aids.has(id)) }));
     clearTimeout(this._sweepT); this._sweepT = setTimeout(this.sweepBlobs, 10000);
+    // Real delete waits out the undo window instead of happening immediately (TODO.md's second
+    // option) — clicking undo within ~10s just restores local state and never touches the server.
+    const delIds = [...del];
+    const delTimer = setTimeout(() => {
+      fetch('/api/uploads', { method: 'DELETE', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ ids: delIds }) })
+        .then(() => this.loadCounts()).catch(() => {});
+    }, 10000);
     const n = ups.length;
-    this.notify(`Deleted ${n} upload${n > 1 ? 's' : ''} · ${this.fmtSize(ups.reduce((a: number, u: any) => a + (u.size || 0), 0))} freed`, { kind: 'delete', undo: () => this.restore(sn) });
+    this.notify(`Deleted ${n} upload${n > 1 ? 's' : ''} · ${this.fmtSize(ups.reduce((a: number, u: any) => a + (u.size || 0), 0))} freed`, { kind: 'delete', undo: () => { clearTimeout(delTimer); this.restore(sn); } });
   }
   upStep(d: number) { const l = this._upIds || [], i = l.indexOf(this.state.upPv), n = l[i + d]; if (i >= 0 && n) this.setState({ upPv: n }); }
   upZip(ids: string[]) { this.zipUrls(this.state.uploads.filter((u: any) => ids.includes(u.id) && u.url).map((u: any) => ({ url: u.url, name: u.name })), 'studio-uploads'); }
@@ -819,8 +879,8 @@ export default class App extends ReactComponent<Record<string, never>, AnyState>
   bulkItems(ids: string[]) { const set = new Set(ids), out: AnyState[] = []; this.state.gens.forEach((g: any) => g.items.forEach((it: any) => { if (set.has(it.id)) out.push({ it, g }); })); return out; }
   bulkFav(ids: string[], on: boolean) {
     const set = new Set(ids), n = ids.length, sn = this.snap();
-    this.setState((s: AnyState) => ({ gens: s.gens.map((g: any) => ({ ...g, items: g.items.map((it: any) => (set.has(it.id) ? { ...it, fav: on } : it)) })), selected: s.view === 'favorites' && !on ? [] : s.selected }), () => this.persistFav(ids, on));
-    this.notify(`${n} ${n > 1 ? 'items' : 'item'} ${on ? 'added to' : 'removed from'} Favorites`, { undo: () => { this.restore(sn); this.persistFav(ids, !on); } });
+    this.setState((s: AnyState) => ({ gens: s.gens.map((g: any) => ({ ...g, items: g.items.map((it: any) => (set.has(it.id) ? { ...it, fav: on } : it)) })), selected: s.view === 'favorites' && !on ? [] : s.selected }), () => { this.persistFav(ids, on); this.loadCounts(); });
+    this.notify(`${n} ${n > 1 ? 'items' : 'item'} ${on ? 'added to' : 'removed from'} Favorites`, { undo: () => { this.restore(sn); this.persistFav(ids, !on); this.loadCounts(); } });
   }
   bulkMove(ids: string[], pid: string | null) {
     const set = new Set(ids), n = ids.length, sn = this.snap();
@@ -884,14 +944,19 @@ export default class App extends ReactComponent<Record<string, never>, AnyState>
   api = {
     // TODO(models): FIX LATER. GET /api/models (proxied from Higgsfield), see TODO.md.
     listModels: async () => { await wait(250); return PLACEHOLDER_CATALOG; },
-    // TODO(backend): GET /api/assets?view&type&model&project&fav&ratio&sort&q&cursor&limit
     listAssets: async (p: AnyState) => {
-      await wait(p.cursor ? 380 : 220);
-      const all = this.queryAssets(p), start = p.cursor ? Number(p.cursor) : 0, end = start + p.limit;
-      return { ids: all.slice(start, end).map((x) => x.it.id), nextCursor: end < all.length ? String(end) : null, total: all.length };
+      const qs = new URLSearchParams({ view: p.view, fType: p.fType, fModel: p.fModel, fProject: p.fProject, fFav: p.fFav, fRatio: p.fRatio, sort: p.sort, q: p.q || '', limit: String(p.limit) });
+      if (p.cursor) qs.set('cursor', p.cursor);
+      const r = await fetch(`/api/assets?${qs}`);
+      if (!r.ok) throw new Error('listAssets failed');
+      return r.json();
     },
-    // TODO(backend): GET /api/assets/ids?<same filters> (powers "Select all N")
-    listAssetIds: async (p: AnyState) => { await wait(120); return this.queryAssets(p).map((x) => x.it.id); },
+    listAssetIds: async (p: AnyState) => {
+      const qs = new URLSearchParams({ view: p.view, fType: p.fType, fModel: p.fModel, fProject: p.fProject, fFav: p.fFav, fRatio: p.fRatio, sort: p.sort, q: p.q || '' });
+      const r = await fetch(`/api/assets/ids?${qs}`);
+      if (!r.ok) throw new Error('listAssetIds failed');
+      return r.json();
+    },
   };
   loadCatalog() {
     this.api.listModels().then((c) => this.setState((s: AnyState) => {
@@ -907,19 +972,6 @@ export default class App extends ReactComponent<Record<string, never>, AnyState>
     return (p.fType === 'all' || g.type === p.fType) && (p.fModel === 'all' || g.model === p.fModel) && (p.fProject === 'all' || this.projOf(g, it) === p.fProject)
       && (p.fFav === 'all' || (p.fFav === 'fav' ? it.fav : !it.fav)) && (p.fRatio === 'all' || g.ratio === p.fRatio)
       && (!qt.length || qt.every((w) => (g.prompt || '').toLowerCase().includes(w)));
-  }
-  queryAssets(p: AnyState) {
-    const qt = terms(p.q), out: AnyState[] = [];
-    this.state.gens.forEach((g: any) => g.items.forEach((it: any) => { if (this.assetMatch({ it, g }, p, qt)) out.push({ it, g }); }));
-    const byStr = (a: string, b: string) => (a || '￿').localeCompare(b || '￿');
-    const cmp: Record<string, (x: AnyState, y: AnyState) => number> = {
-      new: (x, y) => y.g.t - x.g.t, old: (x, y) => x.g.t - y.g.t,
-      fav: (x, y) => (y.it.fav - x.it.fav) || y.g.t - x.g.t,
-      model: (x, y) => byStr(this.modelName(x.g.model), this.modelName(y.g.model)) || y.g.t - x.g.t,
-      project: (x, y) => byStr(this.projName(this.projOf(x.g, x.it)), this.projName(this.projOf(y.g, y.it))) || y.g.t - x.g.t,
-      type: (x, y) => byStr(x.g.type, y.g.type) || y.g.t - x.g.t,
-    };
-    return out.sort(p.view === 'favorites' ? cmp.new : (cmp[p.sort] || cmp.new));
   }
   gridKey(s: AnyState) { return s.view === 'assets' || s.view === 'favorites' ? JSON.stringify(this.gridParams(s)) : ''; }
   resetGrid() {
@@ -1231,7 +1283,6 @@ export default class App extends ReactComponent<Record<string, never>, AnyState>
     const byId = this.memo('byId', [flat], () => new Map(flat.map((x: any) => [x.it.id, x])));
     const gp = this.gridParams(s), gqt = terms(gp.q);
     const gridList = this.memo('gridList', [byId, s.gridIds, s.view, s.fType, s.fModel, s.fProject, s.fFav, s.fRatio, s.qd], () => s.gridIds.map((id: string) => byId.get(id)).filter((x: any) => x && this.assetMatch(x, gp, gqt)));
-    const favs = this.memo('favs', [flat], () => flat.filter((x: any) => x.it.fav));
     this._lists = this.memo('lists', [feedIds, gridList, s.view], () => ({ feed: feedIds, assets: isAssets ? gridList.map((a: any) => a.it.id) : [], favorites: isFavorites ? gridList.map((a: any) => a.it.id) : [] }));
     const gridIds = gridList.map((x: any) => x.it.id);
     const liveTotal = Math.max(gridList.length, s.gridTotal - (s.gridIds.length - gridList.length));
@@ -1267,7 +1318,7 @@ export default class App extends ReactComponent<Record<string, never>, AnyState>
       };
     }
 
-    const projCount = (pid: string) => flat.filter(({ it, g }: AnyState) => this.projOf(g, it) === pid).length;
+    const projCount = (pid: string) => s.counts.projects[pid] || 0;
     const crumb = s.view === 'create' ? (s.projectId ? this.projName(s.projectId) : 'Create') : isAssets ? 'Assets' : isFavorites ? 'Favorites' : s.view === 'uploads' ? 'Uploads' : 'Settings';
     const upBytes = s.uploads.reduce((a: number, u: any) => a + (u.size || 0), 0);
     const headerMeta = (isAssets || isFavorites) ? (s.gridBoot ? '' : liveTotal + (liveTotal === 1 ? ' item' : ' items')) : s.view === 'uploads' ? `${s.uploads.length} file${s.uploads.length === 1 ? '' : 's'} · ${this.fmtSize(upBytes)}` : '';
@@ -1278,8 +1329,8 @@ export default class App extends ReactComponent<Record<string, never>, AnyState>
     const kindCount = (k: string) => modeRefs.filter((x: any) => x.kind === k).length;
     const rm = (id: string) => () => this.setState((st: AnyState) => ({ refs: { ...st.refs, list: st.refs.list.filter((y: any) => y.id !== id) } }), this.sweepBlobs);
     const refChips = [
-      ...(isVideo && s.refs.start ? [{ id: 'start', isImage: true, url: s.refs.start.url, tag: 'Start', tagTip: TAG_TIPS.Start, onRemove: () => this.setState((st: AnyState) => ({ refs: { ...st.refs, start: null } }), this.sweepBlobs) }] : []),
-      ...(isVideo && s.refs.end ? [{ id: 'end', isImage: true, url: s.refs.end.url, tag: 'End', tagTip: TAG_TIPS.End, onRemove: () => this.setState((st: AnyState) => ({ refs: { ...st.refs, end: null } }), this.sweepBlobs) }] : []),
+      ...(isVideo && s.refs.start ? [{ id: 'start', isImage: true, url: s.refs.start.url, tag: 'Start', tagTip: TAG_TIPS.Start, uploading: !!s.refs.start.uploading, onRemove: () => this.setState((st: AnyState) => ({ refs: { ...st.refs, start: null } }), this.sweepBlobs) }] : []),
+      ...(isVideo && s.refs.end ? [{ id: 'end', isImage: true, url: s.refs.end.url, tag: 'End', tagTip: TAG_TIPS.End, uploading: !!s.refs.end.uploading, onRemove: () => this.setState((st: AnyState) => ({ refs: { ...st.refs, end: null } }), this.sweepBlobs) }] : []),
       ...modeRefs.map((x: any) => ({ ...x, isImage: x.kind === 'image', isVideo: x.kind === 'video', isAudio: x.kind === 'audio', thumb: x.kind === 'video' ? x.url + '#t=0.1' : x.url, tag: '', onRemove: rm(x.id) })),
     ].map((r: any) => ({ ...r, bg: r.isImage && r.url ? `url("${r.url}")` : 'none' }));
 
@@ -1298,11 +1349,11 @@ export default class App extends ReactComponent<Record<string, never>, AnyState>
       toggleCollapse: () => { const c = !s.collapsed; try { localStorage.setItem('studio.sidebarCollapsed', c ? '1' : '0'); } catch { /* ignore */ } this.setState({ collapsed: c, popover: null }); },
       nav: { create: navS(s.view === 'create' && !s.projectId), assets: navS(isAssets), favorites: navS(isFavorites), uploads: navS(s.view === 'uploads'), settings: navS(s.view === 'settings') },
       goCreate: go('create'), goAssets: go('assets'), goFavorites: go('favorites'), goUploads: go('uploads'), goSettings: go('settings'),
-      assetTotal: flat.length, favTotal: favs.length, upTotal: s.uploads.length,
+      assetTotal: s.counts.assets, favTotal: s.counts.favorites, upTotal: s.counts.uploads,
       projectsChevron: s.projectsOpen ? 0 : -90, toggleProjects: set({ projectsOpen: !s.projectsOpen }), showProjects: s.collapsed || s.projectsOpen,
-      projectItems: s.projects.map((p: any) => this.memo('pr:' + p.id, [p, s.gens, expanded, s.projHover === p.id, s.popover === 'proj:' + p.id, s.view === 'create' && s.projectId === p.id, s.projDrop && s.projDrop.id === p.id ? s.projDrop.pos : null, s.assetDrag > 0, s.projDragId === p.id], () => {
+      projectItems: s.projects.map((p: any) => this.memo('pr:' + p.id, [p, s.gens, s.counts, expanded, s.projHover === p.id, s.popover === 'proj:' + p.id, s.view === 'create' && s.projectId === p.id, s.projDrop && s.projDrop.id === p.id ? s.projDrop.pos : null, s.assetDrag > 0, s.projDragId === p.id], () => {
         const menuOpen = s.popover === 'proj:' + p.id, showMore = expanded && (s.projHover === p.id || menuOpen);
-        const count = s.gens.reduce((n: number, g: any) => n + g.items.filter((it: any) => this.projOf(g, it) === p.id).length, 0);
+        const count = s.counts.projects[p.id] || 0;
         const dp = s.projDrop && s.projDrop.id === p.id ? s.projDrop.pos : null, nv = navS(s.view === 'create' && s.projectId === p.id);
         return { name: p.name, emoji: p.emoji || '', noEmoji: !p.emoji, count, showCount: !showMore && count > 0, expanded, showMore, menuOpen, padR: showMore ? 20 : 0, ...nv,
           ...(dp === 'into' ? { bg: 'color-mix(in srgb, var(--accent) 14%, transparent)', color: 'var(--text)' } : {}),
@@ -1846,6 +1897,7 @@ export default class App extends ReactComponent<Record<string, never>, AnyState>
                           </div>
                         )}
                         {r.tag && <span title={r.tagTip} style={css('position:absolute;left:4px;bottom:4px;font-size:9.5px;padding:1px 4px;border-radius:3px;background:rgba(0,0,0,.6);color:#fff;cursor:help')}>{r.tag}</span>}
+                        {r.uploading && <div title="Uploading…" style={css('position:absolute;inset:0;border-radius:8px;display:flex;align-items:center;justify-content:center;background:rgba(0,0,0,.45);color:#fff')}>{this.spinner()}</div>}
                         <button onClick={r.onRemove} title="Remove" style={css('position:absolute;top:-5px;right:-5px;width:16px;height:16px;display:flex;align-items:center;justify-content:center;border:1px solid var(--border2);border-radius:50%;background:var(--raised);color:var(--text2);cursor:pointer;padding:0')}>
                           <svg width="8" height="8" viewBox="0 0 24 24" style={css('fill:none;stroke:currentColor;stroke-width:3;stroke-linecap:round')}><path d="M18 6L6 18M6 6l12 12" /></svg>
                         </button>

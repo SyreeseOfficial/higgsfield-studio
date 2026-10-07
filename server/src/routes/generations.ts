@@ -1,15 +1,28 @@
 import { Router } from "express";
-import multer from "multer";
-import { mkdirSync, writeFileSync } from "node:fs";
+import { mkdirSync, writeFileSync, readFileSync } from "node:fs";
 import { dirname } from "node:path";
 import { db } from "../db.js";
 import { readStoredKey } from "./key.js";
 import { createMany, getStatus, cancelRequest, uploadFile, ERR_CONCURRENCY, type RefInput, type ErrShape } from "../higgsfield.js";
 
 export const generationsRouter = Router();
-const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 50 * 1024 * 1024 } });
 
 const MEDIA_DIR = new URL("../../data/media/", import.meta.url).pathname;
+
+const EXT_MIME: Record<string, string> = {
+  jpg: "image/jpeg", jpeg: "image/jpeg", png: "image/png", webp: "image/webp", gif: "image/gif",
+  mp4: "video/mp4", webm: "video/webm", mov: "video/quicktime",
+  mp3: "audio/mpeg", wav: "audio/wav", m4a: "audio/mp4", ogg: "audio/ogg",
+};
+
+/** Reads a local /media/... url straight off disk — both uploads and saved generation outputs
+ * live under MEDIA_DIR, so there's no need for a self HTTP round trip to fetch our own files. */
+function readLocalMedia(url: string): { buffer: Buffer; contentType: string } {
+  const rel = url.replace(/^\/media\//, "");
+  const path = `${MEDIA_DIR}${rel}`;
+  const ext = path.split(".").pop()?.toLowerCase() || "";
+  return { buffer: readFileSync(path), contentType: EXT_MIME[ext] || "application/octet-stream" };
+}
 
 type GenRow = {
   id: string; project: string | null; type: string; model: string; prompt: string; negative: string | null;
@@ -17,11 +30,11 @@ type GenRow = {
   status: string; error_title: string | null; error_detail: string | null; created_at: number;
 };
 type ItemRow = { id: string; generation_id: string; hf_request_id: string | null; seed: string; status: string; url: string | null; fav: number };
-type RefRow = { generation_id: string; url: string; kind: string; name: string | null; tag: string | null };
+type RefRow = { generation_id: string; url: string; kind: string; name: string | null; tag: string | null; upload_id: string | null };
 
 function fullGen(row: GenRow) {
   const items = db.prepare("SELECT * FROM items WHERE generation_id = ?").all(row.id) as ItemRow[];
-  const refs = db.prepare("SELECT url, kind, name, tag FROM generation_refs WHERE generation_id = ?").all(row.id) as RefRow[];
+  const refs = db.prepare("SELECT url, kind, name, tag, upload_id FROM generation_refs WHERE generation_id = ?").all(row.id) as RefRow[];
   return {
     id: row.id, project: row.project, type: row.type, model: row.model, prompt: row.prompt, negative: row.negative || "",
     ratio: row.ratio, res: row.res, fmt: row.fmt, duration: row.duration, audio: !!row.audio, batch: row.batch,
@@ -36,32 +49,45 @@ generationsRouter.get("/", (_req, res) => {
   res.json(rows.map(fullGen));
 });
 
-generationsRouter.post("/", upload.array("files"), async (req, res) => {
+type RefInputBody = { uploadId?: string; url?: string; kind: string; tag?: string; name?: string };
+
+generationsRouter.post("/", async (req, res) => {
   const cred = readStoredKey();
   if (!cred) return res.status(401).json({ error: { title: "Connect your API key", detail: "Connect a Higgsfield API key in Settings before generating." } });
 
-  let meta: any, refMeta: { kind: string; name: string; tag?: string }[];
-  try {
-    meta = JSON.parse(String(req.body?.meta ?? "{}"));
-    refMeta = JSON.parse(String(req.body?.refMeta ?? "[]"));
-  } catch {
-    return res.status(400).json({ error: { title: "Bad request", detail: "Malformed generation payload." } });
-  }
+  const meta: any = req.body || {};
   const batch = Math.max(1, Math.min(10, Number(meta.batch) || 1));
-  const files = (req.files as Express.Multer.File[] | undefined) || [];
+  const refInputs: RefInputBody[] = Array.isArray(meta.refs) ? meta.refs : [];
 
-  // Upload any attached references to Higgsfield first — their endpoints need a URL they can fetch,
-  // and nothing here is reachable from outside this machine.
-  let refs: RefInput[] = [];
+  // Refs arrive as either an uploadId (from the Uploads library / a fresh composer attach, which
+  // now always lands in the uploads table first) or a bare local url (reusing an existing Assets
+  // output as a reference). Resolve both to a LOCAL, persistent url + bytes: the local url is what
+  // we store and show the user (so a lightbox/composer chip survives a refresh and doesn't depend
+  // on Higgsfield's ephemeral hosting), the bytes get relayed through Higgsfield's presigned upload
+  // flow (uploadFile) purely to get something *their* generation endpoints can fetch for this one
+  // request — that result is never persisted.
+  let resolvedRefs: { url: string; kind: string; name: string | null; tag: string | null; uploadId: string | null }[];
+  let hfRefs: RefInput[];
   try {
-    refs = await Promise.all(
-      files.map(async (f, i) => ({ url: await uploadFile(cred, f.buffer, f.mimetype), kind: refMeta[i]?.kind || "image", tag: refMeta[i]?.tag }))
-    );
+    resolvedRefs = refInputs.map((r) => {
+      if (r.uploadId) {
+        const row = db.prepare("SELECT path, name FROM uploads WHERE id = ?").get(r.uploadId) as { path: string; name: string } | undefined;
+        if (!row) throw new Error("upload not found");
+        return { url: `/media/uploads/${row.path.split("/").pop()}`, kind: r.kind, name: row.name, tag: r.tag || null, uploadId: r.uploadId };
+      }
+      if (r.url) return { url: r.url, kind: r.kind, name: r.name || null, tag: r.tag || null, uploadId: null };
+      throw new Error("ref needs uploadId or url");
+    });
+    hfRefs = await Promise.all(resolvedRefs.map(async (r) => {
+      const { buffer, contentType } = readLocalMedia(r.url);
+      const url = await uploadFile(cred, buffer, contentType);
+      return { url, kind: r.kind, tag: r.tag || undefined };
+    }));
   } catch {
-    return res.status(502).json({ error: { title: "Couldn't upload reference", detail: "Higgsfield didn't accept one of the attached files. Try again." } });
+    return res.status(502).json({ error: { title: "Couldn't attach reference", detail: "Higgsfield didn't accept one of the attached files. Try again." } });
   }
 
-  const job = { type: meta.type, model: meta.model, prompt: meta.prompt, negative: meta.negative, ratio: meta.ratio, res: meta.res, duration: meta.duration, audio: meta.audio, refs };
+  const job = { type: meta.type, model: meta.model, prompt: meta.prompt, negative: meta.negative, ratio: meta.ratio, res: meta.res, duration: meta.duration, audio: meta.audio, refs: hfRefs };
   const results = await createMany(cred, job, batch);
   const firstError = results.find((r) => "error" in r) as { error: ErrShape } | undefined;
   if (firstError) {
@@ -78,11 +104,13 @@ generationsRouter.post("/", upload.array("files"), async (req, res) => {
      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'pending', ?)`
   );
   const insertItem = db.prepare(`INSERT INTO items (id, generation_id, hf_request_id, seed, status) VALUES (?, ?, ?, ?, 'pending')`);
-  const insertRef = db.prepare(`INSERT INTO generation_refs (generation_id, url, kind, name, tag) VALUES (?, ?, ?, ?, ?)`);
+  const insertRef = db.prepare(`INSERT INTO generation_refs (generation_id, url, kind, name, tag, upload_id) VALUES (?, ?, ?, ?, ?, ?)`);
+  const insertFts = db.prepare(`INSERT INTO generations_fts (id, prompt) VALUES (?, ?)`);
   db.transaction(() => {
     insertGen.run(id, meta.project || null, meta.type, meta.model, meta.prompt, meta.negative || null, meta.ratio, meta.res || null, meta.fmt || null, meta.duration || null, meta.audio ? 1 : 0, batch, now);
     results.forEach((r, i) => insertItem.run(id + "-" + i, id, (r as { requestId: string }).requestId, id + "x" + i));
-    refs.forEach((r) => insertRef.run(id, r.url, r.kind, (r as any).name || null, r.tag || null));
+    resolvedRefs.forEach((r) => insertRef.run(id, r.url, r.kind, r.name, r.tag, r.uploadId));
+    insertFts.run(id, meta.prompt);
   })();
 
   res.json({ id });
@@ -136,6 +164,7 @@ generationsRouter.delete("/:id", async (req, res) => {
   db.transaction(() => {
     db.prepare("DELETE FROM items WHERE generation_id = ?").run(req.params.id);
     db.prepare("DELETE FROM generation_refs WHERE generation_id = ?").run(req.params.id);
+    db.prepare("DELETE FROM generations_fts WHERE id = ?").run(req.params.id);
     db.prepare("DELETE FROM generations WHERE id = ?").run(req.params.id);
   })();
   res.status(204).end();

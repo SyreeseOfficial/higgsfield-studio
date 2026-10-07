@@ -61,6 +61,34 @@ db.exec(`
     url TEXT NOT NULL,
     kind TEXT NOT NULL,
     name TEXT,
-    tag TEXT
+    tag TEXT,
+    upload_id TEXT
   );
+
+  CREATE TABLE IF NOT EXISTS uploads (
+    id TEXT PRIMARY KEY,
+    kind TEXT NOT NULL,
+    name TEXT NOT NULL,
+    size INTEGER NOT NULL,
+    w INTEGER,
+    h INTEGER,
+    dur INTEGER,
+    created_at INTEGER NOT NULL,
+    path TEXT NOT NULL
+  );
+
+  -- Standalone (not external-content) FTS5 index: no sync triggers to maintain, just insert
+  -- alongside each generation and delete alongside each delete. Good enough for prompt search
+  -- on a single-user local app.
+  CREATE VIRTUAL TABLE IF NOT EXISTS generations_fts USING fts5(id UNINDEXED, prompt);
 `);
+
+// Backfill rows inserted before this table existed (e.g. from earlier testing in dev).
+db.exec(`
+  INSERT INTO generations_fts (id, prompt)
+  SELECT id, prompt FROM generations WHERE id NOT IN (SELECT id FROM generations_fts)
+`);
+
+// generation_refs predates the upload_id column (added once uploads got their own table) —
+// CREATE TABLE IF NOT EXISTS won't retrofit it onto an already-existing table.
+try { db.exec(`ALTER TABLE generation_refs ADD COLUMN upload_id TEXT`); } catch { /* already there */ }
