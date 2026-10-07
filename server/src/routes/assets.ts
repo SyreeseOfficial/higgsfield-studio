@@ -95,11 +95,12 @@ countsRouter.get("/", (_req, res) => {
     `SELECT COUNT(*) AS n FROM items JOIN generations ON generations.id = items.generation_id WHERE generations.status = 'completed' AND items.fav = 1`
   ).get() as { n: number }).n;
   const uploads = (db.prepare(`SELECT COUNT(*) AS n FROM uploads`).get() as { n: number }).n;
+  const uploadBytes = (db.prepare(`SELECT COALESCE(SUM(size), 0) AS n FROM uploads`).get() as { n: number }).n;
   const projectRows = db.prepare(
     `SELECT generations.project AS pid, COUNT(*) AS n FROM items JOIN generations ON generations.id = items.generation_id
      WHERE generations.status = 'completed' AND generations.project IS NOT NULL GROUP BY generations.project`
   ).all() as { pid: string; n: number }[];
   const projects: Record<string, number> = {};
   projectRows.forEach((r) => { projects[r.pid] = r.n; });
-  res.json({ assets, favorites, uploads, projects });
+  res.json({ assets, favorites, uploads, uploadBytes, projects });
 });

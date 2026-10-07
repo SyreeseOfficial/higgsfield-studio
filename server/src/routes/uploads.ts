@@ -1,6 +1,7 @@
 import { Router } from "express";
 import multer from "multer";
 import { mkdirSync, writeFileSync, unlinkSync } from "node:fs";
+import { createHash } from "node:crypto";
 import { db } from "../db.js";
 
 export const uploadsRouter = Router();
@@ -11,13 +12,13 @@ mkdirSync(UPLOADS_DIR, { recursive: true });
 
 type UploadRow = {
   id: string; kind: string; name: string; size: number; w: number | null; h: number | null;
-  dur: number | null; created_at: number; path: string;
+  dur: number | null; created_at: number; path: string; hash: string | null;
 };
 
 function toJson(row: UploadRow, usage: number) {
   return {
     id: row.id, kind: row.kind, name: row.name, size: row.size, w: row.w, h: row.h, dur: row.dur,
-    t: row.created_at, url: `/media/uploads/${row.path.split("/").pop()}`, usage,
+    t: row.created_at, url: `/media/uploads/${row.path.split("/").pop()}`, usage, hash: row.hash,
   };
 }
 
@@ -29,6 +30,7 @@ uploadsRouter.post("/", upload.single("file"), (req, res) => {
   const ext = (f.originalname.split(".").pop() || "bin").toLowerCase().replace(/[^a-z0-9]/g, "") || "bin";
   const path = `${UPLOADS_DIR}${id}.${ext}`;
   writeFileSync(path, f.buffer);
+  const hash = createHash("sha256").update(f.buffer).digest("hex");
 
   // Dimensions/duration come from the client, which already computes them (imgDims()/mediaMeta())
   // before upload — no image/video processing library needed server-side just to re-derive them.
@@ -37,10 +39,10 @@ uploadsRouter.post("/", upload.single("file"), (req, res) => {
   const dur = req.body.dur ? Number(req.body.dur) : null;
   const created_at = Date.now();
 
-  db.prepare(`INSERT INTO uploads (id, kind, name, size, w, h, dur, created_at, path) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`)
-    .run(id, kind, f.originalname, f.size, w, h, dur, created_at, path);
+  db.prepare(`INSERT INTO uploads (id, kind, name, size, w, h, dur, created_at, path, hash) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`)
+    .run(id, kind, f.originalname, f.size, w, h, dur, created_at, path, hash);
 
-  res.json(toJson({ id, kind, name: f.originalname, size: f.size, w, h, dur, created_at, path }, 0));
+  res.json(toJson({ id, kind, name: f.originalname, size: f.size, w, h, dur, created_at, path, hash }, 0));
 });
 
 // ponytail: filters all in one query, then paginate in JS. The usage filter needs a HAVING clause

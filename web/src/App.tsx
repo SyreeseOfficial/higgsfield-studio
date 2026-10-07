@@ -50,21 +50,6 @@ const SAMPLES = {
     ['Dancer in white studio', 'Dancer spinning in an empty white studio, flowing fabric, camera orbiting slowly'],
   ],
 } as const;
-// TODO(models): FIX LATER. Stand-in for api.listModels() until GET /api/models
-// returns the real Higgsfield catalog + pricing (see TODO.md). Nothing else
-// should read this directly — delete once the real endpoint exists.
-const PLACEHOLDER_CATALOG = {
-  image: [
-    { id: 'soul', name: 'Higgsfield Soul', desc: 'Photoreal people and fashion', cost: { perOutput: 4 } },
-    { id: 'flux', name: 'Flux Pro', desc: 'Precise prompt adherence', cost: { perOutput: 4 } },
-    { id: 'seedream', name: 'Seedream 4.0', desc: 'High-resolution detail', cost: { perOutput: 4 } },
-  ],
-  video: [
-    { id: 'seedance', name: 'Seedance 2.0', desc: 'Cinematic motion, native audio', cost: { perOutput: 20 } },
-    { id: 'kling', name: 'Kling 2.5', desc: 'Realistic physics', cost: { perOutput: 20 } },
-    { id: 'wan', name: 'Wan 2.5', desc: 'Fast drafts', cost: { perOutput: 20 } },
-  ],
-};
 const RATIOS = { image: ['1:1', '3:4', '4:3', '9:16', '16:9', '21:9'], video: ['16:9', '9:16', '1:1', '4:3', '3:4', '21:9'] };
 const OPTS = { image: { res: ['1K', '2K', '4K'], fmt: ['PNG', 'JPG', 'WEBP'] }, video: { res: ['480p', '720p', '1080p'], fmt: ['MP4', 'WEBM', 'MOV'] } };
 const MAX_REFS = 10;
@@ -82,7 +67,6 @@ function loadDraft(): Record<string, unknown> {
 }
 function loadTheme(): 'dark' | 'light' { try { return localStorage.getItem('studio.theme') === 'light' ? 'light' : 'dark'; } catch { return 'dark'; } }
 function loadDefMode(): 'image' | 'video' { try { return localStorage.getItem('studio.defaultMode') === 'video' ? 'video' : DEFAULT_MODE; } catch { return DEFAULT_MODE; } }
-function wait(ms: number) { return new Promise((r) => setTimeout(r, ms)); }
 function zip(files: { name: Uint8Array; data: Uint8Array }[]): Blob {
   const T = Array.from({ length: 256 }, (_, n) => { let c = n; for (let k = 0; k < 8; k++) c = c & 1 ? 0xEDB88320 ^ (c >>> 1) : c >>> 1; return c >>> 0; });
   const crc = (d: Uint8Array) => { let c = 0xFFFFFFFF; for (let i = 0; i < d.length; i++) c = T[(c ^ d[i]) & 255] ^ (c >>> 8); return (c ^ 0xFFFFFFFF) >>> 0; };
@@ -163,7 +147,7 @@ export default class App extends ReactComponent<Record<string, never>, AnyState>
     duration: 5, audio: true, batch: 2,
     refs: { start: null, end: null, list: [] },
     projects: [] as unknown[],
-    counts: { assets: 0, favorites: 0, uploads: 0, projects: {} as Record<string, number> },
+    counts: { assets: 0, favorites: 0, uploads: 0, uploadBytes: 0, projects: {} as Record<string, number> },
     newEmoji: null,
     uploads: [] as unknown[],
     gens: [] as unknown[],
@@ -172,7 +156,7 @@ export default class App extends ReactComponent<Record<string, never>, AnyState>
     pending: [] as unknown[], feedShown: FEED_PAGE, hoverId: null, projHover: null, lightbox: null, lbSource: 'feed',
     fType: 'all', fModel: 'all', fProject: 'all', fFav: 'all', fRatio: 'all', q: '', projDrop: null, projDragId: null, assetDrag: 0, sort: 'new', newName: '', renameId: null,
     selectMode: false, selected: [] as string[], confirm: null, shortcuts: false, gridIds: [] as string[], gridCursor: null, gridTotal: 0, gridDone: false, gridLoading: false, gridBoot: true, qd: '', catalog: null, catalogErr: false,
-    upQ: '', upType: 'all', upUse: 'all', upSort: 'new', upSelect: false, upSel: [] as string[], upPv: null, upHover: null, zipping: false, toasts: [] as unknown[], dragging: false,
+    upQ: '', upType: 'all', upUse: 'all', upSort: 'new', upSelect: false, upSel: [] as string[], upPv: null, upHover: null, zipping: false, exporting: false, toasts: [] as unknown[], dragging: false,
     online: typeof navigator === 'undefined' ? true : navigator.onLine !== false, rateUntil: null, copied: null,
     ...loadDraft(),
   };
@@ -293,6 +277,21 @@ export default class App extends ReactComponent<Record<string, never>, AnyState>
   }
   setTheme(theme: string) { this.setState({ theme }); try { localStorage.setItem('studio.theme', theme); } catch { /* ignore */ } }
   setDefMode(mode: string) { this.setState({ defMode: mode }); try { localStorage.setItem('studio.defaultMode', mode); } catch { /* ignore */ } }
+  exportBackup = async () => {
+    if (this.state.exporting) return;
+    this.setState({ exporting: true });
+    try {
+      const r = await fetch('/api/export');
+      if (!r.ok) throw new Error('export failed');
+      const blob = await r.blob(), a = document.createElement('a');
+      a.href = URL.createObjectURL(blob); a.download = `studio-backup-${new Date().toISOString().slice(0, 10)}.zip`;
+      a.click(); URL.revokeObjectURL(a.href);
+    } catch {
+      this.toastMsg("Couldn't prepare the backup. Try again.", 'error');
+    } finally {
+      this.setState({ exporting: false });
+    }
+  };
   persistFav(ids: string[], fav: boolean) {
     fetch('/api/generations/items/fav', { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ ids, fav }) }).catch(() => {});
   }
@@ -303,7 +302,7 @@ export default class App extends ReactComponent<Record<string, never>, AnyState>
       const rows: AnyState[] = await r.json();
       const gens = rows.filter((g) => g.status === 'completed');
       const failed = rows.filter((g) => g.status === 'failed').map((g) => ({ ...g, err: g.error }));
-      const pending = rows.filter((g) => g.status === 'pending').map((g): AnyState => ({ ...g, t: g.t, dur: g.type === 'video' ? 60000 : 15000, cost: 0 }));
+      const pending = rows.filter((g) => g.status === 'pending').map((g): AnyState => ({ ...g, t: g.t, dur: g.type === 'video' ? 60000 : 15000 }));
       this.setState((s: AnyState) => ({ gens: [...s.gens, ...gens], failed: [...s.failed, ...failed], pending: [...s.pending, ...pending], session: [...gens.map((g) => g.id).reverse(), ...s.session] }));
       pending.forEach((g) => this.pollGen(g.id, g));
     } catch { /* server not reachable yet */ }
@@ -522,8 +521,7 @@ export default class App extends ReactComponent<Record<string, never>, AnyState>
 
   // ── Generation (real: server/src/routes/generations.ts) ─────────────────
   genBlock(): any {
-    const s = this.state, cost = this.costOf({ type: s.mode, model: s.model[s.mode], batch: s.batch }) ?? 0, rl = this.rateLeft();
-    void cost;
+    const s = this.state, rl = this.rateLeft();
     if (this.offline()) return { reason: 'Offline', title: "You're offline. Generate is paused until you reconnect." };
     if (rl) return { reason: 'Rate limited · ' + this.clock(rl), title: 'Higgsfield is limiting requests from this key' };
     if (!s.hasKey) return { reason: 'Connect key', title: 'Connect your Higgsfield API key to generate', action: () => this.setState({ modal: 'connect', keyInput: '', keyErr: '', replacing: false, popover: null }) };
@@ -547,12 +545,11 @@ export default class App extends ReactComponent<Record<string, never>, AnyState>
     if (this.offline()) { this.toastMsg("You're offline. Try again when you reconnect.", 'error'); return false; }
     if (this.rateLeft()) { this.toastMsg(`Rate limited. Try again in ${this.clock(this.rateLeft())}.`, 'error'); return false; }
     if (!ks.hasKey) { this.setState({ modal: 'connect', keyErr: '', popover: null, lightbox: null }); return false; }
-    const cost = this.costOf(p);
-    if (cost == null) { this.toastMsg("This model isn't available right now", 'error'); return false; }
+    if (!this.findModel(p.type, p.model)) { this.toastMsg("This model isn't available right now", 'error'); return false; }
     this.setState({ walkGen: true });
     const tempId = 'tmp' + Date.now() + Math.random().toString(36).slice(2, 5);
     const dur = (p.type === 'video' ? 60000 : 15000);
-    this.setState((s: AnyState) => ({ pending: [{ id: tempId, ...p, t: Date.now(), dur, cost }, ...s.pending], popover: null, view: 'create', lightbox: null }));
+    this.setState((s: AnyState) => ({ pending: [{ id: tempId, ...p, t: Date.now(), dur }, ...s.pending], popover: null, view: 'create', lightbox: null }));
     this.submitGen(tempId, p);
     return true;
   }
@@ -609,7 +606,7 @@ export default class App extends ReactComponent<Record<string, never>, AnyState>
     this.notify('Generation cancelled.', { kind: 'info' });
   }
   retryFailed(f: AnyState) {
-    const { id, err, cost, ...rest } = f; const p = { ...rest };
+    const { id, err, ...rest } = f; const p = { ...rest };
     if (this.runGen(p)) this.setState((s: AnyState) => ({ failed: s.failed.filter((x: any) => x.id !== id) }));
   }
   toggleFav(id: string) {
@@ -896,7 +893,7 @@ export default class App extends ReactComponent<Record<string, never>, AnyState>
   rerunPlan(sel: AnyState[]) {
     const by = new Map<string, AnyState>(); sel.forEach(({ g }) => { if (!g.uploaded) by.set(g.id, { g, n: (by.get(g.id)?.n || 0) + 1 }); });
     const runs = [...by.values()].map(({ g, n }) => ({ ...this.fields(g), batch: Math.min(4, n), project: g.project, refs: g.refs || [] }));
-    return { runs, cost: runs.reduce((c, r) => c + (this.costOf(r) || 0), 0) };
+    return { runs };
   }
   bulkRerun(sel: AnyState[]) {
     const { runs } = this.rerunPlan(sel), s = this.state;
@@ -942,8 +939,11 @@ export default class App extends ReactComponent<Record<string, never>, AnyState>
   // exception already wired to a real endpoint is the API key (see loadKey/
   // submitKey/removeKey above, backed by server/src/routes/key.ts).
   api = {
-    // TODO(models): FIX LATER. GET /api/models (proxied from Higgsfield), see TODO.md.
-    listModels: async () => { await wait(250); return PLACEHOLDER_CATALOG; },
+    listModels: async () => {
+      const r = await fetch('/api/models');
+      if (!r.ok) throw new Error('listModels failed');
+      return r.json();
+    },
     listAssets: async (p: AnyState) => {
       const qs = new URLSearchParams({ view: p.view, fType: p.fType, fModel: p.fModel, fProject: p.fProject, fFav: p.fFav, fRatio: p.fRatio, sort: p.sort, q: p.q || '', limit: String(p.limit) });
       if (p.cursor) qs.set('cursor', p.cursor);
@@ -965,7 +965,6 @@ export default class App extends ReactComponent<Record<string, never>, AnyState>
     })).catch(() => this.setState({ catalogErr: true }));
   }
   findModel(type: string, id: string): AnyState | null { const c = this.state.catalog; return c ? (c[type] || []).find((m: any) => m.id === id) : null; }
-  costOf(p: AnyState): number | null { const m = this.findModel(p.type, p.model); return m && m.cost ? p.batch * (m.cost.perOutput || 0) : null; }
   gridParams(s: AnyState = this.state) { return { view: s.view, fType: s.fType, fModel: s.fModel, fProject: s.fProject, fFav: s.fFav, fRatio: s.fRatio, sort: s.sort, q: s.qd }; }
   assetMatch({ it, g }: AnyState, p: AnyState, qt: string[]) {
     if (p.view === 'favorites') return !!it.fav;
@@ -1084,7 +1083,12 @@ export default class App extends ReactComponent<Record<string, never>, AnyState>
   };
   lbStep(d: number) {
     const s = this.state, list = this._lists[s.lbSource] || [], n = list[list.indexOf(s.lightbox) + d];
-    if (n) this.setState({ lightbox: n });
+    if (n) { this.setState({ lightbox: n }); return; }
+    // Assets/Favorites only keep whatever's been scrolled into view (gridIds) — stepping past the
+    // end of that means more exist on the server (gridDone false), not that this is the last item.
+    if (d > 0 && (s.lbSource === 'assets' || s.lbSource === 'favorites') && !s.gridDone && !s.gridLoading) {
+      this.fetchPage().then(() => this.lbStep(d));
+    }
   }
   itemMenu(it: AnyState, g: AnyState, src: string): AnyState[] {
     const s = this.state, close = (fn: () => void) => () => { this.setState({ popover: null }); fn(); };
@@ -1131,6 +1135,10 @@ export default class App extends ReactComponent<Record<string, never>, AnyState>
     const selSet = new Set(s.upSel), allSel = ids.length > 0 && ids.every((id: string) => selSet.has(id)), bytes = (arr: any[]) => arr.reduce((a, x) => a + ((x.u || x).size || 0), 0);
     const selUps = s.uploads.filter((u: any) => selSet.has(u.id)), hasSel = selUps.length > 0;
     const unused = all.filter((x: any) => !x.i.used), old = all.filter((x: any) => now - x.u.t > 30 * 86400000), big = all.filter((x: any) => (x.u.size || 0) > 25e6);
+    // Duplicate = same content hash. Keep the newest copy of each group, select the rest.
+    const byHash = new Map<string, AnyState[]>();
+    all.forEach((x: any) => { if (x.u.hash) { if (!byHash.has(x.u.hash)) byHash.set(x.u.hash, []); byHash.get(x.u.hash)!.push(x); } });
+    const dupes = [...byHash.values()].filter((g) => g.length > 1).flatMap((g) => g.sort((a, b) => b.u.t - a.u.t).slice(1));
     const pick = (arr: any[]) => () => this.setState({ upSelect: true, upSel: arr.map((x) => x.u.id), popover: null, upType: 'all', upUse: 'all', upQ: '' });
     const label = (x: any) => (x.i.gens.length ? `Used in ${x.i.gens.length}` : x.i.composer ? 'In composer' : x.i.asset ? 'In Assets' : 'Unused');
     const tiles = list.map((x: any) => {
@@ -1176,7 +1184,7 @@ export default class App extends ReactComponent<Record<string, never>, AnyState>
         { ...menu('upSort', 'Sort', [{ id: 'new', label: 'Newest first' }, { id: 'old', label: 'Oldest first' }, { id: 'large', label: 'Largest first' }, { id: 'name', label: 'Name (A–Z)' }], s.upSort), bg: 'transparent' }],
       filtersActive: filtered, clearFilters: set({ upQ: '', upType: 'all', upUse: 'all' }),
       cleanOpen: s.popover === 'upClean', cleanBg: s.popover === 'upClean' ? 'var(--active)' : 'transparent', cleanToggle: (e: any) => this.openPop('upClean', e, 'bottom-end'),
-      clean: ([['Select unused', unused], ['Select older than 30 days', old], ['Select larger than 25 MB', big]] as [string, any[]][]).map(([l, arr]) => ({ label: l, count: arr.length ? `${arr.length} · ${this.fmtSize(bytes(arr))}` : '0', op: arr.length ? 1 : 0.4, pe: arr.length ? 'auto' : 'none', onClick: pick(arr) })),
+      clean: ([['Select unused', unused], ['Select older than 30 days', old], ['Select larger than 25 MB', big], ['Select duplicates (keep newest)', dupes]] as [string, any[]][]).map(([l, arr]) => ({ label: l, count: arr.length ? `${arr.length} · ${this.fmtSize(bytes(arr))}` : '0', op: arr.length ? 1 : 0.4, pe: arr.length ? 'auto' : 'none', onClick: pick(arr) })),
       delUnusedLabel: unused.length ? `Delete ${unused.length} unused · ${this.fmtSize(bytes(unused))}` : 'No unused files', delUnusedOp: unused.length ? 1 : 0.4, delUnusedPe: unused.length ? 'auto' : 'none', delUnused: () => this.deleteUploads(unused.map((x: any) => x.u.id)),
       startSelect: set({ upSelect: true, upSel: [], popover: null }), endSelect: set({ upSelect: false, upSel: [] }),
       onUpload: () => this.pick('library'),
@@ -1320,8 +1328,11 @@ export default class App extends ReactComponent<Record<string, never>, AnyState>
 
     const projCount = (pid: string) => s.counts.projects[pid] || 0;
     const crumb = s.view === 'create' ? (s.projectId ? this.projName(s.projectId) : 'Create') : isAssets ? 'Assets' : isFavorites ? 'Favorites' : s.view === 'uploads' ? 'Uploads' : 'Settings';
-    const upBytes = s.uploads.reduce((a: number, u: any) => a + (u.size || 0), 0);
-    const headerMeta = (isAssets || isFavorites) ? (s.gridBoot ? '' : liveTotal + (liveTotal === 1 ? ' item' : ' items')) : s.view === 'uploads' ? `${s.uploads.length} file${s.uploads.length === 1 ? '' : 's'} · ${this.fmtSize(upBytes)}` : '';
+    // Counts/bytes come from /api/counts (the real totals), not s.uploads.length/size — that array
+    // is only whatever page of uploads happened to load, so summing it undercounts past the first
+    // page (see TODO.md's "Show storage used" item).
+    const upCount = s.counts.uploads ?? s.uploads.length, upBytes = s.counts.uploadBytes ?? s.uploads.reduce((a: number, u: any) => a + (u.size || 0), 0);
+    const headerMeta = (isAssets || isFavorites) ? (s.gridBoot ? '' : liveTotal + (liveTotal === 1 ? ' item' : ' items')) : s.view === 'uploads' ? `${upCount} file${upCount === 1 ? '' : 's'} · ${this.fmtSize(upBytes)}` : '';
     const pc = s.projectId ? projCount(s.projectId) : 0;
     const showKeyForm = s.modal === 'connect' || (s.modal === 'manage' && s.replacing);
 
@@ -1389,6 +1400,8 @@ export default class App extends ReactComponent<Record<string, never>, AnyState>
       toggleTheme: () => this.setTheme(s.theme === 'dark' ? 'light' : 'dark'),
       hasKey: s.hasKey, noKey: !s.hasKey,
       openKey: set({ modal: s.hasKey ? 'manage' : 'connect', keyInput: '', keyErr: '', replacing: false }),
+      pricingUrl: (s.catalog && s.catalog.pricingUrl) || 'https://higgsfield.ai/pricing',
+      exportBackup: this.exportBackup, exporting: s.exporting,
       ...this.keyVals(), ...this.walkVals(samples, feedEmpty), samples,
 
       crumb, crumbParent: s.view === 'create' && s.projectId ? 'Projects' : '', headerMeta,
@@ -1418,15 +1431,19 @@ export default class App extends ReactComponent<Record<string, never>, AnyState>
       isVideo, hasRefs: refChips.length > 0, refChips,
       refCount: isVideo ? `${refChips.length} added` : `${kindCount('image')}/${MAX}`,
       attachTitle: isVideo ? 'Add references' : `Add reference images (${kindCount('image')}/${MAX})`,
-      attach: (e: any) => {
-        if (isVideo) { this.openPop('attach', e, feedEmpty ? 'bottom-start' : 'top-start'); return; }
-        if (kindCount('image') >= MAX) { this.toastMsg('Reference limit reached (10 images)', 'error'); return; }
-        this.pick('image');
-      },
+      attach: (e: any) => { this.openPop('attach', e, feedEmpty ? 'bottom-start' : 'top-start'); },
+      // "Choose from Uploads" jumps straight to the Uploads page pre-armed in select mode — the
+      // existing "Use as reference" bulk action there (useUploads()) already attaches and returns
+      // to Create, so there's no separate picker UI to build.
       attachItems: [
-        { label: 'Start frame', count: s.refs.start ? '1/1' : '', full: false, opacity: 1, onClick: () => this.pick('start') },
-        { label: 'End frame', count: s.refs.end ? '1/1' : '', full: false, opacity: 1, onClick: () => this.pick('end') },
-        ...([['image', 'Images'], ['video', 'Videos'], ['audio', 'Audio']] as [string, string][]).map(([k, label]) => { const c = kindCount(k); return { label, count: c + '/' + MAX, full: c >= MAX, opacity: c >= MAX ? 0.4 : 1, onClick: () => this.pick(k) }; }),
+        ...(isVideo ? [
+          { label: 'Start frame', count: s.refs.start ? '1/1' : '', full: false, opacity: 1, onClick: () => this.pick('start') },
+          { label: 'End frame', count: s.refs.end ? '1/1' : '', full: false, opacity: 1, onClick: () => this.pick('end') },
+          ...(['image', 'video', 'audio'] as const).map((k) => { const c = kindCount(k); const label = k === 'image' ? 'Images' : k === 'video' ? 'Videos' : 'Audio'; return { label, count: c + '/' + MAX, full: c >= MAX, opacity: c >= MAX ? 0.4 : 1, onClick: () => this.pick(k) }; }),
+        ] : [
+          { label: 'Images', count: `${kindCount('image')}/${MAX}`, full: kindCount('image') >= MAX, opacity: kindCount('image') >= MAX ? 0.4 : 1, onClick: () => this.pick('image') },
+        ]),
+        { label: 'Choose from Uploads', count: '', full: false, opacity: 1, onClick: () => this.setState({ view: 'uploads', upSelect: true, upSel: [], popover: null }) },
       ],
 
       prompt: s.prompt, placeholder: isVideo ? 'Describe a video…' : 'Describe an image…',
@@ -1504,7 +1521,7 @@ export default class App extends ReactComponent<Record<string, never>, AnyState>
           bulkMoveItems: [{ id: null, name: 'No project' }, ...s.projects].map((p: any) => ({ label: p.name, check: sel.length > 0 && sel.every((x: any) => (this.projOf(x.g, x.it) || null) === p.id), onClick: () => this.bulkMove(s.selected, p.id) })),
           zipLabel: s.zipping ? 'Zipping…' : 'Download .zip', bulkZip: () => this.zipDownload(s.selected),
           bulkCopyLabel: s.copied === 'bulk' ? 'Copied' : 'Copy prompts', bulkCopy: () => this.bulkCopy(sel),
-          rerunTitle: `Rerun with same settings · ${this.rerunPlan(sel).cost} credits`, bulkRerun: () => this.bulkRerun(sel) }; })(),
+          rerunTitle: 'Rerun with same settings', bulkRerun: () => this.bulkRerun(sel) }; })(),
       selectAll: () => { if (allSel) { this.setState({ selected: [] }); return; } this.api.listAssetIds(this.gridParams()).then((ids) => this.setState({ selected: ids })); },
       deleteSelected: () => this.askDelete(s.selected, true), selDelOpacity: s.selected.length ? 1 : 0.4,
 
@@ -1577,7 +1594,10 @@ export default class App extends ReactComponent<Record<string, never>, AnyState>
           </button>
         </div>
 
-        <button onClick={v.goCreate} title="Create" className="u-hov-active" style={css(`display:flex;align-items:center;gap:10px;height:30px;padding:0 8px;border:0;border-radius:6px;background:${v.nav.create.bg};color:${v.nav.create.color};cursor:pointer;text-align:left;white-space:nowrap;overflow:hidden`)}>
+        <button onClick={v.goCreate} title="Create" className="u-hov-active"
+          onDragOver={(e: any) => { if (e.dataTransfer.types.includes('application/x-studio-upload')) e.preventDefault(); }}
+          onDrop={(e: any) => { const id = e.dataTransfer.getData('application/x-studio-upload'); if (id) { e.preventDefault(); this.useUploads([id]); } }}
+          style={css(`display:flex;align-items:center;gap:10px;height:30px;padding:0 8px;border:0;border-radius:6px;background:${v.nav.create.bg};color:${v.nav.create.color};cursor:pointer;text-align:left;white-space:nowrap;overflow:hidden`)}>
           <svg width="15" height="15" viewBox="0 0 24 24" style={css('flex-shrink:0;fill:none;stroke:currentColor;stroke-width:1.75;stroke-linecap:round;stroke-linejoin:round')}><path d="M12 3l1.9 5.1L19 10l-5.1 1.9L12 17l-1.9-5.1L5 10l5.1-1.9z" /><path d="M19 17v4M17 19h4" /></svg>
           {v.expanded && <span>Create</span>}
         </button>
@@ -2253,7 +2273,7 @@ export default class App extends ReactComponent<Record<string, never>, AnyState>
           )}
           <div style={css('display:grid;grid-template-columns:repeat(auto-fill, minmax(170px, 1fr));gap:16px 8px')}>
             {up.tiles.map((t: any) => (
-              <div key={t.id} onMouseEnter={t.onEnter} onMouseLeave={t.onLeave} style={css('display:flex;flex-direction:column;gap:7px;min-width:0')}>
+              <div key={t.id} draggable onDragStart={(e: any) => { e.dataTransfer.setData('application/x-studio-upload', t.id); e.dataTransfer.effectAllowed = 'copy'; }} onMouseEnter={t.onEnter} onMouseLeave={t.onLeave} style={css('display:flex;flex-direction:column;gap:7px;min-width:0')}>
                 <div onClick={t.onOpen} style={css(`position:relative;aspect-ratio:1 / 1;border-radius:8px;overflow:hidden;background:var(--hover);cursor:${t.cursor};outline:${t.outline};outline-offset:2px`)}>
                   {t.isImage && <img src={t.src} alt="" loading="lazy" draggable={false} style={css(`width:100%;height:100%;object-fit:cover;display:block;opacity:${t.imgOp}`)} />}
                   {t.hasVideoSrc && <video src={t.videoSrc} muted playsInline preload="metadata" style={css(`width:100%;height:100%;object-fit:cover;display:block;opacity:${t.imgOp}`)} />}
@@ -2372,6 +2392,7 @@ export default class App extends ReactComponent<Record<string, never>, AnyState>
                 <span><span style={css('color:var(--text2)')}>What it's for.</span> The key authenticates every generation request to Higgsfield models. Credits are charged to the account that owns the key.</span>
                 <span><span style={css('color:var(--text2)')}>Where it's stored.</span> Encrypted server-side, never kept in your browser. Only the last 4 characters are shown.</span>
                 <span>Keys are created at <a href="https://open.higgsfield.ai/api-keys" target="_blank" rel="noreferrer">open.higgsfield.ai</a>.</span>
+                <span>Credit costs vary by model and aren't available through the API — see <a href={v.pricingUrl} target="_blank" rel="noreferrer">current pricing</a>.</span>
               </div>
             </div>
           </div>
@@ -2400,6 +2421,18 @@ export default class App extends ReactComponent<Record<string, never>, AnyState>
                 <div style={css('display:flex;gap:2px;padding:2px;border-radius:8px;background:var(--hover);border:1px solid var(--border)')}>
                   {v.defModeOpts.map((o: any, i: number) => (<button key={i} onClick={o.onClick} style={css(`height:24px;padding:0 12px;border:0;border-radius:6px;background:${o.bg};color:${o.color};box-shadow:${o.shadow};font-size:12.5px;cursor:pointer`)}>{o.label}</button>))}
                 </div>
+              </div>
+            </div>
+          </div>
+          <div style={css('display:flex;flex-direction:column;gap:12px')}>
+            <div style={css('font-size:12px;font-weight:500;color:var(--text3)')}>Data</div>
+            <div style={css('border:1px solid var(--border);border-radius:10px')}>
+              <div style={css('display:flex;align-items:center;gap:16px;padding:16px')}>
+                <div style={css('flex:1;display:flex;flex-direction:column;gap:4px')}>
+                  <span style={css('font-weight:500')}>Backup</span>
+                  <span style={{ color: 'var(--text3)' }}>Download the database and media files as a .zip.</span>
+                </div>
+                <button onClick={v.exportBackup} disabled={v.exporting} className="u-hov-surface" style={css(`height:30px;padding:0 12px;border:1px solid var(--border2);border-radius:7px;background:transparent;color:var(--text);cursor:${v.exporting ? 'default' : 'pointer'};flex-shrink:0;opacity:${v.exporting ? 0.6 : 1}`)}>{v.exporting ? 'Preparing…' : 'Export backup'}</button>
               </div>
             </div>
           </div>

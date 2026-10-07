@@ -92,3 +92,6 @@ db.exec(`
 // generation_refs predates the upload_id column (added once uploads got their own table) —
 // CREATE TABLE IF NOT EXISTS won't retrofit it onto an already-existing table.
 try { db.exec(`ALTER TABLE generation_refs ADD COLUMN upload_id TEXT`); } catch { /* already there */ }
+
+// uploads predates content-hash dedupe — same retrofit as above.
+try { db.exec(`ALTER TABLE uploads ADD COLUMN hash TEXT`); } catch { /* already there */ }
