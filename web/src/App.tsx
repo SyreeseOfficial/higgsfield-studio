@@ -34,7 +34,6 @@ function css(s: string): React.CSSProperties {
 // comes from the network and from TODO.md's P0 backend work, not from here.
 const SHOW_WALKTHROUGH = true;
 const DEFAULT_MODE: 'image' | 'video' = 'image';
-const FAILURE_RATE: 'never' | 'sometimes' | 'always' = 'sometimes';
 
 const TAG_TIPS: Record<string, string> = { Start: 'Start frame: the video opens on this image', End: 'End frame: the video ends on this image' };
 const SAMPLES = {
@@ -71,11 +70,6 @@ const OPTS = { image: { res: ['1K', '2K', '4K'], fmt: ['PNG', 'JPG', 'WEBP'] }, 
 const MAX_REFS = 10;
 const PAGE = 24;
 const FEED_PAGE = 20;
-const ERRORS: Record<string, { title: string; detail: string }> = {
-  timeout: { title: 'The model timed out', detail: "Higgsfield didn't return a result within 2 minutes. Your credits were refunded." },
-  server: { title: "Higgsfield couldn't finish this run", detail: 'The server returned an error (502). This is usually temporary. Your credits were refunded.' },
-  safety: { title: 'Blocked by the content filter', detail: 'Higgsfield flagged something in this prompt. Rephrase it and try again. No credits were charged.' },
-};
 const DRAFT_KEYS = ['prompt', 'negOn', 'negPrompt', 'model', 'ratio', 'res', 'fmt', 'duration', 'audio', 'batch'];
 function loadDraft(): Record<string, unknown> {
   try {
@@ -284,7 +278,35 @@ export default class App extends ReactComponent<Record<string, never>, AnyState>
     };
   }
 
+  // ── Projects / generations persistence (real: server/src/routes/*) ─────
+  async loadProjects() {
+    try {
+      const r = await fetch('/api/projects');
+      if (r.ok) this.setState({ projects: await r.json() });
+    } catch { /* server not reachable yet */ }
+  }
+  persistProjects(list: AnyState[]) {
+    fetch('/api/projects', { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(list) }).catch(() => {});
+  }
+  async loadGenerations() {
+    try {
+      const r = await fetch('/api/generations');
+      if (!r.ok) return;
+      const rows: AnyState[] = await r.json();
+      const gens = rows.filter((g) => g.status === 'completed');
+      const failed = rows.filter((g) => g.status === 'failed').map((g) => ({ ...g, err: g.error }));
+      const pending = rows.filter((g) => g.status === 'pending').map((g): AnyState => ({ ...g, t: g.t, dur: g.type === 'video' ? 60000 : 15000, cost: 0 }));
+      this.setState((s: AnyState) => ({ gens: [...s.gens, ...gens], failed: [...s.failed, ...failed], pending: [...s.pending, ...pending], session: [...gens.map((g) => g.id).reverse(), ...s.session] }));
+      pending.forEach((g) => this.pollGen(g.id, g));
+    } catch { /* server not reachable yet */ }
+  }
+
   // ── Lifecycle ────────────────────────────────────────────────────────────
+  // ponytail: this used to be defined but never called anywhere — nothing wired
+  // up on page load (key state, catalog, keyboard shortcuts, paste handler, all
+  // dead). Needed a real mount hook for loadProjects/loadGenerations below
+  // anyway, so fixing this at the root instead of adding a second one.
+  componentDidMount() { this.mountEffects(); }
   mountEffects() {
     this.onKey = (e: KeyboardEvent) => {
       const s = this.state;
@@ -350,6 +372,8 @@ export default class App extends ReactComponent<Record<string, never>, AnyState>
     window.addEventListener('keydown', this.onKey);
     this.loadCatalog();
     this.loadKey();
+    this.loadProjects();
+    this.loadGenerations();
     window.addEventListener('paste', this.onPaste);
     this.onNet = () => { const on = navigator.onLine !== false; if (on === this.state.online) return; this.setState({ online: on }); if (on) this.notify('Back online', { kind: 'info' }); };
     window.addEventListener('online', this.onNet); window.addEventListener('offline', this.onNet);
@@ -447,7 +471,7 @@ export default class App extends ReactComponent<Record<string, never>, AnyState>
       if (sn.uploads) { const ku = new Set(sn.uploads.map((u: any) => u.id)); out.uploads = [...sn.uploads, ...s.uploads.filter((u: any) => !ku.has(u.id))]; }
       if (sn.refs) out.refs = sn.refs;
       return out;
-    });
+    }, () => this.persistProjects(this.state.projects));
   }
   copy(text: string, key: string) {
     try { navigator.clipboard.writeText(text).catch(() => {}); } catch { /* ignore */ }
@@ -489,6 +513,9 @@ export default class App extends ReactComponent<Record<string, never>, AnyState>
       refs: [...(m === 'video' && s.refs.start ? [{ ...s.refs.start, kind: 'image', tag: 'Start' }] : []), ...(m === 'video' && s.refs.end ? [{ ...s.refs.end, kind: 'image', tag: 'End' }] : []),
         ...s.refs.list.filter((x: any) => x.mode === m).map((x: any) => ({ url: x.url, kind: x.kind, name: x.name, tag: '' }))] })) this.setState({ prompt: '' });
   };
+  // Real submission below (server/src/routes/generations.ts). The synchronous guards stay up front so
+  // `generate()`'s `if (this.runGen(p)) clearPrompt()` contract is unchanged; the network round trip
+  // (ref upload + POST + poll) runs detached, same shape as the old setTimeout it replaces.
   runGen(p: AnyState): boolean {
     const ks = this.state;
     if (this.offline()) { this.toastMsg("You're offline. Try again when you reconnect.", 'error'); return false; }
@@ -497,35 +524,69 @@ export default class App extends ReactComponent<Record<string, never>, AnyState>
     const cost = this.costOf(p);
     if (cost == null) { this.toastMsg("This model isn't available right now", 'error'); return false; }
     this.setState({ walkGen: true });
-    const id = 'g' + Date.now() + Math.random().toString(36).slice(2, 5);
-    const dur = (p.type === 'video' ? 14000 : 5000) + p.batch * 900;
-    this.setState((s: AnyState) => ({ pending: [{ id, ...p, t: Date.now(), dur, cost }, ...s.pending], popover: null, view: 'create', lightbox: null }));
-    this._gt = this._gt || {};
-    this._gt[id] = setTimeout(() => {
-      delete this._gt![id];
-      const mode = FAILURE_RATE;
-      if (mode === 'always' || (mode === 'sometimes' && Math.random() < 0.25)) {
-        const keys = Object.keys(ERRORS), err = ERRORS[keys[Math.floor(Math.random() * keys.length)]];
-        this.setState((s: AnyState) => ({ failed: [{ id, ...p, t: Date.now(), err }, ...s.failed], pending: s.pending.filter((x: any) => x.id !== id) }));
-        this.toastMsg('A generation failed', 'error');
+    const tempId = 'tmp' + Date.now() + Math.random().toString(36).slice(2, 5);
+    const dur = (p.type === 'video' ? 60000 : 15000);
+    this.setState((s: AnyState) => ({ pending: [{ id: tempId, ...p, t: Date.now(), dur, cost }, ...s.pending], popover: null, view: 'create', lightbox: null }));
+    this.submitGen(tempId, p);
+    return true;
+  }
+  async submitGen(tempId: string, p: AnyState) {
+    try {
+      const fd = new FormData();
+      const refMeta: AnyState[] = [];
+      for (const r of p.refs || []) {
+        const blob = await fetch(r.url).then((x) => x.blob());
+        fd.append('files', blob, r.name || 'ref');
+        refMeta.push({ kind: r.kind, name: r.name, tag: r.tag || '' });
+      }
+      fd.append('refMeta', JSON.stringify(refMeta));
+      const { refs, ...meta } = p;
+      fd.append('meta', JSON.stringify(meta));
+      const r = await fetch('/api/generations', { method: 'POST', body: fd });
+      const d = await r.json();
+      if (!r.ok) {
+        this.setState((s: AnyState) => ({ pending: s.pending.filter((x: any) => x.id !== tempId) }));
+        if (r.status === 429) { this.startRate(Number(r.headers.get('Retry-After')) || 15); this.setState({ prompt: p.prompt }); this.toastMsg(d.error?.title || 'Rate limited', 'error'); return; }
+        this.setState((s: AnyState) => ({ failed: [{ id: tempId, ...p, t: Date.now(), err: d.error }, ...s.failed] }));
+        this.toastMsg(d.error?.title || 'A generation failed', 'error');
         return;
       }
-      const ids = Array.from({ length: p.batch }, (_, i) => id + '-' + i); ids.forEach((x, i) => { this._fresh[x] = { d: i * 90 }; }); setTimeout(() => { ids.forEach((x) => delete this._fresh[x]); this.forceUpdate(); }, 6000);
-      this.setState((s: AnyState) => {
-        const g = { id, ...p, t: Date.now(), items: Array.from({ length: p.batch }, (_, i) => ({ id: id + '-' + i, seed: id + 'x' + i, fav: false })) };
-        return { gens: [...s.gens, g], session: [id, ...s.session], pending: s.pending.filter((x: any) => x.id !== id), walkResult: s.walkResult || s.walkGen };
-      });
-    }, dur);
-    return true;
+      const realId = d.id;
+      this.setState((s: AnyState) => ({ pending: s.pending.map((x: any) => (x.id === tempId ? { ...x, id: realId } : x)) }));
+      this.pollGen(realId, p);
+    } catch {
+      this.setState((s: AnyState) => ({ pending: s.pending.filter((x: any) => x.id !== tempId) }));
+      this.toastMsg("Couldn't reach the server.", 'error');
+    }
+  }
+  pollGen(id: string, p: AnyState) {
+    this._gt = this._gt || {};
+    const tick = async () => {
+      let d: AnyState;
+      try { d = await fetch(`/api/generations/${id}`).then((r) => r.json()); }
+      catch { this._gt![id] = setTimeout(tick, 3000); return; }
+      if (d.status === 'pending') { this._gt![id] = setTimeout(tick, 3000); return; }
+      delete this._gt![id];
+      this.setState((s: AnyState) => ({ pending: s.pending.filter((x: any) => x.id !== id) }));
+      if (d.status === 'completed') {
+        const ids = d.items.map((it: AnyState) => it.id); ids.forEach((x: string, i: number) => { this._fresh[x] = { d: i * 90 }; }); setTimeout(() => { ids.forEach((x: string) => delete this._fresh[x]); this.forceUpdate(); }, 6000);
+        this.setState((s: AnyState) => ({ gens: [...s.gens, { ...p, id, t: d.t, items: d.items }], session: [id, ...s.session], walkResult: s.walkResult || s.walkGen }));
+      } else {
+        this.setState((s: AnyState) => ({ failed: [{ ...p, id, t: Date.now(), err: d.error }, ...s.failed] }));
+        this.toastMsg('A generation failed', 'error');
+      }
+    };
+    tick();
   }
   cancelGen(id: string) {
     const p = this.state.pending.find((x: any) => x.id === id); if (!p) return;
     clearTimeout(this._gt?.[id]); if (this._gt) delete this._gt[id];
     this.setState((s: AnyState) => ({ pending: s.pending.filter((x: any) => x.id !== id) }));
+    if (!id.startsWith('tmp')) fetch(`/api/generations/${id}`, { method: 'DELETE' }).catch(() => {});
     this.notify('Generation cancelled.', { kind: 'info' });
   }
   retryFailed(f: AnyState) {
-    const { id, ...rest } = f; const p = { ...rest }; delete p.t; delete p.err; delete p.cost;
+    const { id, err, cost, ...rest } = f; const p = { ...rest };
     if (this.runGen(p)) this.setState((s: AnyState) => ({ failed: s.failed.filter((x: any) => x.id !== id) }));
   }
   toggleFav(id: string) {
@@ -695,14 +756,17 @@ export default class App extends ReactComponent<Record<string, never>, AnyState>
     this.setState((s: AnyState) => {
       const list = s.projects.filter((p: any) => p.id !== from), moved = s.projects.find((p: any) => p.id === from), i = list.findIndex((p: any) => p.id === to);
       if (!moved || i < 0) return null; list.splice(pos === 'after' ? i + 1 : i, 0, moved); return { projects: list };
-    });
+    }, () => this.persistProjects(this.state.projects));
   }
   saveProject() {
     const s = this.state, n = s.newName.trim(); if (!n) return;
     const emoji = s.newEmoji || null;
-    if (s.renameId) { this.setState((st: AnyState) => ({ projects: st.projects.map((p: any) => (p.id === st.renameId ? { ...p, name: n, emoji } : p)), modal: null, renameId: null, newName: '' })); this.notify('Project saved'); return; }
+    if (s.renameId) {
+      this.setState((st: AnyState) => ({ projects: st.projects.map((p: any) => (p.id === st.renameId ? { ...p, name: n, emoji } : p)), modal: null, renameId: null, newName: '' }), () => this.persistProjects(this.state.projects));
+      this.notify('Project saved'); return;
+    }
     const id = 'p' + Date.now();
-    this.setState((st: AnyState) => ({ projects: [...st.projects, { id, name: n, emoji }], modal: null, newName: '', view: 'create', projectId: id, projectsOpen: true }));
+    this.setState((st: AnyState) => ({ projects: [...st.projects, { id, name: n, emoji }], modal: null, newName: '', view: 'create', projectId: id, projectsOpen: true }), () => this.persistProjects(this.state.projects));
     this.notify(`Created "${n}"`);
   }
   deleteProject(withAssets: boolean) {
@@ -715,7 +779,7 @@ export default class App extends ReactComponent<Record<string, never>, AnyState>
       const alive = new Set(gens.map((g: any) => g.id));
       return { projects: s.projects.filter((p: any) => p.id !== pid), gens, session: s.session.filter((id: string) => alive.has(id)), confirm: null,
         projectId: s.projectId === pid ? null : s.projectId, fProject: s.fProject === pid ? 'all' : s.fProject };
-    });
+    }, () => this.persistProjects(this.state.projects));
     this.notify(withAssets ? `Deleted "${name}" and its assets` : `Deleted "${name}"`, { kind: 'delete', undo: () => this.restore(sn) });
   }
   moveTo(itemId: string, pid: string | null) {

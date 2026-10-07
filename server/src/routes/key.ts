@@ -19,6 +19,11 @@ function getRow(): KeyRow | undefined {
     | undefined;
 }
 
+// ponytail: TODO.md asks for a `credits` field here, but Higgsfield's public API
+// has no balance/credits endpoint — checked their OpenAPI spec and billing docs.
+// The only places that number exists are the web dashboard, the `hf` CLI, and an
+// unrelated MCP server, none of which a plain API key can call. Not faking a
+// number — if Higgsfield ever ships one, add it here.
 keyRouter.get("/", (_req, res) => {
   const row = getRow();
   if (!row) return res.json({ connected: false, last4: null, status: null });
