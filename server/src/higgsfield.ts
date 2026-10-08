@@ -192,11 +192,12 @@ async function submit(cred: Cred, path: string, body: any): Promise<CreateResult
 
 // ponytail: Higgsfield has one HTTP endpoint PER MODEL (and a different one again
 // for the text-only vs reference-image variant of the same model), not one
-// generic "create a generation" call. soul, seedance, kling, kling-standard, minimax, soul-v2
-// and soul-cinema keep bespoke branches (confirmed via the OpenAPI spec); everything in
-// GENERIC_VIDEO/GENERIC_IMAGE above is confirmed via Higgsfield's own template source. Anything
-// still missing from both falls through to ERR.unsupported — better to say so than to guess a
-// path and silently waste the user's credits on a malformed call.
+// generic "create a generation" call. soul, seedance, kling, kling-standard, minimax, soul-v2,
+// soul-cinema, the 6 kling-3-* variants and seedance-2-5 keep bespoke branches (confirmed via the
+// OpenAPI spec or the template registry); everything in GENERIC_VIDEO/GENERIC_IMAGE above is
+// confirmed via Higgsfield's own template source too. Anything still missing from both falls
+// through to ERR.unsupported — better to say so than to guess a path and silently waste the
+// user's credits on a malformed call.
 async function createOne(cred: Cred, job: CreateJob): Promise<CreateResult> {
   const generic = job.type === "video" ? GENERIC_VIDEO[job.model] : GENERIC_IMAGE[job.model];
   if (generic) {
@@ -248,6 +249,71 @@ async function createOne(cred: Cred, job: CreateJob): Promise<CreateResult> {
     const body: any = { prompt: job.prompt, duration: job.duration === 10 ? 10 : 5, image_url: img.url };
     if (job.negative) body.negative_prompt = job.negative;
     return submit(cred, "kling-video/v2.5-turbo/standard/image-to-video", body);
+  }
+  // Kling 3.0 (6 variants) and Seedance 2.5 — ported from the official template's
+  // generation/catalog/models/kling-3.ts and seedance-2.5.ts (base variant only; Edit/Extend need a
+  // "source video" UI concept this composer doesn't have yet, see TODO.md). multiShots, cfgScale,
+  // characterOrientation and keepOriginalSound have no UI control — left at their documented
+  // defaults, same pattern as minimax's prompt_optimizer above. sound reuses the existing
+  // audio toggle (job.audio), converted to the "on"/"off" string the API wants.
+  if (job.model === "kling-3-turbo") {
+    const img = refUrl(job.refs, "Start");
+    const path = img ? "kling-video/v3.0-turbo/image-to-video" : "kling-video/v3.0-turbo/text-to-video";
+    const body: any = { prompt: job.prompt, duration: job.duration || 5, resolution: job.res || "720p" };
+    if (img) body.image_url = img;
+    else body.aspect_ratio = job.ratio;
+    return submit(cred, path, body);
+  }
+  if (job.model === "kling-3-std" || job.model === "kling-3-pro" || job.model === "kling-3-4k") {
+    const prefix = job.model === "kling-3-std" ? "kling-video/v3.0/std" : job.model === "kling-3-pro" ? "kling-video/v3.0/pro" : "kling-video/v3.0/4k";
+    const start = refUrl(job.refs, "Start");
+    const end = refUrl(job.refs, "End");
+    const body: any = { prompt: job.prompt, sound: job.audio ? "on" : "off", duration: job.duration || 5, cfg_scale: 0.5, multi_shots: false };
+    if (start) {
+      body.image_url = start;
+      if (end) body.last_image_url = end;
+      return submit(cred, `${prefix}/image-to-video`, body);
+    }
+    body.aspect_ratio = job.ratio;
+    return submit(cred, `${prefix}/text-to-video`, body);
+  }
+  if (job.model === "kling-3-motion-std" || job.model === "kling-3-motion-pro") {
+    const path = job.model === "kling-3-motion-std" ? "kling-video/v3/motion-control/std" : "kling-video/v3/motion-control/pro";
+    const start = refUrl(job.refs, "Start");
+    const video = refsByKind(job.refs, "video")[0];
+    const body: any = { prompt: job.prompt, keep_original_sound: "yes", character_orientation: "video" };
+    if (start) body.image_url = start;
+    if (video) body.video_url = video;
+    return submit(cred, path, body);
+  }
+  if (job.model === "seedance-2-5") {
+    const start = refUrl(job.refs, "Start");
+    const end = refUrl(job.refs, "End");
+    const refs = refsByKind(job.refs, "image");
+    const videos = refsByKind(job.refs, "video");
+    const audios = refsByKind(job.refs, "audio");
+    if ((start || end) && (refs.length || videos.length || audios.length)) {
+      return { error: { title: "Can't use both frames and references", detail: "Use either a start/end frame or attached references, not both. Remove one and try again." } };
+    }
+    if (end && !start) {
+      return { error: { title: "Add a start frame first", detail: "An end frame needs a start frame too — attach one and try again." } };
+    }
+    const shared: any = { resolution: job.res || "720p", generate_audio: !!job.audio, duration: job.duration || 5 };
+    if (job.prompt.trim()) shared.prompt = job.prompt.trim();
+    if (start) {
+      const body: any = { ...shared, image_url: start };
+      if (end) body.end_image_url = end;
+      return submit(cred, "bytedance/seedance-2.5/image-to-video", body);
+    }
+    if (refs.length || videos.length || audios.length) {
+      const body: any = { ...shared, aspect_ratio: job.ratio };
+      if (refs.length) body.image_urls = refs;
+      if (videos.length) body.video_urls = videos;
+      if (audios.length) body.audio_urls = audios;
+      return submit(cred, "bytedance/seedance-2.5/reference-to-video", body);
+    }
+    if (!job.prompt.trim()) return { error: { title: "Add a prompt or a reference", detail: "Describe what you want, or attach a reference image/video/audio, and try again." } };
+    return submit(cred, "bytedance/seedance-2.5/text-to-video", { ...shared, aspect_ratio: job.ratio });
   }
   return { error: ERR.unsupported };
 }

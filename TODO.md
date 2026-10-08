@@ -7,10 +7,8 @@ UI source of truth, kept for reference only — the real app is `web/` + `server
 
 ## Open
 
-- [ ] **Switch to the official SDK** (`@higgsfield/client`, matches docs.higgsfield.ai/docs/how-to/sdk). `server/src/higgsfield.ts` hand-rolls raw `fetch()` instead. Check each call (`createOne`, `getStatus`, `cancelRequest`, `uploadFile`) against what the SDK supports — keep raw REST only for what it can't do.
 - [ ] **Guard duplicate submissions — UI and server.** `generate()`/`runGen()` (`App.tsx`) has no in-flight lock; a double-click fires two generations. `POST /api/generations` (`generations.ts`) has no server-side de-dup either.
-- [ ] **Add setup docs.** No root README or `.env.example` since the Vite/Express rewrite. Need: how to run (`npm run dev`), `PORT`, and that the Higgsfield key is entered via Settings (encrypted in SQLite), not an env var.
-- [ ] **Wire up Kling 3.0, Seedance 2.5, Genjutsu, Cinema Studio.** Kling 3.0 (6 variants) and Seedance 2.5 (3 variants) have exact schemas in Higgsfield's template registry (`generation/catalog/models/kling-3.ts`, `seedance-2.5.ts`) but need new UI first: a `sound` on/off toggle + `multiShots` boolean for Kling 3, a "source video" media role for Seedance 2.5 Edit/Extend. Genjutsu and Cinema Studio aren't in the registry at all — still no schema.
+- [ ] **Wire up Genjutsu, Cinema Studio, Seedance 2.5 Edit/Extend.** Genjutsu and Cinema Studio aren't in Higgsfield's template registry at all — still no schema. Seedance 2.5 Edit/Extend need a "source video" media role this composer doesn't have (Kling 3.0's 6 variants and Seedance 2.5's base variant are wired now — see Model catalog below).
 
 ---
 
@@ -25,12 +23,16 @@ UI source of truth, kept for reference only — the real app is `web/` + `server
 - Persistence: `generations`, `items`, `projects`, `uploads`, `generation_refs` tables; favorites and project order survive a refresh.
 - Removed all demo/seed data and fake props.
 - No balance/credits endpoint exists on Higgsfield's API — not faked; Settings links to their pricing page instead.
+- Generation submission goes through the official `@higgsfield/client` SDK (`v2`'s `subscribe()`, `withPolling: false` — we poll ourselves for incremental per-item status). The SDK only covers submission, nothing else (no standalone status check, cancel, or presigned-upload helper), so `getStatus`/`cancelRequest`/`uploadFile` stay on raw REST — that's what the SDK itself falls back to.
+- Root `README.md` + `.env.example` added (how to run, `PORT`, and that the Higgsfield key goes through Settings, not an env var).
 
 ### Model catalog
 - `GET /api/models` lists the real catalog, synced against `open.higgsfield.ai/explore` and Higgsfield's official template registry (`pnpm dlx shadcn@latest view higgsfield-ai/app-templates/<model>` — real first-party source, not a guess).
-- 29 of 33 models wired to real endpoints: `soul`, `soul-v2`, `soul-cinema`, `seedance`, `kling`, `kling-standard`, `kling-2-6`, `kling-o1`, `kling-o3`, `minimax`, `minimax-h3`, `flux-2`, `flux-3`, `dop`, `pixverse-6`, `wan-2-6`, `wan-2-7`, `wan-3`, `wan-3-prime`, `happy-horse-1-0`, `happy-horse-1-1`, `ltx-2-5-fast`, `ltx-2-5-pro`, `grok-image`, `grok-video`, `ideogram`, `recraft`, `qwen-image`, `z-image`. Generic ones share one path/body mapper (`GENERIC_VIDEO`/`GENERIC_IMAGE` + `mapByPaths()` in `higgsfield.ts`), ported from the template's own mapper.
+- 36 of 38 models wired to real endpoints: `soul`, `soul-v2`, `soul-cinema`, `seedance`, `seedance-2-5`, `kling`, `kling-standard`, `kling-2-6`, `kling-3-turbo`, `kling-3-std`, `kling-3-pro`, `kling-3-4k`, `kling-3-motion-std`, `kling-3-motion-pro`, `kling-o1`, `kling-o3`, `minimax`, `minimax-h3`, `flux-2`, `flux-3`, `dop`, `pixverse-6`, `wan-2-6`, `wan-2-7`, `wan-3`, `wan-3-prime`, `happy-horse-1-0`, `happy-horse-1-1`, `ltx-2-5-fast`, `ltx-2-5-pro`, `grok-image`, `grok-video`, `ideogram`, `recraft`, `qwen-image`, `z-image`. Generic ones share one path/body mapper (`GENERIC_VIDEO`/`GENERIC_IMAGE` + `mapByPaths()` in `higgsfield.ts`), ported from the template's own mapper; Kling 3.0's 6 variants and Seedance 2.5 have bespoke branches (also ported from the template's own mapper functions, not guessed).
+- Only 2 remain unwired: Genjutsu, Cinema Studio — not in the template registry at all, still no schema.
 - Excluded: Ads Studio, Product Shots, Graphic Ads, Marketplace Design, Marketing Studio Image, AI Influencer — brand/product-asset workflows, not prompt-to-image/video models.
 - Bugs found live and fixed: switching models didn't reset resolution/ratio to a value valid for the new model (only duration was); Seedance's resolution enum was `'4K'`, the real API wants `'4k'`; image-only models (DoP, Kling O1/O3) could submit with no reference and have Higgsfield silently accept + start charging — now fails instantly with a clear error instead.
+- Kling 3.0/Seedance 2.5 settings with no UI control (`multiShots`, `cfgScale`, `characterOrientation`, `keepOriginalSound`) are left at their documented defaults rather than adding new pills — `sound` is the one exception, it reuses the existing Audio toggle (`job.audio`) rather than adding a second one.
 
 ### Assets, history, uploads
 - `GET /api/assets` (filters, cursor paging, FTS5 prompt search), `GET /api/assets/ids`, `GET /api/counts` — all server-side.
