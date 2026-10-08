@@ -1454,7 +1454,7 @@ export default class App extends ReactComponent<Record<string, never>, AnyState>
       shortcutsOpen: !!s.shortcuts, closeShortcuts: set({ shortcuts: false }), openShortcuts: set({ shortcuts: true, popover: null }),
       isCreate: s.view === 'create', isGrid: isAssets || isFavorites, isAssets, isSettings: s.view === 'settings', isUploads: s.view === 'uploads', up,
       feed, feedDays, hasFeed: !feedEmpty, onFeedScroll: this.maybeMoreFeed, feedEmpty, emptyTitle: s.projectId ? `New in ${this.projName(s.projectId)}` : 'What do you want to make?',
-      dock: feedEmpty ? { justify: 'center', pad: '24px 24px 12vh', innerPad: '0', bg: 'transparent' } : { justify: 'flex-end', pad: '0', innerPad: '48px 24px 20px', bg: 'linear-gradient(to bottom, transparent, var(--panel) 45%)' },
+      dock: feedEmpty ? { justify: 'flex-end', pad: '24px 24px 12vh', innerPad: '0', bg: 'transparent' } : { justify: 'flex-end', pad: '0', innerPad: '48px 24px 20px', bg: 'linear-gradient(to bottom, transparent, var(--panel) 45%)' },
       popRef: this.popRef, pp: s.popXY ? { left: s.popXY.left + 'px', top: s.popXY.top + 'px', maxH: s.popXY.maxH + 'px', vis: 'visible' } : { left: '0px', top: '0px', maxH: 'none', vis: 'hidden' },
 
       onDragEnter: (e: any) => { if (!this.hasFiles(e)) return; e.preventDefault(); this.dragDepth++; if (!this.state.dragging) this.setState({ dragging: true }); },
