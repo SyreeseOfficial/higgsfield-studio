@@ -37,12 +37,7 @@ const DEFAULT_MODE: 'image' | 'video' = 'image';
 
 const TAG_TIPS: Record<string, string> = { Start: 'Start frame: the video opens on this image', End: 'End frame: the video ends on this image' };
 const SAMPLES = {
-  image: [
-    ['Window-light portrait', 'Close-up portrait of an elderly fisherman in soft window light, weathered skin, shallow depth of field, 85mm'],
-    ['Perfume on wet stone', 'Amber glass perfume bottle on wet black stone, single hard rim light, dark studio background'],
-    ['Desert house, blue hour', 'Pink adobe house in the desert at blue hour, warm light glowing inside, long exposure sky'],
-    ['Breakfast overhead', 'Overhead shot of a rustic breakfast table with figs, bread and coffee, natural morning light'],
-  ],
+  image: [] as [string, string][],
   video: [
     ['Drone over coastline', 'Slow drone push over a rugged coastline at sunrise, waves breaking on black rocks, mist rising'],
     ['Neon street in rain', 'Handheld walk down a neon-lit street in the rain at night, reflections on wet pavement, shallow focus'],
@@ -50,8 +45,16 @@ const SAMPLES = {
     ['Dancer in white studio', 'Dancer spinning in an empty white studio, flowing fabric, camera orbiting slowly'],
   ],
 } as const;
-const RATIOS = { image: ['1:1', '3:4', '4:3', '9:16', '16:9', '21:9'], video: ['16:9', '9:16', '1:1', '4:3', '3:4', '21:9'] };
-const OPTS = { image: { res: ['1K', '2K', '4K'], fmt: ['PNG', 'JPG', 'WEBP'] }, video: { res: ['480p', '720p', '1080p'], fmt: ['MP4', 'WEBM', 'MOV'] } };
+// Per-model limits — only a control shows up for a model if server/src/higgsfield.ts's createOne()
+// actually forwards that param for it. ratios/res verified against Higgsfield's OpenAPI spec for
+// soul and kling (neither has a format param either, nor does the documented Seedance request body —
+// the real output extension comes from Higgsfield's response, not a client choice, so there's no
+// Format control at all).
+const MODEL_CAPS: Record<string, { ratios?: string[]; res?: string[]; duration?: boolean; audio?: boolean; negative?: boolean }> = {
+  soul: { ratios: ['1:1', '4:3', '3:4', '3:2', '2:3', '5:4', '4:5', '16:9', '9:16', '21:9'], res: ['2K', '4K'] },
+  seedance: { ratios: ['16:9', '9:16', '1:1', '4:3', '3:4', '21:9'], res: ['480p', '720p', '1080p', '4K'], duration: true, audio: true },
+  kling: { duration: true, negative: true },
+};
 const MAX_REFS = 10;
 const PAGE = 24;
 const FEED_PAGE = 20;
@@ -530,13 +533,21 @@ export default class App extends ReactComponent<Record<string, never>, AnyState>
     if (!s.prompt.trim()) return { reason: 'Add a prompt', title: 'Describe what you want to make' };
     return null;
   }
+  // Generate always stops at a confirmation modal first (doGenerate actually submits) — guards
+  // against an accidental click or an accidental ⌘/Ctrl+Enter firing off a real generation.
   generate = () => {
     const s = this.state, m = s.mode, b = this.genBlock();
     if (b) { if (b.action) b.action(); return; }
-    if (this.runGen({ type: m, model: s.model[m], prompt: s.prompt.trim(), negative: s.negOn ? s.negPrompt.trim() : '', ratio: s.ratio[m], res: s.res[m], fmt: s.fmt[m], duration: s.duration, audio: s.audio, batch: s.batch, project: s.projectId,
+    const payload = { type: m, model: s.model[m], prompt: s.prompt.trim(), negative: s.negOn ? s.negPrompt.trim() : '', ratio: s.ratio[m], res: s.res[m], fmt: s.fmt[m], duration: s.duration, audio: s.audio, batch: s.batch, project: s.projectId,
       refs: [...(m === 'video' && s.refs.start ? [{ ...s.refs.start, kind: 'image', tag: 'Start' }] : []), ...(m === 'video' && s.refs.end ? [{ ...s.refs.end, kind: 'image', tag: 'End' }] : []),
-        ...s.refs.list.filter((x: any) => x.mode === m).map((x: any) => ({ url: x.url, kind: x.kind, name: x.name, tag: '', uploadId: x.uploadId }))] })) this.setState({ prompt: '' });
+        ...s.refs.list.filter((x: any) => x.mode === m).map((x: any) => ({ url: x.url, kind: x.kind, name: x.name, tag: '', uploadId: x.uploadId }))] };
+    this.setState({ confirm: { kind: 'generate', payload }, popover: null });
   };
+  doGenerate() {
+    const c = this.state.confirm;
+    if (!c || c.kind !== 'generate') return;
+    this.setState({ confirm: null }, () => { if (this.runGen(c.payload)) this.setState({ prompt: '' }); });
+  }
   // Real submission below (server/src/routes/generations.ts). The synchronous guards stay up front so
   // `generate()`'s `if (this.runGen(p)) clearPrompt()` contract is unchanged; the network round trip
   // (ref upload + POST + poll) runs detached, same shape as the old setTimeout it replaces.
@@ -635,14 +646,14 @@ export default class App extends ReactComponent<Record<string, never>, AnyState>
     const done = [k1, k2, k3], active = done.indexOf(false), generating = s.walkGen && !s.walkResult;
     const defs: [string, string, string, () => void][] = [
       ['Connect your API key', 'Links Studio to your Higgsfield account so you can generate.', s.hasKey ? 'Fix key' : 'Connect key', () => this.setState({ modal: s.hasKey ? 'manage' : 'connect', keyInput: '', keyErr: '', replacing: false })],
-      ['Try a sample prompt', 'Pick one below, or write your own.', 'Insert a sample', () => this.insertSample(samples[0].prompt)],
+      ['Try a sample prompt', 'Pick one below, or write your own.', 'Insert a sample', () => samples[0] && this.insertSample(samples[0].prompt)],
       ['Get your first result', 'Results show up here and in Assets.', s.prompt.trim() ? 'Generate' : '', this.generate],
     ];
     const steps = defs.map(([title, text, cta, onCta], i) => {
       const isActive = i === active, d = done[i];
       return {
         n: i + 1, title, text, done: d, notDone: !d,
-        cta: isActive && !(i === 2 && generating) ? cta : '', onCta,
+        cta: isActive && !(i === 2 && generating) && !(i === 1 && !samples.length) ? cta : '', onCta,
         busy: i === 2 && generating ? 'Generating…' : '',
         bg: isActive ? 'var(--raised)' : 'transparent', border: isActive ? 'var(--border2)' : 'var(--border)',
         color: d ? 'var(--text2)' : isActive ? 'var(--text)' : 'var(--text2)',
@@ -1200,6 +1211,7 @@ export default class App extends ReactComponent<Record<string, never>, AnyState>
   }
   buildVals(): AnyState {
     const s = this.state, M: AnyState = s.catalog || { image: [], video: [] }, mode: 'image' | 'video' = s.mode, isVideo = mode === 'video', MAX = MAX_REFS;
+    const caps = MODEL_CAPS[s.model[mode]] || {};
     const set = (patch: AnyState) => () => this.setState(patch);
     const on = { bg: 'var(--seg)', color: 'var(--text)', shadow: s.theme === 'light' ? '0 1px 2px rgba(0,0,0,.08)' : 'none' };
     const off = { bg: 'transparent', color: 'var(--text3)', shadow: 'none' };
@@ -1298,7 +1310,7 @@ export default class App extends ReactComponent<Record<string, never>, AnyState>
     const filterMenus = this.memo('fm', [s.catalog, s.popover, s.fModel, s.fProject, s.fRatio, s.fFav, s.sort, s.projects, s.gens], () => [
       menu('fModel', 'Model', [{ id: 'all', label: 'All' }, ...[...M.image, ...M.video].map((m: any) => ({ id: m.id, label: m.name }))], s.fModel),
       menu('fProject', 'Project', [{ id: 'all', label: 'All' }, ...s.projects.map((p: any) => ({ id: p.id, label: p.name }))], s.fProject),
-      menu('fRatio', 'Ratio', [{ id: 'all', label: 'All' }, ...[...new Set([...RATIOS.image, ...RATIOS.video, ...s.gens.map((g: any) => g.ratio)])].map((r) => ({ id: r, label: r }))], s.fRatio),
+      menu('fRatio', 'Ratio', [{ id: 'all', label: 'All' }, ...[...new Set([...Object.values(MODEL_CAPS).flatMap((c) => c.ratios || []), ...s.gens.map((g: any) => g.ratio)])].map((r) => ({ id: r, label: r }))], s.fRatio),
       menu('fFav', 'Starred', [{ id: 'all', label: 'All' }, { id: 'fav', label: 'Favorites only' }, { id: 'nofav', label: 'Not favorited' }], s.fFav),
       menu('sort', 'Sort', [{ id: 'new', label: 'Newest first' }, { id: 'old', label: 'Oldest first' }, { id: 'fav', label: 'Favorites first' }, { id: 'model', label: 'Model (A–Z)' }, { id: 'project', label: 'Project (A–Z)' }, { id: 'type', label: 'Images, then videos' }], s.sort),
     ]);
@@ -1342,13 +1354,15 @@ export default class App extends ReactComponent<Record<string, never>, AnyState>
 
     const confirm = s.confirm, cProj = confirm && confirm.kind === 'project' ? confirm.id : null, cN = cProj ? projCount(cProj) : 0;
     const nItems = confirm && confirm.kind === 'items' ? confirm.ids.length : 0;
+    const cGen = confirm && confirm.kind === 'generate' ? confirm.payload : null;
     const allSel = gridIds.length > 0 && s.selected.length >= liveTotal && gridIds.every((id: string) => s.selected.includes(id));
 
     const samples = (SAMPLES as any)[this.state.mode].map(([label, prompt]: [string, string]) => ({ label, prompt, insert: () => this.insertSample(prompt) }));
     return {
       theme: s.theme, isDark: s.theme === 'dark', isLight: s.theme === 'light',
       fileRef: this.fileRef, feedRef: this.feedRef, promptRef: this.promptRef, onFiles: this.onFiles,
-      negOn: s.negOn, negPrompt: s.negPrompt, onNeg: (e: any) => this.setState({ negPrompt: e.target.value }),
+      negSupported: !!caps.negative,
+      negOn: s.negOn && !!caps.negative, negPrompt: s.negPrompt, onNeg: (e: any) => this.setState({ negPrompt: e.target.value }),
       toggleNeg: () => this.setState({ negOn: !s.negOn }), negTitle: s.negOn ? 'Hide negative prompt' : 'Negative prompt',
       negBtn: s.negOn ? { bg: 'var(--active)', color: 'var(--text)', border: 'var(--border2)' } : { bg: 'transparent', color: 'var(--text2)', border: 'var(--border)' },
       expanded, collapsed: s.collapsed, asideW: s.collapsed ? 48 : 232, collapseTitle: s.collapsed ? 'Expand sidebar' : 'Collapse sidebar',
@@ -1453,31 +1467,23 @@ export default class App extends ReactComponent<Record<string, never>, AnyState>
       popSettings: set({ popover: s.popover === 'settings' ? null : 'settings' }),
       popOpen: !!s.popover, closePop: set({ popover: null }),
       modelGroupLabel: isVideo ? 'Video model' : 'Image model',
-      ratioItems: RATIOS[mode].map((r) => {
-        const [a, b] = r.split(':').map(Number), k = 15 / Math.max(a, b), act = r === s.ratio[mode];
-        return { label: r, w: Math.max(6, Math.round(a * k * (a > b ? 1.2 : 1))), h: Math.max(6, Math.round(b * k)),
-          bg: act ? 'var(--active)' : 'transparent', color: act ? 'var(--text)' : 'var(--text3)', border: act ? 'var(--border2)' : 'transparent',
-          onClick: () => per('ratio', r) };
-      }),
       pillsRef: this.pillsRef,
       pills: (() => {
         const shape = (r: string, k0 = 13) => { const [a, b] = r.split(':').map(Number), k = k0 / Math.max(a, b); return { w: Math.max(5, Math.round(a * k)), h: Math.max(5, Math.round(b * k)) }; };
         const opt = (label: string, cur: boolean, fn: () => void, x: AnyState = {}) => ({ label, desc: '', shape: false, check: cur, bg: cur ? 'var(--hover)' : 'transparent', onClick: () => { fn(); this.setState({ popover: null }); }, ...x });
-        const ic = (k: string) => ({ model: k === 'model', ratio: k === 'ratio', dur: k === 'dur', res: k === 'res', fmt: k === 'fmt', batch: k === 'batch', audio: k === 'audio', mute: k === 'mute' });
+        const ic = (k: string) => ({ model: k === 'model', ratio: k === 'ratio', dur: k === 'dur', res: k === 'res', batch: k === 'batch', audio: k === 'audio', mute: k === 'mute' });
         const list = [
           { key: 'model', icon: 'model', title: isVideo ? 'Video model' : 'Image model', value: s.catalog ? this.modelName(s.model[mode]) : 'Loading…', menuW: 260,
             items: M[mode].map((m: any) => opt(m.name, m.id === s.model[mode], () => per('model', m.id), { desc: m.desc })) },
-          { key: 'ratio', icon: 'ratio', title: 'Aspect ratio', value: s.ratio[mode], menuW: 150, ...shape(s.ratio[mode]),
-            items: RATIOS[mode].map((r) => opt(r, r === s.ratio[mode], () => per('ratio', r), { shape: true, ...shape(r, 14) })) },
-          isVideo ? { key: 'dur', icon: 'dur', title: 'Duration', value: s.duration + 's', menuW: 140,
+          caps.ratios ? { key: 'ratio', icon: 'ratio', title: 'Aspect ratio', value: s.ratio[mode], menuW: 150, ...shape(s.ratio[mode]),
+            items: caps.ratios.map((r) => opt(r, r === s.ratio[mode], () => per('ratio', r), { shape: true, ...shape(r, 14) })) } : null,
+          isVideo && caps.duration ? { key: 'dur', icon: 'dur', title: 'Duration', value: s.duration + 's', menuW: 140,
             items: [5, 10].map((v) => opt(v + 's', v === s.duration, () => this.setState({ duration: v }))) } : null,
-          { key: 'res', icon: 'res', title: 'Resolution', value: s.res[mode], menuW: 140,
-            items: OPTS[mode].res.map((v) => opt(String(v), v === s.res[mode], () => per('res', v))) },
-          { key: 'fmt', icon: 'fmt', title: 'Format', value: s.fmt[mode], menuW: 140,
-            items: OPTS[mode].fmt.map((v) => opt(String(v), v === s.fmt[mode], () => per('fmt', v))) },
+          caps.res ? { key: 'res', icon: 'res', title: 'Resolution', value: s.res[mode], menuW: 140,
+            items: caps.res.map((v) => opt(String(v), v === s.res[mode], () => per('res', v))) } : null,
           { key: 'batch', icon: 'batch', title: 'Batch size', value: s.batch + '×', menuW: 140,
             items: [1, 2, 3, 4].map((v) => opt(v + '×', v === s.batch, () => this.setState({ batch: v }))) },
-          isVideo ? { key: 'audio', icon: s.audio ? 'audio' : 'mute', title: 'Audio', value: s.audio ? 'Audio on' : 'Audio off', menuW: 220,
+          isVideo && caps.audio ? { key: 'audio', icon: s.audio ? 'audio' : 'mute', title: 'Audio', value: s.audio ? 'Audio on' : 'Audio off', menuW: 220,
             items: [opt('On', s.audio, () => this.setState({ audio: true }), { desc: 'Generate sound with the video' }), opt('Off', !s.audio, () => this.setState({ audio: false }))] } : null,
         ].filter(Boolean) as AnyState[];
         const lvl = s.pillLvl || 0, keep: string[] | null = lvl === 0 ? null : lvl === 1 ? ['model', 'ratio'] : lvl === 2 ? ['model'] : [];
@@ -1559,6 +1565,11 @@ export default class App extends ReactComponent<Record<string, never>, AnyState>
       projConfirmBody: cN ? `This project has ${cN} asset${cN > 1 ? 's' : ''}. Keep them in Assets without a project, or delete them too.` : 'This project is empty.',
       projDeleteLabel: cN ? 'Delete assets too' : 'Delete project',
       deleteProjKeep: () => this.deleteProject(false), deleteProjAll: () => this.deleteProject(true),
+      confirmGenerate: !!cGen,
+      confirmGenTitle: cGen ? `Generate ${cGen.batch > 1 ? cGen.batch + ' ' : ''}${cGen.type === 'video' ? (cGen.batch > 1 ? 'videos' : 'a video') : (cGen.batch > 1 ? 'images' : 'an image')}?` : '',
+      confirmGenPrompt: cGen ? cGen.prompt : '',
+      confirmGenMeta: cGen ? [this.modelName(cGen.model), cGen.ratio, cGen.type === 'video' ? cGen.duration + 's' : null, cGen.res].filter(Boolean).join(' · ') : '',
+      doGenerateConfirm: () => this.doGenerate(),
 
       toasts: s.toasts.map((t: any) => {
         const onT = t.shown && !t.leaving;
@@ -1951,9 +1962,11 @@ export default class App extends ReactComponent<Record<string, never>, AnyState>
                     </div>
                   )}
                 </div>
-                <button onClick={v.toggleNeg} title={v.negTitle} className="u-hov-surface-text" style={css(`width:30px;height:28px;flex-shrink:0;display:flex;align-items:center;justify-content:center;border:1px solid ${v.negBtn.border};border-radius:7px;background:${v.negBtn.bg};color:${v.negBtn.color};cursor:pointer`)}>
-                  <svg width="14" height="14" viewBox="0 0 24 24" style={css('fill:none;stroke:currentColor;stroke-width:1.75;stroke-linecap:round')}><circle cx="12" cy="12" r="8.5" /><path d="M6 6l12 12" /></svg>
-                </button>
+                {v.negSupported && (
+                  <button onClick={v.toggleNeg} title={v.negTitle} className="u-hov-surface-text" style={css(`width:30px;height:28px;flex-shrink:0;display:flex;align-items:center;justify-content:center;border:1px solid ${v.negBtn.border};border-radius:7px;background:${v.negBtn.bg};color:${v.negBtn.color};cursor:pointer`)}>
+                    <svg width="14" height="14" viewBox="0 0 24 24" style={css('fill:none;stroke:currentColor;stroke-width:1.75;stroke-linecap:round')}><circle cx="12" cy="12" r="8.5" /><path d="M6 6l12 12" /></svg>
+                  </button>
+                )}
                 <div style={css('display:flex;flex-shrink:0;gap:2px;padding:2px;border-radius:8px;background:var(--hover);border:1px solid var(--border)')}>
                   <button onClick={v.setImage} style={css(`display:flex;align-items:center;gap:6px;height:24px;padding:0 9px;border:0;border-radius:6px;background:${v.modeSeg.image.bg};color:${v.modeSeg.image.color};box-shadow:${v.modeSeg.image.shadow};font-size:12.5px;cursor:pointer`)}>
                     <svg width="13" height="13" viewBox="0 0 24 24" style={css('fill:none;stroke:currentColor;stroke-width:1.75;stroke-linecap:round;stroke-linejoin:round')}><rect x="3" y="3" width="18" height="18" rx="3" /><circle cx="9" cy="9" r="1.8" /><path d="M21 15l-5-5L5 21" /></svg>
@@ -1972,7 +1985,6 @@ export default class App extends ReactComponent<Record<string, never>, AnyState>
                         {p.ic.ratio && <span style={css('width:13px;height:13px;flex-shrink:0;display:flex;align-items:center;justify-content:center')}><span style={{ width: p.w, height: p.h, border: '1.5px solid currentColor', borderRadius: 2, boxSizing: 'border-box' }} /></span>}
                         {p.ic.dur && <svg width="13" height="13" viewBox="0 0 24 24" style={css('flex-shrink:0;fill:none;stroke:currentColor;stroke-width:1.75;stroke-linecap:round;stroke-linejoin:round')}><circle cx="12" cy="12" r="8.5" /><path d="M12 7.5V12l3 2" /></svg>}
                         {p.ic.res && <svg width="13" height="13" viewBox="0 0 24 24" style={css('flex-shrink:0;fill:none;stroke:currentColor;stroke-width:1.75;stroke-linecap:round;stroke-linejoin:round')}><path d="M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5" /></svg>}
-                        {p.ic.fmt && <svg width="13" height="13" viewBox="0 0 24 24" style={css('flex-shrink:0;fill:none;stroke:currentColor;stroke-width:1.75;stroke-linecap:round;stroke-linejoin:round')}><path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z" /><path d="M14 3v5h5" /></svg>}
                         {p.ic.batch && <svg width="13" height="13" viewBox="0 0 24 24" style={css('flex-shrink:0;fill:none;stroke:currentColor;stroke-width:1.75;stroke-linecap:round;stroke-linejoin:round')}><rect x="8" y="8" width="12" height="12" rx="2" /><path d="M16 8V6a2 2 0 0 0-2-2H6a2 2 0 0 0-2 2v8a2 2 0 0 0 2 2h2" /></svg>}
                         {p.ic.audio && <svg width="13" height="13" viewBox="0 0 24 24" style={css('flex-shrink:0;fill:none;stroke:currentColor;stroke-width:1.75;stroke-linecap:round;stroke-linejoin:round')}><path d="M11 5L6 9H3v6h3l5 4z" /><path d="M15.5 8.5a5 5 0 0 1 0 7M18.5 5.5a9 9 0 0 1 0 13" /></svg>}
                         {p.ic.mute && <svg width="13" height="13" viewBox="0 0 24 24" style={css('flex-shrink:0;fill:none;stroke:currentColor;stroke-width:1.75;stroke-linecap:round;stroke-linejoin:round')}><path d="M11 5L6 9H3v6h3l5 4z" /><path d="M16 9.5l5 5M21 9.5l-5 5" /></svg>}
@@ -2648,6 +2660,19 @@ export default class App extends ReactComponent<Record<string, never>, AnyState>
                 <button onClick={v.closeModal} className="u-hov-surface" style={css('height:32px;padding:0 12px;border:1px solid var(--border2);border-radius:7px;background:transparent;color:var(--text);cursor:pointer')}>Cancel</button>
                 {v.projHasAssets && <button onClick={v.deleteProjKeep} className="u-hov-surface" style={css('height:32px;padding:0 12px;border:1px solid var(--border2);border-radius:7px;background:transparent;color:var(--text);cursor:pointer')}>Keep assets</button>}
                 <button onClick={v.deleteProjAll} style={css('height:32px;padding:0 14px;border:0;border-radius:7px;background:var(--danger);color:var(--on-danger);font-weight:500;cursor:pointer')}>{v.projDeleteLabel}</button>
+              </div>
+            </>
+          )}
+          {v.confirmGenerate && (
+            <>
+              <div style={css('display:flex;flex-direction:column;gap:6px')}>
+                <div style={css('font-size:15px;font-weight:500')}>{v.confirmGenTitle}</div>
+                <div style={css('color:var(--text2);line-height:1.5;max-height:160px;overflow-y:auto')}>&ldquo;{v.confirmGenPrompt}&rdquo;</div>
+                <div style={css('font-size:12px;color:var(--text3)')}>{v.confirmGenMeta}</div>
+              </div>
+              <div style={css('display:flex;justify-content:flex-end;gap:8px')}>
+                <button onClick={v.closeModal} className="u-hov-surface" style={css('height:32px;padding:0 12px;border:1px solid var(--border2);border-radius:7px;background:transparent;color:var(--text);cursor:pointer')}>Cancel</button>
+                <button onClick={v.doGenerateConfirm} autoFocus style={css('height:32px;padding:0 14px;border:0;border-radius:7px;background:var(--accent);color:var(--on-accent);font-weight:500;cursor:pointer')}>Generate</button>
               </div>
             </>
           )}
