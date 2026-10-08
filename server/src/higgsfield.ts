@@ -1,3 +1,5 @@
+import { createHiggsfieldClient, AuthenticationError, APIError } from "@higgsfield/client/v2";
+
 const BASE = "https://api.higgsfield.ai";
 const USER_AGENT = "higgsfield-studio/0.1";
 
@@ -168,6 +170,26 @@ function mapByPaths(job: CreateJob, paths: PlatformPaths, hasDuration: boolean):
   return null;
 }
 
+// Submission goes through the official SDK (v2's subscribe(), withPolling:false — we poll
+// ourselves, see getStatus below, since the client needs incremental per-item status rather than
+// one blocking wait). Status/cancel/upload stay on raw REST: v2's HiggsfieldClient only exposes
+// subscribe()/configure(), nothing for a standalone status check, cancel, or the presigned-upload
+// dance — see TODO.md.
+async function submit(cred: Cred, path: string, body: any): Promise<CreateResult> {
+  const client = createHiggsfieldClient({ credentials: `${cred.keyId}:${cred.keySecret}` });
+  try {
+    const r = await client.subscribe(path, { input: body, withPolling: false });
+    return { requestId: r.request_id };
+  } catch (e: any) {
+    if (e instanceof AuthenticationError) return { error: ERR.invalidKey };
+    // NotEnoughCreditsError/ValidationError/BadInputError all extend APIError but only set
+    // statusCode (not responseData) themselves — their real detail lives in e.message instead, so
+    // synthesize a body errFromStatus can read the same way it reads a raw fetch response.
+    if (e instanceof APIError) return { error: errFromStatus(e.statusCode ?? 0, e.responseData ?? { detail: e.message }) };
+    return { error: ERR.server }; // network failure or anything else unrecognized
+  }
+}
+
 // ponytail: Higgsfield has one HTTP endpoint PER MODEL (and a different one again
 // for the text-only vs reference-image variant of the same model), not one
 // generic "create a generation" call. soul, seedance, kling, kling-standard, minimax, soul-v2
@@ -176,68 +198,58 @@ function mapByPaths(job: CreateJob, paths: PlatformPaths, hasDuration: boolean):
 // still missing from both falls through to ERR.unsupported — better to say so than to guess a
 // path and silently waste the user's credits on a malformed call.
 async function createOne(cred: Cred, job: CreateJob): Promise<CreateResult> {
-  let res: Response;
   const generic = job.type === "video" ? GENERIC_VIDEO[job.model] : GENERIC_IMAGE[job.model];
   if (generic) {
     const mapped = mapByPaths(job, generic, job.type === "video");
     if (!mapped) return { error: ERR.needsImage };
-    res = await hf(cred, "/" + mapped.path, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(mapped.body) });
-  } else if (job.model === "soul") {
+    return submit(cred, mapped.path, mapped.body);
+  }
+  if (job.model === "soul") {
     const resolution = job.res === "4K" ? "4K" : "2K"; // soul only ships 2K/4K
-    res = await hf(cred, "/higgsfield-ai/soul/standard", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ prompt: job.prompt, num_images: 1, resolution, aspect_ratio: job.ratio }),
-    });
-  } else if (job.model === "soul-v2" || job.model === "soul-cinema") {
+    return submit(cred, "higgsfield-ai/soul/standard", { prompt: job.prompt, num_images: 1, resolution, aspect_ratio: job.ratio });
+  }
+  if (job.model === "soul-v2" || job.model === "soul-cinema") {
     const path = job.model === "soul-v2" ? "higgsfield-ai/soul/v2/standard" : "higgsfield-ai/soul/cinema";
     const resolution = job.res === "1080p" ? "1080p" : "720p";
-    res = await hf(cred, "/" + path, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ prompt: job.prompt, batch_size: 1, resolution, aspect_ratio: job.ratio, enhance_prompt: false }),
-    });
-  } else if (job.model === "seedance") {
+    return submit(cred, path, { prompt: job.prompt, batch_size: 1, resolution, aspect_ratio: job.ratio, enhance_prompt: false });
+  }
+  if (job.model === "seedance") {
     const images = job.refs.filter((r) => r.kind === "image").map((r) => r.url);
     const videos = job.refs.filter((r) => r.kind === "video").map((r) => r.url);
-    const path = images.length || videos.length ? "/bytedance/seedance-2.0/reference-to-video" : "/bytedance/seedance-2.0/text-to-video";
+    const path = images.length || videos.length ? "bytedance/seedance-2.0/reference-to-video" : "bytedance/seedance-2.0/text-to-video";
     const body: any = { prompt: job.prompt, duration: job.duration || 5, resolution: job.res || "720p", aspect_ratio: job.ratio, generate_audio: !!job.audio };
     if (images.length) body.image_urls = images.slice(0, 9);
     if (videos.length) body.video_urls = videos.slice(0, 3);
-    res = await hf(cred, path, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
-  } else if (job.model === "kling") {
+    return submit(cred, path, body);
+  }
+  if (job.model === "kling") {
     // kling-video takes one image_url, not an array — first image ref wins (Start frame, if tagged).
     const img = job.refs.find((r) => r.kind === "image");
-    const path = img ? "/kling-video/v2.5-turbo/pro/image-to-video" : "/kling-video/v2.5-turbo/pro/text-to-video";
+    const path = img ? "kling-video/v2.5-turbo/pro/image-to-video" : "kling-video/v2.5-turbo/pro/text-to-video";
     const body: any = { prompt: job.prompt, duration: job.duration === 10 ? 10 : 5 };
     if (job.negative) body.negative_prompt = job.negative;
     if (img) body.image_url = img.url;
-    res = await hf(cred, path, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
-  } else if (job.model === "minimax") {
+    return submit(cred, path, body);
+  }
+  if (job.model === "minimax") {
     // hailuo-2.3/standard: confirmed via the OpenAPI spec. duration is 6|10 (not 5|10 like kling) —
     // prompt_optimizer has no UI control, left at the API's own default (true).
     const img = job.refs.find((r) => r.kind === "image");
-    const path = img ? "/minimax/hailuo-2.3/standard/image-to-video" : "/minimax/hailuo-2.3/standard/text-to-video";
+    const path = img ? "minimax/hailuo-2.3/standard/image-to-video" : "minimax/hailuo-2.3/standard/text-to-video";
     const body: any = { prompt: job.prompt, duration: job.duration === 10 ? 10 : 6, prompt_optimizer: true };
     if (img) body.image_url = img.url;
-    res = await hf(cred, path, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
-  } else if (job.model === "kling-standard") {
+    return submit(cred, path, body);
+  }
+  if (job.model === "kling-standard") {
     // v2.5-turbo/standard/image-to-video only — confirmed via the OpenAPI spec (same body shape as
     // pro, but no text-to-video counterpart exists for this tier; image_url is required).
     const img = job.refs.find((r) => r.kind === "image");
     if (!img) return { error: ERR.needsImage };
     const body: any = { prompt: job.prompt, duration: job.duration === 10 ? 10 : 5, image_url: img.url };
     if (job.negative) body.negative_prompt = job.negative;
-    res = await hf(cred, "/kling-video/v2.5-turbo/standard/image-to-video", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
-  } else {
-    return { error: ERR.unsupported };
+    return submit(cred, "kling-video/v2.5-turbo/standard/image-to-video", body);
   }
-  if (!res.ok) {
-    const body = await res.json().catch(() => ({}));
-    return { error: errFromStatus(res.status, body) };
-  }
-  const data = await res.json();
-  return { requestId: data.request_id as string };
+  return { error: ERR.unsupported };
 }
 
 /** Creates `count` Higgsfield requests for one generation (soul alone could batch via num_images, but
