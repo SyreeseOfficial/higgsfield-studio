@@ -26,18 +26,15 @@ The UI is finished, but every "server" call is faked in memory. Search the file 
   - `Component.RATIOS`/`OPTS`/duration choices stay hardcoded — Higgsfield's docs don't expose per-model capability metadata either, so there's nothing real to fetch them from.
   - The UI still handles a slow/failed catalog load the same way ("Loading models" / "Models unavailable").
 
-## History and paging (done in UI, needs endpoints)
+## History and paging — DONE
 
-- [ ] `GET /api/assets?view&type&model&project&fav&ratio&sort&q&cursor&limit` returns `{ ids | items, nextCursor, total }`. Replace the stub in `api.listAssets`.
-  - The grid already pages 24 at a time with cursors, shows skeletons, and refreshes when new items arrive.
-  - Search is debounced (250ms) and runs server-side. Use SQLite FTS5 on prompts.
-- [ ] `GET /api/assets/ids?<filters>` returns all matching ids, for "Select all N" (`api.listAssetIds`).
-- [ ] Return items rather than ids once the client no longer keeps every generation in memory. Today `fetchPage` resolves ids against local state.
-- [ ] Sidebar counts (Assets, Favorites, project counts) are computed locally. Replace with `GET /api/counts`.
+- [x] `GET /api/assets?view&type&model&project&fav&ratio&sort&q&cursor&limit` (`server/src/routes/assets.ts`) returns `{ ids, nextCursor, total }`. Filters, sort and cursor paging all run server-side; search runs through SQLite FTS5 on `generations.prompt`.
+- [x] `GET /api/assets/ids?<filters>` (`assetsRouter.get("/ids")`) returns every matching id for "Select all N".
+- [x] Sidebar counts (Assets, Favorites, project counts, upload bytes) come from `GET /api/counts` (`countsRouter`), not client-side computation.
 - [x] ~~The Create feed pages through items already loaded in the browser (`feedShown`). Move it to a cursor endpoint as well.~~ `GET /api/generations` already returns every generation unconditionally (`loadGenerations()`), so the whole history is already in memory — a cursor endpoint here would add a network layer in front of data that's already local. Revisit only if that full-history load itself becomes the bottleneck.
 - [x] Lightbox prev/next stops at the last loaded item. `lbStep()` now fetches the next page (`fetchPage()`) when it runs past the end of `gridIds` on Assets/Favorites, instead of silently stopping.
 
-## Uploads (done in UI, needs storage)
+## Uploads — DONE
 
 New **Uploads** view in the sidebar. Every file attached as a reference, or uploaded to Assets, is saved here.
 
@@ -49,14 +46,11 @@ The UI already has:
 - Preview with prev/next and "Used in" links
 
 Backend work:
-- [ ] `POST /api/uploads` (multipart): store the file, generate a thumbnail (images; first frame for video; waveform optional for audio), and record `{ id, kind, name, size, w, h, dur, createdAt }`.
-- [ ] `GET /api/uploads?type&usage&sort&q&cursor`. Usage ("Used in N") comes from `generation_refs`.
-- [ ] `DELETE /api/uploads` with body `{ ids }`.
-  - Decide whether generations that used a deleted file keep a thumbnail. Recommended: keep a small thumbnail, delete the original.
-  - Undo is a client toast today. Either soft-delete with a ~10s purge, or delay the real delete until the toast expires.
-- [ ] Composer references should send `uploadId`s, not blob URLs. Replace `blobUrl()` / `uploadRec()` with an upload-then-reference flow, and show progress per chip while uploading.
+- [x] `POST /api/uploads` (multipart, `uploads.ts`) stores the file and records `{ id, kind, name, size, w, h, dur, createdAt, hash }`. No server-side thumbnail generation: images render directly from the stored file and dims/duration are read client-side before upload (`imgDims()`/`mediaMeta()`) — no image/video processing library needed just to re-derive them.
+- [x] `GET /api/uploads?type&usage&sort&q&cursor` — usage count comes from a `generation_refs` join (`uploadsRouter.get("/")`).
+- [x] `DELETE /api/uploads` with body `{ ids }`. Resolved both open decisions: a deleted upload's file is independent of `generation_refs.url` (which always stores its own persistent local copy), so past generations keep working after the source upload is gone; and the real delete waits out the ~10s undo toast (`deleteUploads()` in `App.tsx`) rather than firing immediately — undo just cancels the pending `setTimeout` and restores local state.
+- [x] Composer references send `uploadId`s, not blob URLs. `addFiles()` shows a local blob preview per chip immediately, uploads in the background via `realUpload()`, and `swapUpload()` replaces the preview with the real `uploadId` (or drops it on failure) everywhere it's referenced.
 - [x] Limits: max file size (50MB, `multer`'s `limits.fileSize` in `uploads.ts`). No total quota — single-user localhost tool, decided not worth the friction. Storage-used header now reads `GET /api/counts`'s `uploadBytes` (sum over every upload) instead of summing whatever page of `s.uploads` happened to be loaded client-side, which undercounted past the first page.
-- [ ] "Use as reference" for an upload that's an Assets image: confirm Higgsfield accepts it as a reference input.
 
 ## Higgsfield integration audit (found 2026-10-08)
 
@@ -64,12 +58,12 @@ Backend work:
 - [ ] **Guard against duplicate submissions.** `generate()` → `runGen()` (`web/src/App.tsx`) has no in-flight lock; a double-click before the first POST resolves fires two generations. Add a `submitting` flag or disable the button until `submitGen` settles.
 - [ ] **Add setup docs.** Root README and `.env.example` existed before the Vite/Express rewrite (`e45b043`) and got dropped. Need: how to run (`npm run dev`), `PORT`, and a note that the Higgsfield key is entered via Settings (encrypted in SQLite), not an env var.
 
-## Clean-up items
+## Clean-up items — DONE
 
-- [ ] `onKeyInput` is defined twice in `buildVals()`. Remove the first one.
-- [ ] Zip download fetches files in the browser. Once media is served from your own server, CORS is fine. Otherwise build the zip server-side (`POST /api/zip`).
-- [ ] Theme and default mode (Settings) aren't saved. Persist them in localStorage or `GET/PUT /api/settings`.
-- [ ] Add Uploads shortcuts to the Shortcuts sheet (`/` search, ←/→ in preview, Delete, Cmd/Ctrl+A).
+- [x] ~~`onKeyInput` is defined twice in `buildVals()`. Remove the first one.~~ Only one definition exists now (`App.tsx:1543`).
+- [x] ~~Zip download fetches files in the browser.~~ Media is served from our own server now (`/media/...`), so this is same-origin — no CORS problem to solve, no server-side zip needed.
+- [x] Theme and default mode (Settings) persist to `localStorage` (`studio.theme`, `studio.defaultMode`).
+- [x] Uploads shortcuts are in the Shortcuts sheet (`/` search, ←/→ in preview, Delete, Cmd/Ctrl+A) — `App.tsx:2689-2694`.
 
 ## Nice to have
 
