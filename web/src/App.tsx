@@ -50,12 +50,44 @@ const SAMPLES = {
 // soul and kling (neither has a format param either, nor does the documented Seedance request body —
 // the real output extension comes from Higgsfield's response, not a client choice, so there's no
 // Format control at all).
+// Generic models (GENERIC_VIDEO/GENERIC_IMAGE in higgsfield.ts) all share one settings shape —
+// ported from the official template's videoModel()/imageModel() defaults. Duration there is a
+// continuous 4-10s range, not a discrete choice, so those models get no duration pill; the server
+// sends the template's own default (5s) for every request.
+const GENERIC_VIDEO_CAPS = { ratios: ['16:9', '9:16', '1:1'], res: ['720p', '1080p'] };
+const GENERIC_IMAGE_CAPS = { ratios: ['auto', '1:1', '4:3', '3:4', '16:9', '9:16'], res: ['1k', '2k', '4k'] };
+const SOUL_V2_CAPS = { ratios: ['9:16', '16:9', '4:3', '3:4', '1:1', '2:3', '3:2'], res: ['720p', '1080p'] };
+
 const MODEL_CAPS: Record<string, { ratios?: string[]; res?: string[]; duration?: boolean; durations?: number[]; audio?: boolean; negative?: boolean }> = {
   soul: { ratios: ['1:1', '4:3', '3:4', '3:2', '2:3', '5:4', '4:5', '16:9', '9:16', '21:9'], res: ['2K', '4K'] },
-  seedance: { ratios: ['16:9', '9:16', '1:1', '4:3', '3:4', '21:9'], res: ['480p', '720p', '1080p', '4K'], duration: true, durations: [5, 10], audio: true },
+  'soul-v2': SOUL_V2_CAPS,
+  'soul-cinema': SOUL_V2_CAPS,
+  seedance: { ratios: ['16:9', '9:16', '1:1', '4:3', '3:4', '21:9'], res: ['480p', '720p', '1080p', '4k'], duration: true, durations: [5, 10], audio: true },
   kling: { duration: true, durations: [5, 10], negative: true },
   'kling-standard': { duration: true, durations: [5, 10], negative: true },
   minimax: { duration: true, durations: [6, 10] },
+  'flux-2': GENERIC_IMAGE_CAPS,
+  'grok-image': GENERIC_IMAGE_CAPS,
+  ideogram: GENERIC_IMAGE_CAPS,
+  'qwen-image': GENERIC_IMAGE_CAPS,
+  recraft: GENERIC_IMAGE_CAPS,
+  'z-image': GENERIC_IMAGE_CAPS,
+  dop: GENERIC_VIDEO_CAPS,
+  'flux-3': GENERIC_VIDEO_CAPS,
+  'grok-video': GENERIC_VIDEO_CAPS,
+  'happy-horse-1-0': GENERIC_VIDEO_CAPS,
+  'happy-horse-1-1': GENERIC_VIDEO_CAPS,
+  'kling-2-6': GENERIC_VIDEO_CAPS,
+  'kling-o1': GENERIC_VIDEO_CAPS,
+  'kling-o3': GENERIC_VIDEO_CAPS,
+  'ltx-2-5-fast': GENERIC_VIDEO_CAPS,
+  'ltx-2-5-pro': GENERIC_VIDEO_CAPS,
+  'minimax-h3': GENERIC_VIDEO_CAPS,
+  'pixverse-6': GENERIC_VIDEO_CAPS,
+  'wan-2-6': GENERIC_VIDEO_CAPS,
+  'wan-2-7': GENERIC_VIDEO_CAPS,
+  'wan-3': GENERIC_VIDEO_CAPS,
+  'wan-3-prime': GENERIC_VIDEO_CAPS,
 };
 const MAX_REFS = 10;
 const PAGE = 24;
@@ -1478,8 +1510,10 @@ export default class App extends ReactComponent<Record<string, never>, AnyState>
           { key: 'model', icon: 'model', title: isVideo ? 'Video model' : 'Image model', value: s.catalog ? this.modelName(s.model[mode]) : 'Loading…', menuW: 260,
             items: M[mode].map((m: any) => opt(m.name, m.id === s.model[mode], () => {
               per('model', m.id);
-              const ds = MODEL_CAPS[m.id]?.durations;
-              if (ds && !ds.includes(s.duration)) this.setState({ duration: ds[0] });
+              const next = MODEL_CAPS[m.id] || {};
+              if (next.durations && !next.durations.includes(s.duration)) this.setState({ duration: next.durations[0] });
+              if (next.res && !next.res.includes(s.res[mode])) per('res', next.res[0]);
+              if (next.ratios && !next.ratios.includes(s.ratio[mode])) per('ratio', next.ratios[0]);
             }, { desc: m.desc })) },
           caps.ratios ? { key: 'ratio', icon: 'ratio', title: 'Aspect ratio', value: s.ratio[mode], menuW: 150, ...shape(s.ratio[mode]),
             items: caps.ratios.map((r) => opt(r, r === s.ratio[mode], () => per('ratio', r), { shape: true, ...shape(r, 14) })) } : null,

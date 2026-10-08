@@ -101,23 +101,101 @@ export type CreateJob = {
 
 type CreateResult = { requestId: string } | { error: ErrShape };
 
+// Generic model registry, ported from Higgsfield's own official Next.js template
+// (`pnpm dlx shadcn@latest view higgsfield-ai/app-templates/models` —
+// generation/catalog/defaults.ts + mappers.ts) rather than guessed — see TODO.md.
+// Each entry is the set of real platform paths a model exposes per media role; `mapByPaths`
+// mirrors the template's own `mapByPaths()` exactly: first/last frame, then image-to-video,
+// then reference(s), then plain text.
+type PlatformPaths = { text?: string; image?: string; firstLast?: string; reference?: string };
+
+const GENERIC_VIDEO: Record<string, PlatformPaths> = {
+  dop: { image: "higgsfield-ai/dop/lite" },
+  "flux-3": { text: "blackforestlabs/flux-3/text-to-video", image: "blackforestlabs/flux-3/image-to-video" },
+  "grok-video": { reference: "xai/grok-imagine-video/v1.5/reference-to-video" },
+  "happy-horse-1-0": { text: "alibaba/happy-horse/text-to-video", image: "alibaba/happy-horse/image-to-video" },
+  "happy-horse-1-1": { text: "alibaba/happy-horse/v1.1/text-to-video", image: "alibaba/happy-horse/v1.1/image-to-video" },
+  "kling-2-6": { text: "kling-video/v2.6/pro/text-to-video", image: "kling-video/v2.6/pro/image-to-video" },
+  "kling-o1": { firstLast: "kling-video/omni/first-last-frame" },
+  "kling-o3": { firstLast: "kling-video/o3/first-last-frame" },
+  "ltx-2-5-fast": { text: "lightricks/ltx-2.5/text-to-video/fast" }, // no image-to-video in the template
+  "ltx-2-5-pro": { text: "lightricks/ltx-2.5/text-to-video/pro" },
+  "minimax-h3": { text: "minimax/h3/text-to-video", image: "minimax/h3/image-to-video" },
+  "pixverse-6": { text: "pixverse/v6/text-to-video", image: "pixverse/v6/image-to-video" },
+  "wan-2-6": { text: "wan/v2.6/text-to-video", image: "wan/v2.6/image-to-video" },
+  "wan-2-7": { text: "wan/v2.7/text-to-video", image: "wan/v2.7/image-to-video" },
+  "wan-3": { text: "alibaba/wan-3.0/text-to-video", image: "alibaba/wan-3.0/image-to-video" },
+  "wan-3-prime": { text: "alibaba/wan-3.0-prime/text-to-video", image: "alibaba/wan-3.0-prime/image-to-video" },
+};
+
+const GENERIC_IMAGE: Record<string, PlatformPaths> = {
+  "flux-2": { text: "flux-2-pro" },
+  "grok-image": { text: "xai/grok-imagine-image-2.0" },
+  ideogram: { text: "ideogram/v4.0" },
+  "qwen-image": { text: "alibaba/qwen-image-3/text-to-image" },
+  recraft: { text: "recraft/v4.1/text-to-image" },
+  "z-image": { text: "z-image/turbo" },
+};
+
+function refUrl(refs: RefInput[], tag: string): string | undefined {
+  return refs.find((r) => r.tag === tag)?.url;
+}
+function refsByKind(refs: RefInput[], kind: string): string[] {
+  return refs.filter((r) => r.kind === kind && r.tag !== "Start" && r.tag !== "End").map((r) => r.url);
+}
+
+function mapByPaths(job: CreateJob, paths: PlatformPaths, hasDuration: boolean): { path: string; body: any } | null {
+  const start = refUrl(job.refs, "Start");
+  const end = refUrl(job.refs, "End");
+  const imgs = refsByKind(job.refs, "image");
+  const vids = refsByKind(job.refs, "video");
+  const body: any = { prompt: job.prompt, aspect_ratio: job.ratio, resolution: job.res };
+  if (hasDuration) body.duration = job.duration || 5;
+  if (paths.firstLast && (start || end)) {
+    return { path: paths.firstLast, body: { ...body, ...(start ? { first_frame_url: start } : {}), ...(end ? { last_frame_url: end } : {}) } };
+  }
+  if (paths.image && start) {
+    return { path: paths.image, body: { ...body, image_url: start, ...(end ? { last_image_url: end } : {}) } };
+  }
+  if (paths.reference && (imgs.length || vids.length)) {
+    return { path: paths.reference, body: { ...body, ...(imgs.length ? { image_urls: imgs } : {}), ...(vids.length ? { video_urls: vids } : {}) } };
+  }
+  if (paths.text) return { path: paths.text, body: imgs.length ? { ...body, image_urls: imgs } : body };
+  // No text path and none of the media-specific branches above matched: this model needs a
+  // reference and none was given. (The official template's own mapper falls through to calling
+  // paths.image/reference/firstLast anyway with no media — confirmed live that Higgsfield accepts
+  // and starts "Generating…" on that incomplete request. Diverging here on purpose.)
+  return null;
+}
+
 // ponytail: Higgsfield has one HTTP endpoint PER MODEL (and a different one again
 // for the text-only vs reference-image variant of the same model), not one
-// generic "create a generation" call — confirmed against the official OpenAPI
-// spec and per-model reference docs. Only the five models below (soul, seedance,
-// kling, kling-standard, minimax) have a verified real endpoint; the rest of the catalog in
-// server/src/routes/models.ts is real (checked against open.higgsfield.ai/explore)
-// but schema-unverified, and falls through to ERR.unsupported here — better to
-// say so than to guess a path and silently waste the user's credits on a
-// malformed call.
+// generic "create a generation" call. soul, seedance, kling, kling-standard, minimax, soul-v2
+// and soul-cinema keep bespoke branches (confirmed via the OpenAPI spec); everything in
+// GENERIC_VIDEO/GENERIC_IMAGE above is confirmed via Higgsfield's own template source. Anything
+// still missing from both falls through to ERR.unsupported — better to say so than to guess a
+// path and silently waste the user's credits on a malformed call.
 async function createOne(cred: Cred, job: CreateJob): Promise<CreateResult> {
   let res: Response;
-  if (job.model === "soul") {
+  const generic = job.type === "video" ? GENERIC_VIDEO[job.model] : GENERIC_IMAGE[job.model];
+  if (generic) {
+    const mapped = mapByPaths(job, generic, job.type === "video");
+    if (!mapped) return { error: ERR.needsImage };
+    res = await hf(cred, "/" + mapped.path, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(mapped.body) });
+  } else if (job.model === "soul") {
     const resolution = job.res === "4K" ? "4K" : "2K"; // soul only ships 2K/4K
     res = await hf(cred, "/higgsfield-ai/soul/standard", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ prompt: job.prompt, num_images: 1, resolution, aspect_ratio: job.ratio }),
+    });
+  } else if (job.model === "soul-v2" || job.model === "soul-cinema") {
+    const path = job.model === "soul-v2" ? "higgsfield-ai/soul/v2/standard" : "higgsfield-ai/soul/cinema";
+    const resolution = job.res === "1080p" ? "1080p" : "720p";
+    res = await hf(cred, "/" + path, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ prompt: job.prompt, batch_size: 1, resolution, aspect_ratio: job.ratio, enhance_prompt: false }),
     });
   } else if (job.model === "seedance") {
     const images = job.refs.filter((r) => r.kind === "image").map((r) => r.url);
