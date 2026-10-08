@@ -1,11 +1,18 @@
 import { Router } from "express";
 import { mkdirSync, writeFileSync, readFileSync } from "node:fs";
 import { dirname } from "node:path";
+import { createHash } from "node:crypto";
 import { db } from "../db.js";
 import { readStoredKey } from "./key.js";
 import { createMany, getStatus, cancelRequest, uploadFile, ERR_CONCURRENCY, type RefInput, type ErrShape } from "../higgsfield.js";
 
 export const generationsRouter = Router();
+
+// ponytail: in-memory last-submission fingerprint, not a persisted idempotency-key table — this is
+// a safety net for an accidental double-click/double-Enter within a few seconds, not a distributed
+// de-dup system. Single-user local server, one process, restart clears it (fine).
+const DEDUP_WINDOW_MS = 4000;
+let lastSubmit: { hash: string; at: number } | null = null;
 
 const MEDIA_DIR = new URL("../../data/media/", import.meta.url).pathname;
 
@@ -58,6 +65,18 @@ generationsRouter.post("/", async (req, res) => {
   const meta: any = req.body || {};
   const batch = Math.max(1, Math.min(10, Number(meta.batch) || 1));
   const refInputs: RefInputBody[] = Array.isArray(meta.refs) ? meta.refs : [];
+
+  // Reject an exact repeat of the last-accepted submission within DEDUP_WINDOW_MS — catches a
+  // double-click/double-Enter reaching the server, not just the UI-level guard in App.tsx.
+  const hash = createHash("sha1").update(JSON.stringify({
+    type: meta.type, model: meta.model, prompt: meta.prompt, negative: meta.negative,
+    ratio: meta.ratio, res: meta.res, duration: meta.duration, batch, refs: refInputs,
+  })).digest("hex");
+  const now0 = Date.now();
+  if (lastSubmit && lastSubmit.hash === hash && now0 - lastSubmit.at < DEDUP_WINDOW_MS) {
+    return res.status(409).json({ error: { title: "Already submitting", detail: "This generation was just submitted — give it a moment." } });
+  }
+  lastSubmit = { hash, at: now0 };
 
   // Refs arrive as either an uploadId (from the Uploads library / a fresh composer attach, which
   // now always lands in the uploads table first) or a bare local url (reusing an existing Assets
