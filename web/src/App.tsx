@@ -89,6 +89,11 @@ const MODEL_CAPS: Record<string, { ratios?: string[]; res?: string[]; duration?:
   'wan-3': GENERIC_VIDEO_CAPS,
   'wan-3-prime': GENERIC_VIDEO_CAPS,
   'seedance-2-5': { ratios: ['16:9', '9:16', '1:1', '4:3', '3:4', '21:9'], res: ['480p', '720p'], audio: true },
+  // Edit/Extend have no aspect_ratio param at all (the source video's own ratio carries over) —
+  // no ratio pill. Neither has a discrete duration either (Extend's is a continuous 4-30s range,
+  // same "no pill, server sends a sane default" treatment as seedance-2-5's own duration).
+  'seedance-2-5-edit': { res: ['480p', '720p'], audio: true },
+  'seedance-2-5-extend': { res: ['480p', '720p'], audio: true },
   'kling-3-turbo': { ratios: ['16:9', '9:16', '1:1'], res: ['720p', '1080p'] },
   'kling-3-std': { ratios: ['16:9', '9:16', '1:1'], audio: true },
   'kling-3-pro': { ratios: ['16:9', '9:16', '1:1'], audio: true },

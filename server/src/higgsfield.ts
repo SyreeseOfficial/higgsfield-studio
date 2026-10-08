@@ -193,8 +193,9 @@ async function submit(cred: Cred, path: string, body: any): Promise<CreateResult
 // ponytail: Higgsfield has one HTTP endpoint PER MODEL (and a different one again
 // for the text-only vs reference-image variant of the same model), not one
 // generic "create a generation" call. soul, seedance, kling, kling-standard, minimax, soul-v2,
-// soul-cinema, the 6 kling-3-* variants and seedance-2-5 keep bespoke branches (confirmed via the
-// OpenAPI spec or the template registry); everything in GENERIC_VIDEO/GENERIC_IMAGE above is
+// soul-cinema, the 6 kling-3-* variants, seedance-2-5 and its edit/extend variants keep bespoke
+// branches (confirmed via the OpenAPI spec or the template registry); everything in
+// GENERIC_VIDEO/GENERIC_IMAGE above is
 // confirmed via Higgsfield's own template source too. Anything still missing from both falls
 // through to ERR.unsupported — better to say so than to guess a path and silently waste the
 // user's credits on a malformed call.
@@ -314,6 +315,24 @@ async function createOne(cred: Cred, job: CreateJob): Promise<CreateResult> {
     }
     if (!job.prompt.trim()) return { error: { title: "Add a prompt or a reference", detail: "Describe what you want, or attach a reference image/video/audio, and try again." } };
     return submit(cred, "bytedance/seedance-2.5/text-to-video", { ...shared, aspect_ratio: job.ratio });
+  }
+  if (job.model === "seedance-2-5-edit" || job.model === "seedance-2-5-extend") {
+    // The template's seedance25Edit/Extend have a dedicated "source" role (the one video being
+    // edited/extended) separate from "video" (up to 10 extra reference videos). This composer has
+    // no dedicated source-video UI — reuse the existing generic "Videos" attach option instead: the
+    // first attached video is the source, any further ones become the optional extra references.
+    const [source, ...extraVideos] = refsByKind(job.refs, "video");
+    if (!source) return { error: { title: "Attach a video", detail: "This model edits or extends an existing video — attach one (via the attach menu's Videos option) and try again." } };
+    const refs = refsByKind(job.refs, "image");
+    const audios = refsByKind(job.refs, "audio");
+    const body: any = { resolution: job.res || "720p", generate_audio: !!job.audio, bitrate_mode: "high", video_url: source };
+    if (job.prompt.trim()) body.prompt = job.prompt.trim();
+    if (job.model === "seedance-2-5-extend") body.duration = job.duration || 5;
+    if (refs.length) body.image_urls = refs;
+    if (extraVideos.length) body.video_urls = extraVideos;
+    if (audios.length) body.audio_urls = audios;
+    const path = job.model === "seedance-2-5-edit" ? "bytedance/seedance-2.5/video-edit" : "bytedance/seedance-2.5/video-extend";
+    return submit(cred, path, body);
   }
   return { error: ERR.unsupported };
 }

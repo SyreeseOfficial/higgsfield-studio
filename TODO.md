@@ -7,7 +7,8 @@ UI source of truth, kept for reference only — the real app is `web/` + `server
 
 ## Open
 
-- [ ] **Wire up Genjutsu, Cinema Studio, Seedance 2.5 Edit/Extend.** Genjutsu and Cinema Studio aren't in Higgsfield's template registry at all — still no schema. Seedance 2.5 Edit/Extend need a "source video" media role this composer doesn't have (Kling 3.0's 6 variants and Seedance 2.5's base variant are wired now — see Model catalog below).
+Nothing open right now. Genjutsu and Cinema Studio are the only unwired models left, and that's not
+a build task — see the Model catalog note below.
 
 ---
 
@@ -28,8 +29,9 @@ UI source of truth, kept for reference only — the real app is `web/` + `server
 
 ### Model catalog
 - `GET /api/models` lists the real catalog, synced against `open.higgsfield.ai/explore` and Higgsfield's official template registry (`pnpm dlx shadcn@latest view higgsfield-ai/app-templates/<model>` — real first-party source, not a guess).
-- 36 of 38 models wired to real endpoints: `soul`, `soul-v2`, `soul-cinema`, `seedance`, `seedance-2-5`, `kling`, `kling-standard`, `kling-2-6`, `kling-3-turbo`, `kling-3-std`, `kling-3-pro`, `kling-3-4k`, `kling-3-motion-std`, `kling-3-motion-pro`, `kling-o1`, `kling-o3`, `minimax`, `minimax-h3`, `flux-2`, `flux-3`, `dop`, `pixverse-6`, `wan-2-6`, `wan-2-7`, `wan-3`, `wan-3-prime`, `happy-horse-1-0`, `happy-horse-1-1`, `ltx-2-5-fast`, `ltx-2-5-pro`, `grok-image`, `grok-video`, `ideogram`, `recraft`, `qwen-image`, `z-image`. Generic ones share one path/body mapper (`GENERIC_VIDEO`/`GENERIC_IMAGE` + `mapByPaths()` in `higgsfield.ts`), ported from the template's own mapper; Kling 3.0's 6 variants and Seedance 2.5 have bespoke branches (also ported from the template's own mapper functions, not guessed).
-- Only 2 remain unwired: Genjutsu, Cinema Studio — not in the template registry at all, still no schema.
+- 38 of 40 models wired to real endpoints: `soul`, `soul-v2`, `soul-cinema`, `seedance`, `seedance-2-5`, `seedance-2-5-edit`, `seedance-2-5-extend`, `kling`, `kling-standard`, `kling-2-6`, `kling-3-turbo`, `kling-3-std`, `kling-3-pro`, `kling-3-4k`, `kling-3-motion-std`, `kling-3-motion-pro`, `kling-o1`, `kling-o3`, `minimax`, `minimax-h3`, `flux-2`, `flux-3`, `dop`, `pixverse-6`, `wan-2-6`, `wan-2-7`, `wan-3`, `wan-3-prime`, `happy-horse-1-0`, `happy-horse-1-1`, `ltx-2-5-fast`, `ltx-2-5-pro`, `grok-image`, `grok-video`, `ideogram`, `recraft`, `qwen-image`, `z-image`. Generic ones share one path/body mapper (`GENERIC_VIDEO`/`GENERIC_IMAGE` + `mapByPaths()` in `higgsfield.ts`), ported from the template's own mapper; Kling 3.0's 6 variants and the Seedance 2.5 family have bespoke branches (also ported from the template's own mapper functions, not guessed).
+  - Seedance 2.5 Edit/Extend need a "source" video role the template keeps separate from its generic "video" reference role; this composer has no dedicated source-video control, so it reuses the existing "Videos" attach option instead — the first attached video is the source, any further ones become the optional extra references. No new UI, just that reuse plus a clear "Attach a video" error when none is given.
+- Only 2 models remain unwired, and it's not a build task: Genjutsu and Cinema Studio aren't in Higgsfield's template registry, the OpenAPI spec, or anywhere else checked this session — there's no real schema to wire up, not a missing feature on our end. Revisit only if Higgsfield publishes one.
 - Excluded: Ads Studio, Product Shots, Graphic Ads, Marketplace Design, Marketing Studio Image, AI Influencer — brand/product-asset workflows, not prompt-to-image/video models.
 - Bugs found live and fixed: switching models didn't reset resolution/ratio to a value valid for the new model (only duration was); Seedance's resolution enum was `'4K'`, the real API wants `'4k'`; image-only models (DoP, Kling O1/O3) could submit with no reference and have Higgsfield silently accept + start charging — now fails instantly with a clear error instead.
 - Kling 3.0/Seedance 2.5 settings with no UI control (`multiShots`, `cfgScale`, `characterOrientation`, `keepOriginalSound`) are left at their documented defaults rather than adding new pills — `sound` is the one exception, it reuses the existing Audio toggle (`job.audio`) rather than adding a second one.
