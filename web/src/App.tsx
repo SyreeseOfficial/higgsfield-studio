@@ -54,6 +54,7 @@ const MODEL_CAPS: Record<string, { ratios?: string[]; res?: string[]; duration?:
   soul: { ratios: ['1:1', '4:3', '3:4', '3:2', '2:3', '5:4', '4:5', '16:9', '9:16', '21:9'], res: ['2K', '4K'] },
   seedance: { ratios: ['16:9', '9:16', '1:1', '4:3', '3:4', '21:9'], res: ['480p', '720p', '1080p', '4K'], duration: true, durations: [5, 10], audio: true },
   kling: { duration: true, durations: [5, 10], negative: true },
+  'kling-standard': { duration: true, durations: [5, 10], negative: true },
   minimax: { duration: true, durations: [6, 10] },
 };
 const MAX_REFS = 10;

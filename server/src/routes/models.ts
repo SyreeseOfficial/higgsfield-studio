@@ -8,8 +8,8 @@ export const modelsRouter = Router();
 // whose request body isn't confirmed in docs.higgsfield.ai/docs/openapi.json or a model-specific doc
 // page: per the integration brief, missing verification doesn't authorize dropping a real model from
 // the catalog, only reporting it as unverified. createOne() in higgsfield.ts only has real endpoint
-// logic for soul, seedance, kling and minimax — picking any other model surfaces the honest "Model
-// not connected yet" error instead of guessing an endpoint/schema. Excluded entirely: Ads Studio,
+// logic for soul, seedance, kling, kling-standard and minimax — picking any other model surfaces the
+// honest "Model not connected yet" error instead of guessing an endpoint/schema. Excluded entirely: Ads Studio,
 // Product Shots, Graphic Ads, Marketplace Design, Marketing Studio Image and AI Influencer — those
 // are brand/product-asset workflows, not plain prompt-to-image/video models, so they don't fit this
 // composer's shape.
@@ -26,6 +26,7 @@ const CATALOG = {
   video: [
     { id: "seedance", name: "Seedance 2.0", desc: "Cinematic motion, native audio" },
     { id: "kling", name: "Kling 2.5", desc: "Realistic physics" },
+    { id: "kling-standard", name: "Kling 2.5 Standard", desc: "Image-to-video, lower cost" },
     { id: "minimax", name: "MiniMax Hailuo 2.3", desc: "Text or image to video" },
     { id: "seedance-2-5", name: "Seedance 2.5", desc: "Text/image/video-to-video, audio-to-video — schema not yet verified" },
     { id: "kling-3", name: "Kling 3.0", desc: "Text-to-video, image-to-video — schema not yet verified" },

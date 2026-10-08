@@ -40,6 +40,7 @@ const ERR: Record<string, ErrShape> = {
   server: { title: "Higgsfield couldn't finish this run", detail: "The server returned an error. This is usually temporary. Your credits were refunded." },
   canceled: { title: "Generation canceled", detail: "This generation was canceled before it finished." },
   unsupported: { title: "Model not connected yet", detail: "This model isn't wired to a real Higgsfield endpoint yet." },
+  needsImage: { title: "Add a reference image", detail: "This model only generates video from a starting image — attach one and try again." },
   concurrency: { title: "Too many requests at once", detail: "Higgsfield is limiting requests from this key right now." },
 };
 
@@ -103,8 +104,8 @@ type CreateResult = { requestId: string } | { error: ErrShape };
 // ponytail: Higgsfield has one HTTP endpoint PER MODEL (and a different one again
 // for the text-only vs reference-image variant of the same model), not one
 // generic "create a generation" call — confirmed against the official OpenAPI
-// spec and per-model reference docs. Only the four models below (soul, seedance,
-// kling, minimax) have a verified real endpoint; the rest of the catalog in
+// spec and per-model reference docs. Only the five models below (soul, seedance,
+// kling, kling-standard, minimax) have a verified real endpoint; the rest of the catalog in
 // server/src/routes/models.ts is real (checked against open.higgsfield.ai/explore)
 // but schema-unverified, and falls through to ERR.unsupported here — better to
 // say so than to guess a path and silently waste the user's credits on a
@@ -142,6 +143,14 @@ async function createOne(cred: Cred, job: CreateJob): Promise<CreateResult> {
     const body: any = { prompt: job.prompt, duration: job.duration === 10 ? 10 : 6, prompt_optimizer: true };
     if (img) body.image_url = img.url;
     res = await hf(cred, path, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
+  } else if (job.model === "kling-standard") {
+    // v2.5-turbo/standard/image-to-video only — confirmed via the OpenAPI spec (same body shape as
+    // pro, but no text-to-video counterpart exists for this tier; image_url is required).
+    const img = job.refs.find((r) => r.kind === "image");
+    if (!img) return { error: ERR.needsImage };
+    const body: any = { prompt: job.prompt, duration: job.duration === 10 ? 10 : 5, image_url: img.url };
+    if (job.negative) body.negative_prompt = job.negative;
+    res = await hf(cred, "/kling-video/v2.5-turbo/standard/image-to-video", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
   } else {
     return { error: ERR.unsupported };
   }
