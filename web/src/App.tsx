@@ -50,10 +50,11 @@ const SAMPLES = {
 // soul and kling (neither has a format param either, nor does the documented Seedance request body —
 // the real output extension comes from Higgsfield's response, not a client choice, so there's no
 // Format control at all).
-const MODEL_CAPS: Record<string, { ratios?: string[]; res?: string[]; duration?: boolean; audio?: boolean; negative?: boolean }> = {
+const MODEL_CAPS: Record<string, { ratios?: string[]; res?: string[]; duration?: boolean; durations?: number[]; audio?: boolean; negative?: boolean }> = {
   soul: { ratios: ['1:1', '4:3', '3:4', '3:2', '2:3', '5:4', '4:5', '16:9', '9:16', '21:9'], res: ['2K', '4K'] },
-  seedance: { ratios: ['16:9', '9:16', '1:1', '4:3', '3:4', '21:9'], res: ['480p', '720p', '1080p', '4K'], duration: true, audio: true },
-  kling: { duration: true, negative: true },
+  seedance: { ratios: ['16:9', '9:16', '1:1', '4:3', '3:4', '21:9'], res: ['480p', '720p', '1080p', '4K'], duration: true, durations: [5, 10], audio: true },
+  kling: { duration: true, durations: [5, 10], negative: true },
+  minimax: { duration: true, durations: [6, 10] },
 };
 const MAX_REFS = 10;
 const PAGE = 24;
@@ -1474,11 +1475,15 @@ export default class App extends ReactComponent<Record<string, never>, AnyState>
         const ic = (k: string) => ({ model: k === 'model', ratio: k === 'ratio', dur: k === 'dur', res: k === 'res', batch: k === 'batch', audio: k === 'audio', mute: k === 'mute' });
         const list = [
           { key: 'model', icon: 'model', title: isVideo ? 'Video model' : 'Image model', value: s.catalog ? this.modelName(s.model[mode]) : 'Loading…', menuW: 260,
-            items: M[mode].map((m: any) => opt(m.name, m.id === s.model[mode], () => per('model', m.id), { desc: m.desc })) },
+            items: M[mode].map((m: any) => opt(m.name, m.id === s.model[mode], () => {
+              per('model', m.id);
+              const ds = MODEL_CAPS[m.id]?.durations;
+              if (ds && !ds.includes(s.duration)) this.setState({ duration: ds[0] });
+            }, { desc: m.desc })) },
           caps.ratios ? { key: 'ratio', icon: 'ratio', title: 'Aspect ratio', value: s.ratio[mode], menuW: 150, ...shape(s.ratio[mode]),
             items: caps.ratios.map((r) => opt(r, r === s.ratio[mode], () => per('ratio', r), { shape: true, ...shape(r, 14) })) } : null,
           isVideo && caps.duration ? { key: 'dur', icon: 'dur', title: 'Duration', value: s.duration + 's', menuW: 140,
-            items: [5, 10].map((v) => opt(v + 's', v === s.duration, () => this.setState({ duration: v }))) } : null,
+            items: (caps.durations || [5, 10]).map((v) => opt(v + 's', v === s.duration, () => this.setState({ duration: v }))) } : null,
           caps.res ? { key: 'res', icon: 'res', title: 'Resolution', value: s.res[mode], menuW: 140,
             items: caps.res.map((v) => opt(String(v), v === s.res[mode], () => per('res', v))) } : null,
           { key: 'batch', icon: 'batch', title: 'Batch size', value: s.batch + '×', menuW: 140,

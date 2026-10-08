@@ -103,15 +103,16 @@ type CreateResult = { requestId: string } | { error: ErrShape };
 // ponytail: Higgsfield has one HTTP endpoint PER MODEL (and a different one again
 // for the text-only vs reference-image variant of the same model), not one
 // generic "create a generation" call — confirmed against the official OpenAPI
-// spec and per-model reference docs. Only the three models below have a verified
-// real endpoint; everything else in PLACEHOLDER_CATALOG (flux, seedream, wan)
-// stays unsupported until someone looks up its real schema too (see TODO.md's
-// separate "Models and pricing" section) — better to say so than to guess a path
-// and silently waste the user's credits on a malformed call.
+// spec and per-model reference docs. Only the four models below (soul, seedance,
+// kling, minimax) have a verified real endpoint; the rest of the catalog in
+// server/src/routes/models.ts is real (checked against open.higgsfield.ai/explore)
+// but schema-unverified, and falls through to ERR.unsupported here — better to
+// say so than to guess a path and silently waste the user's credits on a
+// malformed call.
 async function createOne(cred: Cred, job: CreateJob): Promise<CreateResult> {
   let res: Response;
   if (job.model === "soul") {
-    const resolution = job.res === "4K" ? "4K" : "2K"; // soul only ships 2K/4K; our UI also offers 1K
+    const resolution = job.res === "4K" ? "4K" : "2K"; // soul only ships 2K/4K
     res = await hf(cred, "/higgsfield-ai/soul/standard", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -131,6 +132,14 @@ async function createOne(cred: Cred, job: CreateJob): Promise<CreateResult> {
     const path = img ? "/kling-video/v2.5-turbo/pro/image-to-video" : "/kling-video/v2.5-turbo/pro/text-to-video";
     const body: any = { prompt: job.prompt, duration: job.duration === 10 ? 10 : 5 };
     if (job.negative) body.negative_prompt = job.negative;
+    if (img) body.image_url = img.url;
+    res = await hf(cred, path, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
+  } else if (job.model === "minimax") {
+    // hailuo-2.3/standard: confirmed via the OpenAPI spec. duration is 6|10 (not 5|10 like kling) —
+    // prompt_optimizer has no UI control, left at the API's own default (true).
+    const img = job.refs.find((r) => r.kind === "image");
+    const path = img ? "/minimax/hailuo-2.3/standard/image-to-video" : "/minimax/hailuo-2.3/standard/text-to-video";
+    const body: any = { prompt: job.prompt, duration: job.duration === 10 ? 10 : 6, prompt_optimizer: true };
     if (img) body.image_url = img.url;
     res = await hf(cred, path, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
   } else {
