@@ -192,7 +192,7 @@ export default class App extends ReactComponent<Record<string, never>, AnyState>
     failed: [] as unknown[], expanded: {},
     pending: [] as unknown[], feedShown: FEED_PAGE, hoverId: null, projHover: null, lightbox: null, lbSource: 'feed',
     fType: 'all', fModel: 'all', fProject: 'all', fFav: 'all', fRatio: 'all', q: '', projDrop: null, projDragId: null, assetDrag: 0, sort: 'new', newName: '', renameId: null,
-    selectMode: false, selected: [] as string[], confirm: null, shortcuts: false, gridIds: [] as string[], gridCursor: null, gridTotal: 0, gridDone: false, gridLoading: false, gridBoot: true, qd: '', catalog: null, catalogErr: false,
+    selectMode: false, selected: [] as string[], confirm: null, shortcuts: false, gridIds: [] as string[], gridCursor: null, gridTotal: 0, gridDone: false, gridLoading: false, gridBoot: true, qd: '', catalog: null, catalogErr: false, submitting: false,
     upQ: '', upType: 'all', upUse: 'all', upSort: 'new', upSelect: false, upSel: [] as string[], upPv: null, upHover: null, zipping: false, exporting: false, toasts: [] as unknown[], dragging: false,
     online: typeof navigator === 'undefined' ? true : navigator.onLine !== false, rateUntil: null, copied: null,
     ...loadDraft(),
@@ -559,6 +559,7 @@ export default class App extends ReactComponent<Record<string, never>, AnyState>
   // ── Generation (real: server/src/routes/generations.ts) ─────────────────
   genBlock(): any {
     const s = this.state, rl = this.rateLeft();
+    if (s.submitting) return { reason: 'Sending…', title: 'Sending your generation to Higgsfield…' };
     if (this.offline()) return { reason: 'Offline', title: "You're offline. Generate is paused until you reconnect." };
     if (rl) return { reason: 'Rate limited · ' + this.clock(rl), title: 'Higgsfield is limiting requests from this key' };
     if (!s.hasKey) return { reason: 'Connect key', title: 'Connect your Higgsfield API key to generate', action: () => this.setState({ modal: 'connect', keyInput: '', keyErr: '', replacing: false, popover: null }) };
@@ -587,6 +588,7 @@ export default class App extends ReactComponent<Record<string, never>, AnyState>
   // (ref upload + POST + poll) runs detached, same shape as the old setTimeout it replaces.
   runGen(p: AnyState): boolean {
     const ks = this.state;
+    if (ks.submitting) return false; // already sending one — ignore a double-click/double-Enter re-entry
     if (this.offline()) { this.toastMsg("You're offline. Try again when you reconnect.", 'error'); return false; }
     if (this.rateLeft()) { this.toastMsg(`Rate limited. Try again in ${this.clock(this.rateLeft())}.`, 'error'); return false; }
     if (!ks.hasKey) { this.setState({ modal: 'connect', keyErr: '', popover: null, lightbox: null }); return false; }
@@ -594,7 +596,7 @@ export default class App extends ReactComponent<Record<string, never>, AnyState>
     this.setState({ walkGen: true });
     const tempId = 'tmp' + Date.now() + Math.random().toString(36).slice(2, 5);
     const dur = (p.type === 'video' ? 60000 : 15000);
-    this.setState((s: AnyState) => ({ pending: [{ id: tempId, ...p, t: Date.now(), dur }, ...s.pending], popover: null, view: 'create', lightbox: null }));
+    this.setState((s: AnyState) => ({ pending: [{ id: tempId, ...p, t: Date.now(), dur }, ...s.pending], popover: null, view: 'create', lightbox: null, submitting: true }));
     this.submitGen(tempId, p);
     return true;
   }
@@ -609,17 +611,17 @@ export default class App extends ReactComponent<Record<string, never>, AnyState>
       const r = await fetch('/api/generations', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ ...meta, refs: jsonRefs }) });
       const d = await r.json();
       if (!r.ok) {
-        this.setState((s: AnyState) => ({ pending: s.pending.filter((x: any) => x.id !== tempId) }));
+        this.setState((s: AnyState) => ({ pending: s.pending.filter((x: any) => x.id !== tempId), submitting: false }));
         if (r.status === 429) { this.startRate(Number(r.headers.get('Retry-After')) || 15); this.setState({ prompt: p.prompt }); this.toastMsg(d.error?.title || 'Rate limited', 'error'); return; }
         this.setState((s: AnyState) => ({ failed: [{ id: tempId, ...p, t: Date.now(), err: d.error }, ...s.failed] }));
         this.toastMsg(d.error?.title || 'A generation failed', 'error');
         return;
       }
       const realId = d.id;
-      this.setState((s: AnyState) => ({ pending: s.pending.map((x: any) => (x.id === tempId ? { ...x, id: realId } : x)) }));
+      this.setState((s: AnyState) => ({ pending: s.pending.map((x: any) => (x.id === tempId ? { ...x, id: realId } : x)), submitting: false }));
       this.pollGen(realId, p);
     } catch {
-      this.setState((s: AnyState) => ({ pending: s.pending.filter((x: any) => x.id !== tempId) }));
+      this.setState((s: AnyState) => ({ pending: s.pending.filter((x: any) => x.id !== tempId), submitting: false }));
       this.toastMsg("Couldn't reach the server.", 'error');
     }
   }
@@ -2712,7 +2714,7 @@ export default class App extends ReactComponent<Record<string, never>, AnyState>
               </div>
               <div style={css('display:flex;justify-content:flex-end;gap:8px')}>
                 <button onClick={v.closeModal} className="u-hov-surface" style={css('height:32px;padding:0 12px;border:1px solid var(--border2);border-radius:7px;background:transparent;color:var(--text);cursor:pointer')}>Cancel</button>
-                <button onClick={v.doGenerateConfirm} autoFocus style={css('height:32px;padding:0 14px;border:0;border-radius:7px;background:var(--accent);color:var(--on-accent);font-weight:500;cursor:pointer')}>Generate</button>
+                <button onClick={v.doGenerateConfirm} disabled={v.gen.disabled} autoFocus style={css(`height:32px;padding:0 14px;border:0;border-radius:7px;background:${v.gen.bg};color:${v.gen.color};font-weight:500;cursor:${v.gen.cursor}`)}>{v.gen.disabled && v.gen.reasonText ? v.gen.reason : 'Generate'}</button>
               </div>
             </>
           )}
