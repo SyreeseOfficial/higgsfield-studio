@@ -7,7 +7,6 @@ UI source of truth, kept for reference only — the real app is `web/` + `server
 
 ## Open
 
-- [ ] **Guard duplicate submissions — UI and server.** `generate()`/`runGen()` (`App.tsx`) has no in-flight lock; a double-click fires two generations. `POST /api/generations` (`generations.ts`) has no server-side de-dup either.
 - [ ] **Wire up Genjutsu, Cinema Studio, Seedance 2.5 Edit/Extend.** Genjutsu and Cinema Studio aren't in Higgsfield's template registry at all — still no schema. Seedance 2.5 Edit/Extend need a "source video" media role this composer doesn't have (Kling 3.0's 6 variants and Seedance 2.5's base variant are wired now — see Model catalog below).
 
 ---
@@ -25,6 +24,7 @@ UI source of truth, kept for reference only — the real app is `web/` + `server
 - No balance/credits endpoint exists on Higgsfield's API — not faked; Settings links to their pricing page instead.
 - Generation submission goes through the official `@higgsfield/client` SDK (`v2`'s `subscribe()`, `withPolling: false` — we poll ourselves for incremental per-item status). The SDK only covers submission, nothing else (no standalone status check, cancel, or presigned-upload helper), so `getStatus`/`cancelRequest`/`uploadFile` stay on raw REST — that's what the SDK itself falls back to.
 - Root `README.md` + `.env.example` added (how to run, `PORT`, and that the Higgsfield key goes through Settings, not an env var).
+- Duplicate submissions guarded in both places: `App.tsx`'s `runGen()` refuses re-entry while a submission is in flight (every Generate button reflects this as a normal disabled state); `POST /api/generations` separately rejects an exact repeat within a 4s window server-side.
 
 ### Model catalog
 - `GET /api/models` lists the real catalog, synced against `open.higgsfield.ai/explore` and Higgsfield's official template registry (`pnpm dlx shadcn@latest view higgsfield-ai/app-templates/<model>` — real first-party source, not a guess).

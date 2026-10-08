@@ -298,7 +298,7 @@ async function createOne(cred: Cred, job: CreateJob): Promise<CreateResult> {
     if (end && !start) {
       return { error: { title: "Add a start frame first", detail: "An end frame needs a start frame too — attach one and try again." } };
     }
-    const shared: any = { resolution: job.res || "720p", generate_audio: !!job.audio, duration: job.duration || 5 };
+    const shared: any = { resolution: job.res || "720p", generate_audio: !!job.audio, duration: job.duration || 5, bitrate_mode: "high" };
     if (job.prompt.trim()) shared.prompt = job.prompt.trim();
     if (start) {
       const body: any = { ...shared, image_url: start };
