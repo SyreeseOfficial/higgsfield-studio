@@ -7,10 +7,10 @@ export const modelsRouter = Router();
 //   1. https://open.higgsfield.ai/explore (checked 2026-10-08) — which real models exist.
 //   2. Higgsfield's own official Next.js template registry (`pnpm dlx shadcn@latest view
 //      higgsfield-ai/app-templates/<model>`, checked 2026-10-09) — their real request schema.
-// Most of the catalog is now verified this way; `desc` says "schema not yet verified" only for
-// models with no entry in that template registry either (Kling 3.0's six variants, Seedance 2.5's
-// three, Genjutsu, Cinema Studio) — picking one of those surfaces the honest "Model not connected
-// yet" error instead of a guessed call. Excluded entirely: Ads Studio, Product Shots, Graphic Ads,
+// Most of the catalog is now verified this way; `desc` says "unverified" only for models with no
+// entry in that template registry either (Kling 3.0's six variants, Seedance 2.5's three, Genjutsu,
+// Cinema Studio) — picking one of those surfaces the honest "Model not connected yet" error instead
+// of a guessed call. Excluded entirely: Ads Studio, Product Shots, Graphic Ads,
 // Marketplace Design, Marketing Studio Image and AI Influencer — brand/product-asset workflows, not
 // plain prompt-to-image/video models, so they don't fit this composer's shape.
 const CATALOG = {
@@ -46,10 +46,10 @@ const CATALOG = {
     { id: "ltx-2-5-fast", name: "LTX 2.5 Fast", desc: "Text-to-video" },
     { id: "ltx-2-5-pro", name: "LTX 2.5 Pro", desc: "Text-to-video" },
     { id: "grok-video", name: "Grok Imagine Video 1.5", desc: "Reference-to-video" },
-    { id: "seedance-2-5", name: "Seedance 2.5", desc: "Text/image/video-to-video, audio-to-video — schema not yet verified" },
-    { id: "kling-3", name: "Kling 3.0", desc: "Text-to-video, image-to-video — schema not yet verified" },
-    { id: "genjutsu", name: "Genjutsu", desc: "Motion transfer from a reference video — schema not yet verified" },
-    { id: "cinema-studio", name: "Cinema Studio 4.0", desc: "Text/image/video-to-video — schema not yet verified" },
+    { id: "seedance-2-5", name: "Seedance 2.5", desc: "Text/image/video-to-video · unverified" },
+    { id: "kling-3", name: "Kling 3.0", desc: "Text/image-to-video · unverified" },
+    { id: "genjutsu", name: "Genjutsu", desc: "Motion transfer · unverified" },
+    { id: "cinema-studio", name: "Cinema Studio 4.0", desc: "Text/image/video-to-video · unverified" },
   ],
   pricingUrl: "https://higgsfield.ai/pricing",
 };

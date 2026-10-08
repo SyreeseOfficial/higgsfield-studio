@@ -2031,14 +2031,14 @@ export default class App extends ReactComponent<Record<string, never>, AnyState>
                         {p.full && (<><span>{p.value}</span><svg width="10" height="10" viewBox="0 0 24 24" style={css('flex-shrink:0;fill:none;stroke:currentColor;stroke-width:2.25;stroke-linecap:round;stroke-linejoin:round;opacity:.6')}><path d="M6 9l6 6 6-6" /></svg></>)}
                       </button>
                       {p.open && (
-                        <div ref={this.popRef} style={css(`position:fixed;left:${v.pp.left};top:${v.pp.top};max-height:${v.pp.maxH};visibility:${v.pp.vis};overflow-y:auto;box-sizing:border-box;z-index:50;width:${p.menuW}px;background:var(--raised);border:1px solid var(--border2);border-radius:10px;box-shadow:var(--shadow);padding:5px;display:flex;flex-direction:column;gap:1px`)}>
+                        <div ref={this.popRef} style={css(`position:fixed;left:${v.pp.left};top:${v.pp.top};max-height:${v.pp.maxH};visibility:${v.pp.vis};overflow-y:auto;box-sizing:border-box;z-index:50;width:${p.menuW}px;background:var(--raised);border:1px solid var(--border2);border-radius:10px;box-shadow:var(--shadow);padding:5px;display:flex;flex-direction:column;gap:2px`)}>
                           <span style={css('font-size:11.5px;color:var(--text3);padding:5px 8px 4px')}>{p.title}</span>
                           {p.items.map((o: any, i: number) => (
-                            <button key={i} onClick={o.onClick} className="u-hov-active" style={css(`width:100%;display:flex;align-items:center;gap:10px;min-height:30px;padding:5px 8px;border:0;border-radius:6px;background:${o.bg};color:var(--text);cursor:pointer;text-align:left;box-sizing:border-box`)}>
+                            <button key={i} onClick={o.onClick} className="u-hov-active" style={css(`width:100%;display:flex;align-items:center;gap:10px;min-height:30px;padding:6px 8px;border:0;border-radius:6px;background:${o.bg};color:var(--text);cursor:pointer;text-align:left;box-sizing:border-box`)}>
                               {o.shape && <span style={css('width:16px;height:16px;flex-shrink:0;display:flex;align-items:center;justify-content:center;color:var(--text2)')}><span style={{ width: o.w, height: o.h, border: '1.5px solid currentColor', borderRadius: 2, boxSizing: 'border-box' }} /></span>}
-                              <span style={css('flex:1;display:flex;flex-direction:column;gap:2px;min-width:0')}>
-                                <span>{o.label}</span>
-                                {o.desc && <span style={css('font-size:11.5px;color:var(--text3)')}>{o.desc}</span>}
+                              <span style={css('flex:1;display:flex;flex-direction:column;gap:3px;min-width:0')}>
+                                <span style={css('line-height:1.25')}>{o.label}</span>
+                                {o.desc && <span style={css('font-size:11.5px;line-height:1.35;color:var(--text3)')}>{o.desc}</span>}
                               </span>
                               {o.check && <svg width="14" height="14" viewBox="0 0 24 24" style={css('flex-shrink:0;fill:none;stroke:var(--accent-fg);stroke-width:2.25;stroke-linecap:round;stroke-linejoin:round')}><path d="M5 12.5l4.5 4.5L19 7.5" /></svg>}
                             </button>
