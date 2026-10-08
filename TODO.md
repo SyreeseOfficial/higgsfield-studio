@@ -8,29 +8,16 @@ The UI is finished, but every "server" call is faked in memory. Search the file 
 
 ---
 
-## P0: Port and backend (required before real use)
+## P0: Port and backend (required before real use) — DONE
 
-- [ ] **Pick a stack and port.** Suggested: Vite + React for the front end, plus a small Node (Fastify/Express) or Python (FastAPI) server. Port the `.dc.html` template and logic class into React components. Inline styles and CSS variables carry over as they are.
-- [ ] **Higgsfield proxy.** All Higgsfield calls go server-side. The browser never sees the key. This also avoids CORS.
-- [ ] **API key storage.** Replace `submitKey()` (it currently accepts any key after 900ms) with:
-  - `POST /api/key` validates against Higgsfield, then stores the key encrypted at rest (local file or SQLite with an OS-keychain or env secret).
-  - `GET /api/key` returns `{ connected, last4, status: 'valid'|'low'|'invalid', credits }`.
-  - `DELETE /api/key` removes the key.
-  - Remove the hardcoded `keyHint: '7f3a'` and `Component.CREDITS`.
+- [x] **Pick a stack and port.** Vite + React front end (`web/`), Express + better-sqlite3 server (`server/`). The `.dc.html` template was ported into React components (`af143aa`, `e45b043`).
+- [x] **Higgsfield proxy.** All Higgsfield calls go through `server/src/higgsfield.ts`; the browser only ever talks to the local Express server.
+- [x] **API key storage.** `server/src/routes/key.ts`: `POST /api/key` validates against the live API then stores it AES-256-GCM-encrypted at rest (`crypto.ts`); `GET /api/key` returns `{ connected, last4, status }`; `DELETE /api/key` removes it. No `credits`/`'low'` status — see the credits item below, there's no real number to report. `keyHint`/`Component.CREDITS` are gone.
 - [x] ~~**Credits.** Read the real balance from Higgsfield.~~ Not possible: Higgsfield's public API has no balance/credits endpoint (checked their OpenAPI spec and billing docs — the number only exists on their web dashboard, the `hf` CLI, and an unrelated MCP tool, none reachable with a plain API key; see the `ponytail:` comment in `server/src/higgsfield.ts`). The client-side cost math (`costOf()`, `refund()`-adjacent code) is removed rather than left showing a fake number; Settings links out to `higgsfield.ai/pricing` instead.
-- [ ] **Generation.** Replace the `setTimeout` in `runGen()`:
-  - `POST /api/generations` with `{ type, model, prompt, negative, ratio, res, fmt, duration, audio, batch, project, refUploadIds }` returns `{ id }`.
-  - Progress via SSE or polling (`GET /api/generations/:id`). Video takes minutes, so the server needs to keep polling Higgsfield or receive webhooks.
-  - Cancel: `DELETE /api/generations/:id` (`cancelGen()`).
-  - Save the outputs to disk and serve them from `/media/...`. Replace the `picsum.photos` URLs in `src()`.
-- [ ] **Errors and rate limits.** Map real responses onto the existing UI states:
-  - 401 → `keyState: 'invalid'`
-  - 402 → not enough credits
-  - 429 + `Retry-After` → `startRate(sec)`
-  - timeout, 5xx and content-filter errors → `Component.ERRORS`
-  - Remove the random 25% failure (`props.failures`).
-- [ ] **Persistence (SQLite is fine).** Tables: `generations`, `items`, `projects`, `uploads`, `generation_refs` (generation ↔ upload). Today everything except the prompt draft is lost on refresh. Project order and favorites need to persist too.
-- [ ] **Remove demo data and props:** `seedGens`, `ARCHIVE`, `seedFailed`, `seedUploads`, and the props `apiKeyConnected`, `keyStatus`, `network`, `failures`, `startEmpty`.
+- [x] **Generation.** `server/src/routes/generations.ts`: `POST /api/generations` submits to Higgsfield and persists the generation; `GET /api/generations/:id` polls Higgsfield for any still-pending item and flips it to completed/failed; `DELETE /api/generations/:id` cancels the outstanding Higgsfield requests. Outputs are fetched and written under `data/media/<genId>/`, served from `/media/...`. The `picsum.photos` placeholder in `src()` was dead code (every item that reaches render is from a `status: 'completed'` generation, which always has a real `url`) — removed, along with `src()` itself.
+- [x] **Errors and rate limits.** `errFromStatus()`/`isConcurrencyLimit()` in `higgsfield.ts` map 401 → invalid key, 403 → not enough credits (Higgsfield returns 403 here, not 402), 423 → model blocked, 503 → model unavailable, 5xx → server error, the concurrency-limit 400 → a real 429 + `Retry-After` header. The random 25% failure (`props.failures`) is gone.
+- [x] **Persistence.** `server/src/db.ts` has `generations`, `items`, `projects`, `uploads`, `generation_refs` tables. Everything survives a refresh; favorites (`items.fav`) and project order (`projects.sort`) persist too.
+- [x] **Remove demo data and props.** `seedGens`, `ARCHIVE`, `seedFailed`, `seedUploads`, `apiKeyConnected`, `network`, `failures`, `startEmpty` — none remain in `web/src/App.tsx`.
 
 ## Models and pricing: DONE (within API limits)
 
@@ -70,6 +57,12 @@ Backend work:
 - [ ] Composer references should send `uploadId`s, not blob URLs. Replace `blobUrl()` / `uploadRec()` with an upload-then-reference flow, and show progress per chip while uploading.
 - [x] Limits: max file size (50MB, `multer`'s `limits.fileSize` in `uploads.ts`). No total quota — single-user localhost tool, decided not worth the friction. Storage-used header now reads `GET /api/counts`'s `uploadBytes` (sum over every upload) instead of summing whatever page of `s.uploads` happened to be loaded client-side, which undercounted past the first page.
 - [ ] "Use as reference" for an upload that's an Assets image: confirm Higgsfield accepts it as a reference input.
+
+## Higgsfield integration audit (found 2026-10-08)
+
+- [ ] **Switch to the official SDK.** `@higgsfield/client` is the real npm package (maintained by Higgsfield, matches docs.higgsfield.ai/docs/how-to/sdk). `server/src/higgsfield.ts` hand-rolls raw `fetch()` instead. Re-check each call (`createOne`, `getStatus`, `cancelRequest`, `uploadFile`) against what the SDK actually supports before porting — only keep raw REST for whatever the SDK can't do.
+- [ ] **Guard against duplicate submissions.** `generate()` → `runGen()` (`web/src/App.tsx`) has no in-flight lock; a double-click before the first POST resolves fires two generations. Add a `submitting` flag or disable the button until `submitGen` settles.
+- [ ] **Add setup docs.** Root README and `.env.example` existed before the Vite/Express rewrite (`e45b043`) and got dropped. Need: how to run (`npm run dev`), `PORT`, and a note that the Higgsfield key is entered via Settings (encrypted in SQLite), not an env var.
 
 ## Clean-up items
 

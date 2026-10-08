@@ -904,7 +904,7 @@ export default class App extends ReactComponent<Record<string, never>, AnyState>
     const n = runs.length, skipped = sel.filter((x) => x.g.uploaded).length;
     this.notify(`Rerunning ${n} generation${n > 1 ? 's' : ''}${skipped ? ` · skipped ${skipped} upload${skipped > 1 ? 's' : ''}` : ''}`, { kind: 'info' });
   }
-  zipDownload(ids: string[]) { return this.zipUrls(this.bulkItems(ids).map(({ it, g }, i) => ({ url: it.url || this.src(it.seed, g.ratio), base: `${String(i + 1).padStart(3, '0')}-${g.model}-${it.id}` })), 'studio-assets'); }
+  zipDownload(ids: string[]) { return this.zipUrls(this.bulkItems(ids).map(({ it, g }, i) => ({ url: it.url, base: `${String(i + 1).padStart(3, '0')}-${g.model}-${it.id}` })), 'studio-assets'); }
   async zipUrls(list: AnyState[], prefix: string) {
     if (this.state.zipping || !list.length) return;
     const n = list.length, enc = new TextEncoder(), files: { name: Uint8Array; data: Uint8Array }[] = [];
@@ -1001,11 +1001,6 @@ export default class App extends ReactComponent<Record<string, never>, AnyState>
   setQ(v: string, now?: boolean) { clearTimeout(this._qt); this.setState(now ? { q: v, qd: v } : { q: v }); if (!now) this._qt = setTimeout(() => this.setState((st: AnyState) => ({ qd: st.q })), 250); }
 
   // ── Misc helpers ─────────────────────────────────────────────────────────
-  src(seed: string, r: string) {
-    const [a, b] = r.split(':').map(Number);
-    const w = a >= b ? 960 : Math.round(960 * a / b), h = a >= b ? Math.round(960 * b / a) : 960;
-    return `https://picsum.photos/seed/${seed}/${w}/${h}`;
-  }
   modelName(id: string) { if (id === 'upload') return 'Uploaded'; const c = this.state.catalog, m = c && [...(c.image || []), ...(c.video || [])].find((x: any) => x.id === id); return m ? m.name : id; }
   projName(id: string | null) { return (this.state.projects.find((p: any) => p.id === id) || {}).name || ''; }
   projOf(g: AnyState, it: AnyState) { return it && it.project !== undefined ? it.project : g.project; }
@@ -1099,7 +1094,7 @@ export default class App extends ReactComponent<Record<string, never>, AnyState>
       return [b('Back', () => this.setState({ menuPage: 'main' })), sep, { head: true, sep: false, btn: false, label: 'Move to project' },
         ...[{ id: null, name: 'No project' }, ...s.projects].map((p: any) => b(p.name, close(() => this.moveTo(it.id, p.id)), { check: cur === p.id }))];
     }
-    const url = it.url || this.src(it.seed, g.ratio);
+    const url = it.url;
     return [
       b('Regenerate', close(() => this.runGen({ ...this.fields(g), batch: g.items.length, project: g.project }))),
       b('Edit prompt & retry', close(() => this.reuse(g))),
@@ -1216,7 +1211,7 @@ export default class App extends ReactComponent<Record<string, never>, AnyState>
 
     const flat = this.memo('flat', [s.gens], () => { const a: AnyState[] = []; s.gens.forEach((g: any) => g.items.forEach((it: any) => a.push({ it, g }))); return a; });
     const tileOf = ({ it, g }: AnyState, src: string) => {
-      const src0 = it.url || this.src(it.seed, g.ratio), ld = this._loaded.has(src0), fr = this._fresh[it.id];
+      const src0 = it.url, ld = this._loaded.has(src0), fr = this._fresh[it.id];
       const hov = s.hoverId === it.id, menuOpen = s.popover === 'item:' + it.id, selecting = s.selectMode && src !== 'feed', sel = s.selected.includes(it.id);
       return this.memo('t:' + src + ':' + it.id, [it, g, src0, ld, fr, hov, menuOpen, selecting, sel, menuOpen && s.menuPage, menuOpen && s.projects], () => ({
         id: it.id, src: src0, onLoad: () => this.markLoaded(src0), blur: ld ? 0 : 14, scale: ld ? 1 : 1.06,
@@ -1313,7 +1308,7 @@ export default class App extends ReactComponent<Record<string, never>, AnyState>
     let lb: AnyState = { rows: [] };
     const f = s.lightbox && flat.find((x: any) => x.it.id === s.lightbox);
     if (f) {
-      const { it, g } = f, lsrc = it.url || this.src(it.seed, g.ratio), lld = this._loaded.has(lsrc), v = g.type === 'video', list = this._lists[s.lbSource] || [], i = list.indexOf(it.id);
+      const { it, g } = f, lsrc = it.url, lld = this._loaded.has(lsrc), v = g.type === 'video', list = this._lists[s.lbSource] || [], i = list.indexOf(it.id);
       const [pw, ph] = this.pxSize(g), mono = "'Geist Mono',monospace";
       const refs = (g.refs || []).map((r: any) => ({ ...r, isImage: r.kind === 'image', isMedia: r.kind !== 'image', hasTag: !!r.tag, tagTip: TAG_TIPS[r.tag] || '', title: r.name || r.kind }));
       lb = {
