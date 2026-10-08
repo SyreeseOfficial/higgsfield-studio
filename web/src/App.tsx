@@ -88,6 +88,11 @@ const MODEL_CAPS: Record<string, { ratios?: string[]; res?: string[]; duration?:
   'wan-2-7': GENERIC_VIDEO_CAPS,
   'wan-3': GENERIC_VIDEO_CAPS,
   'wan-3-prime': GENERIC_VIDEO_CAPS,
+  'seedance-2-5': { ratios: ['16:9', '9:16', '1:1', '4:3', '3:4', '21:9'], res: ['480p', '720p'], audio: true },
+  'kling-3-turbo': { ratios: ['16:9', '9:16', '1:1'], res: ['720p', '1080p'] },
+  'kling-3-std': { ratios: ['16:9', '9:16', '1:1'], audio: true },
+  'kling-3-pro': { ratios: ['16:9', '9:16', '1:1'], audio: true },
+  'kling-3-4k': { ratios: ['16:9', '9:16', '1:1'], audio: true },
 };
 const MAX_REFS = 10;
 const PAGE = 24;

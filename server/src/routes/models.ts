@@ -8,9 +8,10 @@ export const modelsRouter = Router();
 //   2. Higgsfield's own official Next.js template registry (`pnpm dlx shadcn@latest view
 //      higgsfield-ai/app-templates/<model>`, checked 2026-10-09) — their real request schema.
 // Most of the catalog is now verified this way; `desc` says "unverified" only for models with no
-// entry in that template registry either (Kling 3.0's six variants, Seedance 2.5's three, Genjutsu,
-// Cinema Studio) — picking one of those surfaces the honest "Model not connected yet" error instead
-// of a guessed call. Excluded entirely: Ads Studio, Product Shots, Graphic Ads,
+// entry in that template registry either (Genjutsu, Cinema Studio, Seedance 2.5's Edit/Extend
+// variants — those two need a "source video" UI concept this composer doesn't have) — picking one
+// of those surfaces the honest "Model not connected yet" error instead of a guessed call. Excluded
+// entirely: Ads Studio, Product Shots, Graphic Ads,
 // Marketplace Design, Marketing Studio Image and AI Influencer — brand/product-asset workflows, not
 // plain prompt-to-image/video models, so they don't fit this composer's shape.
 const CATALOG = {
@@ -46,8 +47,13 @@ const CATALOG = {
     { id: "ltx-2-5-fast", name: "LTX 2.5 Fast", desc: "Text-to-video" },
     { id: "ltx-2-5-pro", name: "LTX 2.5 Pro", desc: "Text-to-video" },
     { id: "grok-video", name: "Grok Imagine Video 1.5", desc: "Reference-to-video" },
-    { id: "seedance-2-5", name: "Seedance 2.5", desc: "Text/image/video-to-video · unverified" },
-    { id: "kling-3", name: "Kling 3.0", desc: "Text/image-to-video · unverified" },
+    { id: "seedance-2-5", name: "Seedance 2.5", desc: "Cinematic motion, native audio" },
+    { id: "kling-3-turbo", name: "Kling 3.0 Turbo", desc: "Fast, text or image to video" },
+    { id: "kling-3-std", name: "Kling 3.0 Standard", desc: "Text or image to video, with sound" },
+    { id: "kling-3-pro", name: "Kling 3.0 Pro", desc: "Higher quality, with sound" },
+    { id: "kling-3-4k", name: "Kling 3.0 4K", desc: "4K output, with sound" },
+    { id: "kling-3-motion-std", name: "Kling 3.0 Motion Control", desc: "Apply a reference video's motion to an image" },
+    { id: "kling-3-motion-pro", name: "Kling 3.0 Motion Control Pro", desc: "Apply a reference video's motion to an image" },
     { id: "genjutsu", name: "Genjutsu", desc: "Motion transfer · unverified" },
     { id: "cinema-studio", name: "Cinema Studio 4.0", desc: "Text/image/video-to-video · unverified" },
   ],
