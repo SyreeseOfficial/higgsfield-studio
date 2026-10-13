@@ -1,32 +1,21 @@
-# Higgsfield Studio
+# Next.js template
 
-A single-user, localhost-only UI for generating images and video with the
-[Higgsfield](https://higgsfield.ai) API. No accounts, no auth — it's a local
-tool for one person's own API key.
+This is a Next.js template with shadcn/ui.
 
-- `web/` — Vite + React frontend
-- `server/` — Express + SQLite backend (proxies every Higgsfield call; the
-  browser never sees your API key)
+## Adding components
 
-## Run it
+To add components to your app, run the following command:
 
 ```bash
-npm run install:all
-npm run dev
+npx shadcn@latest add button
 ```
 
-This starts the server on `http://localhost:8787` and the web app on
-`http://localhost:5173`. Open the web app.
+This will place the ui components in the `components` directory.
 
-## Connecting your Higgsfield API key
+## Using components
 
-The key is **not** an environment variable. Open the app, go to Settings,
-and use **Connect API key** to paste the key copied from
-[open.higgsfield.ai/api-keys](https://open.higgsfield.ai/api-keys). It's
-validated against the live API, then stored AES-256-GCM-encrypted in the
-local SQLite database (`server/data/`) — never in source, never in a log.
+To use the components in your app, import them as follows:
 
-## Config
-
-The only environment variable the server reads is `PORT` (default `8787`).
-See `.env.example`.
+```tsx
+import { Button } from "@/components/ui/button";
+```
