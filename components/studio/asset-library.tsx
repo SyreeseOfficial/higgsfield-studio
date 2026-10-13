@@ -10,6 +10,7 @@ import {
   Play,
   Plus,
   Search,
+  Trash2,
 } from "lucide-react"
 
 import { Button } from "@/components/ui/button"
@@ -25,7 +26,7 @@ import {
 } from "@/components/ui/dialog"
 import { Input } from "@/components/ui/input"
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs"
-import { kindOf } from "@/lib/studio/uploads"
+import { kindOf, useUploads } from "@/lib/studio/uploads"
 import type {
   AssetKind,
   AssetLibraryItem,
@@ -299,6 +300,16 @@ export function AssetLibraryModal({
                       key={item.id}
                       item={item}
                       onSelect={pick}
+                      onDelete={
+                        item.source === "upload"
+                          ? () => {
+                              useUploads.getState().remove(item.id)
+                              setSelected((current) =>
+                                current.filter((s) => s.src !== item.src)
+                              )
+                            }
+                          : undefined
+                      }
                       selected={selected.some(
                         (selection) => selection.src === item.src
                       )}
@@ -393,74 +404,89 @@ function UploadCard({
 function ElementCard({
   item,
   onSelect,
+  onDelete,
   selected,
   selectable,
   disabled,
 }: {
   item: AssetLibraryItem
   onSelect: (selection: AssetSelection) => void
+  onDelete?: () => void
   selected: boolean
   selectable: boolean
   disabled: boolean
 }) {
   return (
-    <button
-      type="button"
-      onClick={() => onSelect(item)}
-      aria-label={`${selectable ? "Select" : "Use"} ${item.name ?? item.kind}`}
-      aria-pressed={selectable ? selected : undefined}
-      disabled={disabled}
-      className={cn(
-        "flex h-[148px] w-full flex-col gap-1.5 rounded-q-400 p-1 text-left transition-colors hover:bg-q-transparent-light-05 focus-visible:ring-2 focus-visible:ring-q-border-focus focus-visible:outline-none disabled:opacity-40",
-        selected && "bg-q-transparent-light-10 ring-1 ring-q-border-focus"
-      )}
-    >
-      <span className="relative block h-24 w-full overflow-hidden rounded-q-300 bg-q-background-tertiary">
-        {item.kind === "audio" ? (
-          <span
-            className="flex size-full items-center justify-center"
-            role="img"
-            aria-label="Audio"
-          >
-            <AudioLines className="size-8 text-q-icon-secondary" />
-          </span>
-        ) : item.kind === "video" ? (
-          <video
-            src={item.src}
-            muted
-            playsInline
-            preload="metadata"
-            className="size-full object-cover"
-          />
-        ) : (
-          // eslint-disable-next-line @next/next/no-img-element
-          <img
-            src={item.src}
-            alt={item.name ?? ""}
-            className="size-full object-cover"
-            loading="lazy"
-          />
+    <div className="group relative">
+      <button
+        type="button"
+        onClick={() => onSelect(item)}
+        aria-label={`${selectable ? "Select" : "Use"} ${item.name ?? item.kind}`}
+        aria-pressed={selectable ? selected : undefined}
+        disabled={disabled}
+        className={cn(
+          "flex h-[148px] w-full flex-col gap-1.5 rounded-q-400 p-1 text-left transition-colors hover:bg-q-transparent-light-05 focus-visible:ring-2 focus-visible:ring-q-border-focus focus-visible:outline-none disabled:opacity-40",
+          selected && "bg-q-transparent-light-10 ring-1 ring-q-border-focus"
         )}
-        {selected ? (
-          <span className="absolute top-1 right-1 flex size-5 items-center justify-center rounded-full bg-primary text-primary-foreground">
-            <Check className="size-3" />
-          </span>
-        ) : null}
-        {item.kind === "video" ? (
-          <span className="absolute bottom-1.5 left-1.5 inline-flex size-5 items-center justify-center rounded-full bg-q-overlay-scrim text-q-text-primary">
-            <Play className="size-3" fill="currentColor" />
-          </span>
-        ) : null}
-      </span>
-      <span className="flex min-w-0 flex-col gap-0.5 px-1 py-0.5">
-        <span className="truncate text-q-caption-sm-semi-bold text-q-text-primary">
-          {item.name ?? item.kind}
+      >
+        <span className="relative block h-24 w-full overflow-hidden rounded-q-300 bg-q-background-tertiary">
+          {item.kind === "audio" ? (
+            <span
+              className="flex size-full items-center justify-center"
+              role="img"
+              aria-label="Audio"
+            >
+              <AudioLines className="size-8 text-q-icon-secondary" />
+            </span>
+          ) : item.kind === "video" ? (
+            <video
+              src={item.src}
+              muted
+              playsInline
+              preload="metadata"
+              className="size-full object-cover"
+            />
+          ) : (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img
+              src={item.src}
+              alt={item.name ?? ""}
+              className="size-full object-cover"
+              loading="lazy"
+            />
+          )}
+          {selected ? (
+            <span className="absolute top-1 right-1 flex size-5 items-center justify-center rounded-full bg-primary text-primary-foreground">
+              <Check className="size-3" />
+            </span>
+          ) : null}
+          {item.kind === "video" ? (
+            <span className="absolute bottom-1.5 left-1.5 inline-flex size-5 items-center justify-center rounded-full bg-q-overlay-scrim text-q-text-primary">
+              <Play className="size-3" fill="currentColor" />
+            </span>
+          ) : null}
         </span>
-        <span className="truncate text-q-caption-sm-regular text-q-text-secondary">
-          {item.source === "upload" ? "Upload" : "Generation"}
+        <span className="flex min-w-0 flex-col gap-0.5 px-1 py-0.5">
+          <span className="truncate text-q-caption-sm-semi-bold text-q-text-primary">
+            {item.name ?? item.kind}
+          </span>
+          <span className="truncate text-q-caption-sm-regular text-q-text-secondary">
+            {item.source === "upload" ? "Upload" : "Generation"}
+          </span>
         </span>
-      </span>
-    </button>
+      </button>
+      {onDelete ? (
+        <button
+          type="button"
+          onClick={onDelete}
+          disabled={disabled}
+          aria-label={`Delete ${item.name ?? item.kind}`}
+          className="absolute top-2 left-2 flex size-6 items-center justify-center rounded-full bg-q-overlay-scrim text-q-text-primary opacity-0 transition-opacity group-hover:opacity-100 focus-visible:opacity-100 focus-visible:ring-2 focus-visible:ring-q-border-focus focus-visible:outline-none disabled:hidden [@media(hover:none)]:opacity-100"
+        >
+          <Trash2 className="size-3.5" />
+        </button>
+      ) : null}
+    </div>
   )
 }
 
