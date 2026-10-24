@@ -229,14 +229,14 @@ Work that users don't see but keeps the app healthy.
 - [x] ⚪ **Replace `console.*` in browser code** with one logger.
 
 **Docs**
-- [ ] 🟡 **Rewrite the README** (purpose, screenshots, setup table, limits). ⏱ 15 min
-- [ ] 🟡 **Architecture guide.** ⏱ 15 min
-- [ ] 🟡 **"Adding a model" guide.** ⏱ 15 min
-- [ ] 🟡 **Table of error messages** for support. ⏱ 15 min
-- [ ] 🟡 **Changelog** and release tags. ⏱ 15 min
-- [ ] 🟡 **Run lifecycle diagram.** ⏱ 15 min
-- [ ] 🟡 **Privacy doc** of what leaves the browser. ⏱ 15 min
-- [ ] ⚪ **One-diagram architecture note.**
+- [x] 🟡 **Rewrite the README** (purpose, screenshots, setup table, limits). ⏱ 15 min *(Screenshots left out: they need a browser run; the README says how to see the screens with `HF_MOCK=1`.)*
+- [x] 🟡 **Architecture guide.** ⏱ 15 min
+- [x] 🟡 **"Adding a model" guide.** ⏱ 15 min
+- [x] 🟡 **Table of error messages** for support. ⏱ 15 min
+- [x] 🟡 **Changelog** and release tags. ⏱ 15 min *(Changelog written; no git tag created yet: say when to cut `v0.1.0`.)*
+- [x] 🟡 **Run lifecycle diagram.** ⏱ 15 min
+- [x] 🟡 **Privacy doc** of what leaves the browser. ⏱ 15 min
+- [x] ⚪ **One-diagram architecture note.**
 
 **Setup & running the app**
 - [x] 🟡 **`/api/health` page** for uptime checks. ⏱ 15 min

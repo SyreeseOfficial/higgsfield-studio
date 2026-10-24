@@ -25,7 +25,7 @@ Source of truth for details: [FINDINGS.md](FINDINGS.md). Do one phase at a time.
 | 13 | Tests: infrastructure & fake server | 7 | ☑ (2 ⛔) |
 | 14 | Code quality & lint | 10 | ☑ |
 | 15 | Cleanup & small ops | 14 | ☑ |
-| 16 | Docs | 8 | ☐ |
+| 16 | Docs | 8 | ☑ |
 | ⛔ | Blocked on you | 8 | see bottom |
 
 ---
@@ -191,14 +191,14 @@ Goal: one click = at most one paid job; one slow call never freezes the app.
 - [x] Fail the build if placeholder images are still used (only after placeholders are replaced; see Blocked)
 
 ## Phase 16 — Docs
-- [ ] Rewrite the README
-- [ ] Architecture guide
-- [ ] "Adding a model" guide
-- [ ] Table of error messages
-- [ ] Changelog and release tags
-- [ ] Run lifecycle diagram
-- [ ] Privacy doc (what leaves the browser)
-- [ ] One-diagram architecture note
+- [x] Rewrite the README
+- [x] Architecture guide
+- [x] "Adding a model" guide
+- [x] Table of error messages
+- [x] Changelog and release tags
+- [x] Run lifecycle diagram
+- [x] Privacy doc (what leaves the browser)
+- [x] One-diagram architecture note
 
 ---
 
