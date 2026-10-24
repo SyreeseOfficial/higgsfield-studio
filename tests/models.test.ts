@@ -51,3 +51,19 @@ describe("model files", () => {
     }
   })
 })
+
+describe("ModelId type", () => {
+  it("lists exactly the installed models", async () => {
+    const { readFileSync } = await import("node:fs")
+    const barrel = readFileSync(
+      "generation/catalog/models.generated.ts",
+      "utf8"
+    )
+    const declared = [
+      ...(barrel.match(/export type ModelId = ([^\n]+)/)?.[1] ?? "").matchAll(
+        /"([^"]+)"/g
+      ),
+    ].map((m) => m[1])
+    expect(declared.sort()).toEqual(MODELS.map((m) => m.id).sort())
+  })
+})

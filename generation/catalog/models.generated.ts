@@ -32,6 +32,9 @@ import m27 from "./models/z-image-turbo";
 
 const LAST = Number.MAX_SAFE_INTEGER;
 
+/** Every installed model id; use it where an id is written by hand so a typo fails the build. */
+export type ModelId = "dop" | "flux-2" | "flux-3" | "grok-imagine-2" | "grok-imagine-video-1.5" | "happy-horse-1" | "happy-horse-1.1" | "ideogram-4" | "kling-2.5" | "kling-2.6" | "kling-3-turbo" | "kling-3-std" | "kling-3-pro" | "kling-3-4k" | "kling-3-motion-std" | "kling-3-motion-pro" | "kling-o1" | "kling-o3" | "ltx-2.5-fast" | "ltx-2.5-pro" | "minimax-h3" | "minimax-hailuo-2.3" | "pixverse-6" | "qwen-image-3" | "recraft-4.1" | "seedance-2" | "seedance-2-fast" | "seedance-2-mini" | "seedance-2.5" | "seedance-2.5-edit" | "seedance-2.5-extend" | "soul-2" | "soul-cinema" | "wan-2.6" | "wan-2.7" | "wan-3" | "wan-3-prime" | "z-image-turbo";
+
 const installed: (ModelEntry | ModelEntry[])[] = [m0, m1, m2, m3, m4, m5, m6, m7, m8, m9, m10, m11, m12, m13, m14, m15, m16, m17, m18, m19, m20, m21, m22, m23, m24, m25, m26, m27];
 
 export const MODELS: readonly ModelEntry[] = installed

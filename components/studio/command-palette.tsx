@@ -49,6 +49,7 @@ export function CommandPalette({
       <DialogContent size="md">
         <DialogTitle className="sr-only">Command palette</DialogTitle>
         <input
+          // eslint-disable-next-line jsx-a11y/no-autofocus -- the palette is a modal whose only field is this search box
           autoFocus
           value={query}
           placeholder="Switch model, project or surface…"
@@ -78,6 +79,7 @@ export function CommandPalette({
             </li>
           ) : (
             shown.map((command, index) => (
+              // eslint-disable-next-line jsx-a11y/click-events-have-key-events -- keys are handled by the search input (combobox pattern)
               <li
                 key={command.id}
                 role="option"

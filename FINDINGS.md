@@ -213,20 +213,20 @@ Work that users don't see but keeps the app healthy.
 - [x] ⚪ **Mock mode** (`HF_MOCK=1`) for demos.
 
 **Code quality**
-- [ ] 🟡 **Stricter TypeScript settings** and lint rules. ⏱ 15 min
-- [ ] 🟡 **Catch typo'd model names** at build time. ⏱ 15 min
-- [ ] 🟡 **Command to compare installed models** with the latest catalog. ⏱ 15 min
-- [ ] 🟡 **Lint rule against logging prompts/URLs.** ⏱ 15 min
+- [x] 🟡 **Stricter TypeScript settings** and lint rules. ⏱ 15 min *(Done except `exactOptionalPropertyTypes`: it needs `| undefined` on about 20 UI props; turn it on in tsconfig.json when you want that cleanup.)*
+- [x] 🟡 **Catch typo'd model names** at build time. ⏱ 15 min
+- [x] 🟡 **Command to compare installed models** with the latest catalog. ⏱ 15 min *(`pnpm models:diff`. Written but not run: it needs network and the registry name `higgsfield-ai/app-templates/models`; override with `HF_MODELS_ITEM`.)*
+- [x] 🟡 **Lint rule against logging prompts/URLs.** ⏱ 15 min
 - [ ] 🟡 **Remove an unused add-on** (`radix-ui`) if confirmed. ⏱ 15 min
-- [ ] 🟡 **Pin tool versions** and add hosted automatic checks. ⏱ 15 min
-- [ ] 🟡 **Check update-bot coverage.** ⏱ 15 min
+- [x] 🟡 **Pin tool versions** and add hosted automatic checks. ⏱ 15 min
+- [x] 🟡 **Check update-bot coverage.** ⏱ 15 min
 - [ ] 🟡 **Dev page showing every component** with sample data. ⏱ 15 min
-- [ ] 🟡 **Settings check at build time** so a missing setting fails early. ⏱ 15 min
-- [ ] 🟡 **Stronger accessibility and React lint rules.** ⏱ 15 min
+- [x] 🟡 **Settings check at build time** so a missing setting fails early. ⏱ 15 min
+- [x] 🟡 **Stronger accessibility and React lint rules.** ⏱ 15 min
 - [ ] ⚪ **Simplify how data flows** in the prompt box. *(see Decisions)*
 - [ ] ⚪ **Generate the model table in the README.** *(see Decisions)*
-- [ ] ⚪ **Check settings at startup** with a readable error.
-- [ ] ⚪ **Replace `console.*` in browser code** with one logger.
+- [x] ⚪ **Check settings at startup** with a readable error.
+- [x] ⚪ **Replace `console.*` in browser code** with one logger.
 
 **Docs**
 - [ ] 🟡 **Rewrite the README** (purpose, screenshots, setup table, limits). ⏱ 15 min

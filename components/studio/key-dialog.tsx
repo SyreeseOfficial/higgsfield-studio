@@ -117,6 +117,7 @@ export function KeyDialog({
                 server for API requests.
               </p>
               <Input
+                // eslint-disable-next-line jsx-a11y/no-autofocus -- the key field is the dialog's only input
                 autoFocus
                 type="password"
                 value={apiKey}

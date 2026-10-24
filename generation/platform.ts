@@ -9,7 +9,7 @@ const REQUEST_TIMEOUT_MS = 30_000
 const MODEL_ID = /^[a-z0-9][a-z0-9._/-]*$/i
 
 /** One JSON line per event, never a prompt or reference URL. The request id doubles as the "Support ID" on failed tiles. */
-function log(event: string, fields: Record<string, unknown>) {
+export function log(event: string, fields: Record<string, unknown>) {
   const line = JSON.stringify({
     at: new Date().toISOString(),
     event,
@@ -77,6 +77,7 @@ export function createPlatformClient(options: PlatformClientOptions) {
     const url = `${baseUrl}${path}`
     // Prompts and reference URLs live in bodies; only HF_DEBUG=1 logs them.
     if (DEBUG)
+      // eslint-disable-next-line no-restricted-syntax -- HF_DEBUG=1 is the one place bodies are logged
       console.info("[platform] request", { method, url, body: body ?? null })
     let response: Response
     try {
@@ -104,12 +105,14 @@ export function createPlatformClient(options: PlatformClientOptions) {
     const payload = await readJson(response)
     // Signed upload URLs are credentials; do not write them to logs.
     if (DEBUG)
+      /* eslint-disable no-restricted-syntax -- HF_DEBUG=1 is the one place bodies are logged */
       console.info("[platform] response", {
         method,
         url,
         status: response.status,
         ...(path === UPLOAD_PATH ? {} : { body: payload }),
       })
+    /* eslint-enable no-restricted-syntax */
     if (!response.ok) {
       log("error", { method, path, status: response.status })
       throw new PlatformError(response.status, payload)

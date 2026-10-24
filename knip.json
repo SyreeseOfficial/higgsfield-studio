@@ -1,6 +1,11 @@
 {
   "$schema": "https://unpkg.com/knip@6/schema.json",
-  "entry": ["scripts/*.mjs", "tests/*.test.ts"],
+  "entry": [
+    "scripts/*.mjs",
+    "tests/*.test.ts",
+    "instrumentation.ts",
+    "generation/*.worker.ts"
+  ],
   "ignore": [
     "components/theme-provider.tsx",
     "components/ui/label.tsx",

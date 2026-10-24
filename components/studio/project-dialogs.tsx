@@ -71,6 +71,7 @@ function NameDialog({
                 {description}
               </p>
               <Input
+                // eslint-disable-next-line jsx-a11y/no-autofocus -- the name field is the dialog's only input
                 autoFocus
                 value={name}
                 onChange={(e) => setName(e.target.value)}

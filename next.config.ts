@@ -1,5 +1,6 @@
 import type { NextConfig } from "next"
 
+import { checkEnv, formatProblems } from "./scripts/check-env.mjs"
 import { syncModels, watchModels } from "./scripts/sync-models.mjs"
 
 // Keep the model barrel + registry items in sync with generation/catalog/models/*.
@@ -7,6 +8,12 @@ syncModels()
 if (process.env.NODE_ENV === "development") watchModels()
 
 const dev = process.env.NODE_ENV === "development"
+
+// A production build with a missing or malformed setting fails here, not at the first generation.
+if (!dev && process.env.HF_SKIP_ENV_CHECK !== "1") {
+  const problems = checkEnv()
+  if (problems.length) throw new Error(formatProblems(problems))
+}
 
 // Results and references come from the platform's CDN and signed storage. Their
 // hosts are not published, so media and connect accept any https origin unless

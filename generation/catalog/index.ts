@@ -1,8 +1,10 @@
 import { MODELS } from "./models.generated"
+import type { ModelId } from "./models.generated"
 import { parseSettings } from "./parse-settings"
 import type { ModelEntry } from "./types"
 
 export { MODELS }
+export type { ModelId }
 
 export function getModel(id: string): ModelEntry {
   const model = MODELS.find((entry) => entry.id === id)

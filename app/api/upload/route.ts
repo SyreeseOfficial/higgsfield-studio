@@ -6,7 +6,7 @@ import {
   PLATFORM_KEY_COOKIE,
 } from "@/generation/credentials"
 import { isMockMode } from "@/generation/mock-platform"
-import { createPlatformClient, PlatformError } from "@/generation/platform"
+import { createPlatformClient, log, PlatformError } from "@/generation/platform"
 import { requireUploadContentType } from "@/generation/upload-contract"
 
 export async function POST(request: Request): Promise<NextResponse> {
@@ -70,7 +70,7 @@ export async function POST(request: Request): Promise<NextResponse> {
     })
   } catch (error) {
     const status = error instanceof PlatformError ? error.status : 502
-    console.error("[upload] Could not prepare reference upload", { status })
+    log("error", { route: "upload", status })
     if (status === 401 || status === 403)
       return failure(
         status,

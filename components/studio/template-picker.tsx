@@ -12,6 +12,7 @@ import {
 
 import { Button } from "@/components/ui/button"
 import { cn } from "@/lib/utils"
+import type { ModelId } from "@/generation/catalog"
 
 /**
  * Templates — the "what you can make" examples. A `TemplateItem` seeds the
@@ -40,7 +41,8 @@ export interface TemplateItem {
   /** What the Try action puts in the dock. */
   prompt: string
   /** Catalog model id to switch to, when the template needs a specific one. */
-  modelId?: string
+  /** Checked at build time against the installed model files. */
+  modelId?: ModelId
   settings?: Record<string, unknown>
 }
 
@@ -155,6 +157,7 @@ export function TemplateCard({
         {variant === "triptych" ? (
           template.images.map((src, i) => (
             <div
+              // eslint-disable-next-line react/no-array-index-key -- a fixed trio of images; the same URL may repeat
               key={i}
               className={cn(
                 "min-w-0 flex-1 overflow-hidden border border-white/10",

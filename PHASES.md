@@ -23,7 +23,7 @@ Source of truth for details: [FINDINGS.md](FINDINGS.md). Do one phase at a time.
 | 11 | Speed: loading & bundle | 7 | ☑ |
 | 12 | Tests: pure logic | 9 | ☑ |
 | 13 | Tests: infrastructure & fake server | 7 | ☑ (2 ⛔) |
-| 14 | Code quality & lint | 10 | ☐ |
+| 14 | Code quality & lint | 10 | ☑ |
 | 15 | Cleanup & small ops | 14 | ☐ |
 | 16 | Docs | 8 | ☐ |
 | ⛔ | Blocked on you | 8 | see bottom |
@@ -163,16 +163,16 @@ Goal: one click = at most one paid job; one slow call never freezes the app.
 - [x] Single `pnpm check` command
 
 ## Phase 14 — Code quality & lint
-- [ ] Stricter TypeScript and lint rules
-- [ ] Catch typo'd model names at build time
-- [ ] Command to compare installed models with the latest catalog
-- [ ] Lint rule against logging prompts/URLs
-- [ ] Stronger accessibility and React lint rules
-- [ ] Settings check at build time
-- [ ] Check settings at startup with a readable error
-- [ ] Replace `console.*` in browser code with one logger
-- [ ] Pin tool versions, add hosted automatic checks
-- [ ] Check update-bot coverage
+- [x] Stricter TypeScript and lint rules
+- [x] Catch typo'd model names at build time
+- [x] Command to compare installed models with the latest catalog
+- [x] Lint rule against logging prompts/URLs
+- [x] Stronger accessibility and React lint rules
+- [x] Settings check at build time
+- [x] Check settings at startup with a readable error
+- [x] Replace `console.*` in browser code with one logger
+- [x] Pin tool versions, add hosted automatic checks
+- [x] Check update-bot coverage
 
 ## Phase 15 — Cleanup & small ops
 - [ ] Remove dead code (unused saved-prompt and media stores)
