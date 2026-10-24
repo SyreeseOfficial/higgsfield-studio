@@ -88,9 +88,12 @@ export async function submitGeneration(
     if (caught instanceof PlatformError) {
       if (caught.status === 401 || caught.status === 403)
         return { ok: false, kind: "auth", error }
+      // 408 (timeout) and 409 (conflict) say nothing about whether the job was taken.
+      const maybeTaken =
+        caught.status >= 500 || caught.status === 408 || caught.status === 409
       return {
         ok: false,
-        kind: caught.status < 500 ? "rejected" : "unknown",
+        kind: maybeTaken ? "unknown" : "rejected",
         error,
       }
     }
@@ -106,8 +109,8 @@ export async function getGenerationStatuses(
   data: unknown
 ): Promise<StatusResult[]> {
   const requestIds = [...new Set(parseRequestIds(data))]
-  if (requestIds.length > MAX_STATUS_IDS)
-    throw new Error("Too many request ids")
+  // Past the cap, answer the extras as "try again" rather than failing the whole check.
+  const overflow = requestIds.splice(MAX_STATUS_IDS)
   const client = createPlatformClient(await readCredentials())
   const results: StatusResult[] = []
   for (let i = 0; i < requestIds.length; i += STATUS_CONCURRENCY) {
@@ -136,6 +139,12 @@ export async function getGenerationStatuses(
       ))
     )
   }
+  for (const requestId of overflow)
+    results.push({
+      requestId,
+      error: "Too many requests at once; will check again",
+      terminal: false,
+    })
   return results
 }
 
@@ -158,7 +167,10 @@ async function readCredentials() {
   const stored = await readStoredCredentials()
   if (!stored) throw new MissingCredentialsError()
   const baseUrl = process.env.HF_API_BASE_URL
-  if (!baseUrl) throw new Error("Missing HF_API_BASE_URL")
+  if (!baseUrl)
+    throw new Error(
+      "This app isn't set up yet: the server is missing HF_API_BASE_URL. Add it to .env.local and restart."
+    )
   return { ...stored, baseUrl }
 }
 

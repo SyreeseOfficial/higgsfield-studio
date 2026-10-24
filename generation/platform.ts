@@ -4,6 +4,8 @@ import type { UploadTicket } from "./upload-contract"
 
 const UPLOAD_PATH = "/files/generate-upload-url"
 const DEBUG = process.env.HF_DEBUG === "1"
+/** One slow call must not hold up submit, cancel and status checks behind it. */
+const REQUEST_TIMEOUT_MS = 30_000
 const MODEL_ID = /^[a-z0-9][a-z0-9._/-]*$/i
 
 /** One JSON line per event, never a prompt or reference URL. The request id doubles as the "Support ID" on failed tiles. */
@@ -76,15 +78,28 @@ export function createPlatformClient(options: PlatformClientOptions) {
     // Prompts and reference URLs live in bodies; only HF_DEBUG=1 logs them.
     if (DEBUG)
       console.info("[platform] request", { method, url, body: body ?? null })
-    const response = await fetchImpl(url, {
-      method,
-      headers: {
-        Authorization: auth,
-        ...(body ? { "Content-Type": "application/json" } : {}),
-        ...extraHeaders,
-      },
-      ...(body ? { body: JSON.stringify(body) } : {}),
-    })
+    let response: Response
+    try {
+      response = await fetchImpl(url, {
+        method,
+        headers: {
+          Authorization: auth,
+          ...(body ? { "Content-Type": "application/json" } : {}),
+          ...extraHeaders,
+        },
+        ...(body ? { body: JSON.stringify(body) } : {}),
+        signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
+      })
+    } catch (caught) {
+      // The job may exist: 408 / 502 are treated as "unknown", never "refused".
+      const timedOut = caught instanceof Error && caught.name === "TimeoutError"
+      log("error", { method, path, status: timedOut ? 408 : 502 })
+      throw new PlatformError(timedOut ? 408 : 502, {
+        detail: timedOut
+          ? "Higgsfield did not answer in time. Check again in a moment."
+          : "Could not reach Higgsfield. Check your connection and try again.",
+      })
+    }
 
     const payload = await readJson(response)
     // Signed upload URLs are credentials; do not write them to logs.

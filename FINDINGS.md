@@ -28,7 +28,7 @@ A list of ideas and fixes for the app, written in plain language. Finished work 
 
 The 8 most important items. Each one is also listed in its category below.
 
-1. [ ] **Add a timeout to calls to Higgsfield.** One stuck call can freeze everything else. ⏱ 15 min
+1. [x] **Add a timeout to calls to Higgsfield.** One stuck call can freeze everything else. ⏱ 15 min
 2. [ ] **Stop accidental double charges.** Make sure every "Generate" click has a unique ID so a retry never creates a second paid job. ⏱ 15 min
 3. [ ] **Don't lose starred items.** The app keeps only the newest 400 generations. Starred ones should never be dropped. ⏱ 15 min
 4. [ ] **Save results in case links expire.** Right now we only save links to the images/videos. If those links die, the gallery shows blank tiles. ⏱ 15 min
@@ -58,19 +58,19 @@ I couldn't do these without an answer from you. Each says what I need.
 
 Jobs getting stuck, charged twice, or failing for no reason.
 
-- [ ] 🔴 **Add a timeout to calls to Higgsfield.** One hung call freezes submit, cancel and status checks. ⏱ 15 min
-- [ ] 🔴 **Make sure every generation has a unique ID**, even from older browsers, so a retry can't double-charge. ⏱ 15 min
-- [ ] 🔴 **Show a clear "app isn't set up" screen** instead of raw errors on every generation when settings are missing. ⏱ 15 min
+- [x] 🔴 **Add a timeout to calls to Higgsfield.** One hung call freezes submit, cancel and status checks. ⏱ 15 min
+- [x] 🔴 **Make sure every generation has a unique ID**, even from older browsers, so a retry can't double-charge. ⏱ 15 min
+- [x] 🔴 **Show a clear "app isn't set up" screen** instead of raw errors on every generation when settings are missing. ⏱ 15 min
 - [ ] 🟡 **Dev-mode glitch:** checking on jobs can get dropped when the page reloads itself while developing. Fix it. ⏱ 15 min
-- [ ] 🟡 **Don't throw away good results.** If one group of status checks fails, results from the groups that worked are lost. ⏱ 15 min
-- [ ] 🟡 **Handle "too many jobs" gracefully** instead of failing the whole status check. ⏱ 15 min
-- [ ] 🟡 **Treat "timeout" and "conflict" errors as "maybe it worked"**, not "it failed". Prevents double-charging. ⏱ 15 min
+- [x] 🟡 **Don't throw away good results.** If one group of status checks fails, results from the groups that worked are lost. ⏱ 15 min
+- [x] 🟡 **Handle "too many jobs" gracefully** instead of failing the whole status check. ⏱ 15 min
+- [x] 🟡 **Treat "timeout" and "conflict" errors as "maybe it worked"**, not "it failed". Prevents double-charging. ⏱ 15 min
 - [ ] 🟡 **Fix "Canceling…" getting stuck** if the job was already running and can't be canceled. ⏱ 15 min
 - [ ] 🟡 **Wait a moment before declaring "no media produced".** Sometimes results are just a second late. ⏱ 15 min
 - [ ] 🟡 **Warn when a reference link has expired** instead of failing with a confusing error when using "More like this" later. ⏱ 15 min
 - [ ] 🟡 **Stop the tile from flickering** between "queued" and "running". ⏱ 15 min
-- [ ] 🟡 **Remember several pending retries**, not just one, so changing a prompt after a failure can't cause a duplicate paid job. ⏱ 15 min
-- [ ] 🟡 **Limit running jobs across all browser tabs.** Two tabs currently allow double the limit. ⏱ 15 min
+- [x] 🟡 **Remember several pending retries**, not just one, so changing a prompt after a failure can't cause a duplicate paid job. ⏱ 15 min
+- [x] 🟡 **Limit running jobs across all browser tabs.** Two tabs currently allow double the limit. ⏱ 15 min
 - [ ] 🟡 **Show "Retrying…" and auto-retry once** on temporary server errors.
 - [ ] 🟡 **Pause the queue automatically** when Higgsfield says "slow down", with a visible countdown. ⏱ 15 min
 - [ ] 🟡 **Keep the queue after a page reload** instead of dropping it.

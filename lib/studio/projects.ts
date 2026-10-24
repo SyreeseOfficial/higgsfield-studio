@@ -3,6 +3,8 @@ import { persist } from "zustand/middleware"
 
 import { browserStorage } from "@/generation/stores/browser-storage"
 
+import { newId } from "./id"
+
 export interface Project {
   id: string
   name: string
@@ -16,12 +18,6 @@ type ProjectsState = {
   rename: (id: string, name: string) => void
   remove: (id: string) => void
   touch: (id: string) => void
-}
-
-function newId(): string {
-  return typeof crypto !== "undefined" && "randomUUID" in crypto
-    ? crypto.randomUUID()
-    : `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 10)}`
 }
 
 /** Local-first projects. Swap the storage for a database when the app has accounts. */

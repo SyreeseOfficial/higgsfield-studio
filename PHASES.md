@@ -10,7 +10,7 @@ Source of truth for details: [FINDINGS.md](FINDINGS.md). Do one phase at a time.
 
 | # | Phase | Items | Status |
 |---|---|---|---|
-| 1 | Safe submits (no double charges, no freezes) | 8 | ☐ |
+| 1 | Safe submits (no double charges, no freezes) | 8 | ☑ |
 | 2 | Run lifecycle & recovery | 10 | ☐ |
 | 3 | History & data safety | 9 | ☐ |
 | 4 | Security & downloads | 5 | ☐ |
@@ -32,14 +32,14 @@ Source of truth for details: [FINDINGS.md](FINDINGS.md). Do one phase at a time.
 
 ## Phase 1 — Safe submits
 Goal: one click = at most one paid job; one slow call never freezes the app.
-- [ ] Add a timeout to calls to Higgsfield
-- [ ] Unique ID on every generation (old-browser safe) / stop accidental double charges
-- [ ] Treat "timeout" and "conflict" as "maybe it worked"
-- [ ] Remember several pending retries
-- [ ] Limit running jobs across all browser tabs
-- [ ] Friendly "app isn't set up" screen
-- [ ] Handle "too many jobs" gracefully
-- [ ] Don't throw away good results when one status group fails
+- [x] Add a timeout to calls to Higgsfield
+- [x] Unique ID on every generation (old-browser safe) / stop accidental double charges
+- [x] Treat "timeout" and "conflict" as "maybe it worked"
+- [x] Remember several pending retries
+- [x] Limit running jobs across all browser tabs
+- [x] Friendly "app isn't set up" screen
+- [x] Handle "too many jobs" gracefully
+- [x] Don't throw away good results when one status group fails
 
 ## Phase 2 — Run lifecycle & recovery
 - [ ] Dev-mode glitch: dropped status checks on hot reload

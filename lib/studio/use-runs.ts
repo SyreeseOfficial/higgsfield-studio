@@ -21,6 +21,7 @@ import {
   SAVE_DEBOUNCE_MS,
   VIDEO_DEADLINE_MS,
 } from "./limits"
+import { newId } from "./id"
 import {
   aspectFromSettings,
   loadHistory,
@@ -30,6 +31,7 @@ import {
 } from "./history"
 
 const CHANNEL = "studio-history"
+const MAX_PENDING_KEYS = 20
 
 /** Adds runs another tab created and takes its settled copy of any run still
     running here. Returns `current` untouched when nothing changed, so the
@@ -67,8 +69,8 @@ export function useRuns({ onAuthError }: { onAuthError?: () => void } = {}) {
   const [error, setError] = useState<string | null>(null)
   // Blocks a second submit while the first is still awaiting the platform.
   const submitting = useRef(false)
-  // Key of an attempt whose outcome is unknown, reused if the same plane is retried.
-  const pending = useRef<{ fingerprint: string; key: string } | null>(null)
+  // Keys of attempts whose outcome is unknown, reused if the same plane is retried.
+  const pending = useRef(new Map<string, string>())
   const channel = useRef<BroadcastChannel | null>(null)
   const onAuthErrorRef = useRef(onAuthError)
   useEffect(() => {
@@ -148,7 +150,7 @@ export function useRuns({ onAuthError }: { onAuthError?: () => void } = {}) {
     return () => window.removeEventListener("pagehide", flush)
   }, [loaded])
 
-  const start = useCallback(
+  const send = useCallback(
     async (
       plane: GenerationPlane,
       projectId: string | undefined,
@@ -158,21 +160,21 @@ export function useRuns({ onAuthError }: { onAuthError?: () => void } = {}) {
       setError(null)
       const model = getModel(plane.model)
       const fingerprint = JSON.stringify([plane, projectId])
-      const key =
-        pending.current?.fingerprint === fingerprint
-          ? pending.current.key
-          : crypto.randomUUID()
-      pending.current = { fingerprint, key }
+      const key = pending.current.get(fingerprint) ?? newId()
+      pending.current.delete(fingerprint) // re-insert last: Map order = recency
+      pending.current.set(fingerprint, key)
+      if (pending.current.size > MAX_PENDING_KEYS)
+        pending.current.delete(pending.current.keys().next().value!)
       try {
         const result = await submitGeneration(plane, key)
         if (!result.ok) {
           // Keep the key unless the platform definitely refused the job.
-          if (result.kind !== "unknown") pending.current = null
+          if (result.kind !== "unknown") pending.current.delete(fingerprint)
           if (result.kind === "auth") onAuthErrorRef.current?.()
           setError(result.error)
           return
         }
-        pending.current = null
+        pending.current.delete(fingerprint)
         const { queued } = result
         const record: RunRecord = {
           id: queued.requestId,
@@ -192,6 +194,10 @@ export function useRuns({ onAuthError }: { onAuthError?: () => void } = {}) {
         }
         setRecords((current) => [record, ...current])
         watch(record)
+        // Saved now, not after the debounce, so another tab sees this slot taken.
+        await saveHistory(
+          mergeRecords([record, ...latest.current], await loadHistory())
+        ).catch(() => undefined)
       } catch (caught) {
         // The call itself dropped: the job may exist, so the key stays.
         setError(caught instanceof Error ? caught.message : String(caught))
@@ -202,6 +208,39 @@ export function useRuns({ onAuthError }: { onAuthError?: () => void } = {}) {
       }
     },
     [watch]
+  )
+
+  /** Sends one plane under a cross-tab lock, so two tabs cannot both take the last slot. */
+  const start = useCallback(
+    async (
+      plane: GenerationPlane,
+      projectId: string | undefined,
+      queuedId: string
+    ) => {
+      const locks =
+        typeof navigator === "undefined" ? undefined : navigator.locks
+      if (!locks) return send(plane, projectId, queuedId)
+      let blocked = false
+      await locks.request("studio-submit", async () => {
+        const stored = await loadHistory()
+        const active = new Set(
+          [...stored, ...latest.current]
+            .filter((r) => r.status === "running")
+            .map((r) => r.id)
+        )
+        if (active.size >= MAX_RUNNING) {
+          blocked = true
+          return
+        }
+        await send(plane, projectId, queuedId)
+      })
+      if (blocked) {
+        submitting.current = false
+        // Another tab holds the slots; look again shortly.
+        setTimeout(() => setPump((n) => n + 1), 3000)
+      }
+    },
+    [send]
   )
 
   // Sends the next queued plane whenever a slot is free.
@@ -230,7 +269,7 @@ export function useRuns({ onAuthError }: { onAuthError?: () => void } = {}) {
       setError(null)
       const model = getModel(plane.model)
       const record: RunRecord = {
-        id: `queued-${crypto.randomUUID()}`,
+        id: `queued-${newId()}`,
         requestId: "",
         surface: model.surface,
         modelId: model.id,

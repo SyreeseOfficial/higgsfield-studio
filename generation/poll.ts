@@ -114,13 +114,21 @@ async function round(): Promise<void> {
   try {
     const ids = [...waiting.keys()]
     const results: StatusResult[] = []
+    let failure: unknown
     for (let i = 0; i < ids.length; i += STATUS_BATCH)
-      results.push(
-        ...(await getGenerationStatuses({
-          requestIds: ids.slice(i, i + STATUS_BATCH),
-        }))
-      )
-    misses = 0
+      try {
+        results.push(
+          ...(await getGenerationStatuses({
+            requestIds: ids.slice(i, i + STATUS_BATCH),
+          }))
+        )
+      } catch (caught) {
+        failure = caught // keep the answers the other groups gave
+      }
+    if (failure !== undefined && results.length === 0) throw failure
+    misses = 0 // ponytail: a failing group is retried each round until its deadline
+    for (const result of results) deliver(result)
+    sweep()
     for (const result of results) deliver(result)
     sweep()
   } catch (caught) {
