@@ -98,7 +98,7 @@ Reviewed 2026-10-13 against `17b2826` (Next.js 16, React 19, Tailwind 4, Base UI
 - [x] **[L]** Command palette (`Cmd/Ctrl+K`): switch model, project, surface, open settings, search history. *(Done for models, projects, surfaces, API key and shortcuts. "Open settings" and history search are left out: the settings dialog is opened by its own trigger and the feed has no text search yet.)*
 
 ### Cost and usage awareness
-- [ ] **[L]** Usage dashboard: runs per model/day, success rate, median time-to-complete (local data).
+- [x] **[L]** Usage dashboard: runs per model/day, success rate, median time-to-complete (local data). *(Done as a Usage dialog in the command palette; median time only counts runs finished after completion times were recorded.)*
 
 ### Resilience, safety and privacy
 - [ ] **[H]** Error boundary around the gallery and detail modal so one bad record doesn't blank the app.

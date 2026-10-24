@@ -54,6 +54,7 @@ import {
   type Command,
 } from "@/components/studio/command-palette"
 import { ShortcutsDialog } from "@/components/studio/shortcuts-dialog"
+import { UsageDialog } from "@/components/studio/usage-dialog"
 import { claimTip } from "@/lib/studio/tips"
 import { FeedControls } from "@/components/studio/feed-controls"
 import {
@@ -344,6 +345,7 @@ export function StudioTemplate({
   const [localError, setLocalError] = useState<string | null>(null)
   const [paletteOpen, setPaletteOpen] = useState(false)
   const [shortcutsOpen, setShortcutsOpen] = useState(false)
+  const [usageOpen, setUsageOpen] = useState(false)
   const [tip, setTip] = useState<string | null>(null)
 
   const surface = useActive((s) => s.surface)
@@ -573,6 +575,12 @@ export function StudioTemplate({
       run: () => setKeyOpen(true),
     },
     {
+      id: "usage",
+      label: "Usage",
+      hint: "Stats",
+      run: () => setUsageOpen(true),
+    },
+    {
       id: "shortcuts",
       label: "Keyboard shortcuts",
       hint: "Help",
@@ -752,6 +760,11 @@ export function StudioTemplate({
         open={paletteOpen}
         onOpenChange={setPaletteOpen}
         commands={commands}
+      />
+      <UsageDialog
+        open={usageOpen}
+        onOpenChange={setUsageOpen}
+        records={runs.records.filter((r) => !r.queued)}
       />
       <ShortcutsDialog open={shortcutsOpen} onOpenChange={setShortcutsOpen} />
       {tip && !undo ? (

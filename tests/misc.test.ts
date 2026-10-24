@@ -7,6 +7,8 @@ import {
   applyFeedView,
   type FeedView,
 } from "@/lib/studio/feed-view"
+import { usageStats } from "@/lib/studio/usage"
+import type { RunRecord } from "@/lib/studio/history"
 import { JustifiedLayoutEngine } from "@/components/studio/gallery/justified-engine"
 import type { GalleryItem } from "@/components/studio/gallery/gallery-types"
 
@@ -129,5 +131,39 @@ describe("applyFeedView", () => {
     expect(ids({ sort: "oldest" })).toEqual(["1", "2", "3"])
     expect(ids({ sort: "model" })).toEqual(["2", "1", "3"])
     expect(ids({ sort: "starred" })).toEqual(["3", "2", "1"])
+  })
+})
+
+describe("usageStats", () => {
+  const run = (patch: Partial<RunRecord>): RunRecord => ({
+    id: "x",
+    requestId: "x",
+    surface: "image",
+    modelId: "m",
+    modelLabel: "M",
+    prompt: "",
+    settings: {},
+    aspect: 1,
+    status: "completed",
+    urls: [],
+    createdAt: 0,
+    ...patch,
+  })
+  it("counts success rate and median time", () => {
+    const u = usageStats(
+      [
+        run({ completedAt: 10_000 }),
+        run({ completedAt: 30_000 }),
+        run({ status: "failed" }),
+        run({ status: "running" }),
+      ],
+      7,
+      0
+    )
+    expect(u.total).toBe(4)
+    expect(u.successRate).toBeCloseTo(2 / 3)
+    expect(u.medianSeconds).toBe(20)
+    expect(u.byModel[0]).toMatchObject({ runs: 4, completed: 2, failed: 1 })
+    expect(u.perDay).toHaveLength(7)
   })
 })
