@@ -23,12 +23,22 @@ const plexMono = IBM_Plex_Mono({
   display: "swap",
 })
 
+const description =
+  "Create images and video from prompts and references with Higgsfield models."
+
 export const metadata: Metadata = {
-  title: "Studio",
-  description:
-    "Create images and video from prompts and references with Higgsfield models.",
+  title: { default: "Studio", template: "%s · Studio" },
+  description,
+  applicationName: "Studio",
+  openGraph: {
+    type: "website",
+    siteName: "Studio",
+    title: "Studio",
+    description,
+  },
 }
 
+// Matches --hf-color-background-primary (cool-400) in the dark theme.
 export const viewport: Viewport = { themeColor: "#131416" }
 
 export default function RootLayout({
