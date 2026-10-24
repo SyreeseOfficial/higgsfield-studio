@@ -1,5 +1,6 @@
 import type { MediaItem, Surface } from "@/generation/catalog"
 
+import { HISTORY_MAX_RECORDS } from "./limits"
 import { defaultKv, type Kv } from "./kv"
 
 export type RunStatus = "running" | "completed" | "failed"
@@ -37,7 +38,6 @@ export interface RunRecord {
 }
 
 const KEY = "history.v1"
-const MAX_RECORDS = 400
 
 export async function loadHistory(kv: Kv = defaultKv()): Promise<RunRecord[]> {
   return (await readHistory(kv)).records
@@ -57,7 +57,7 @@ export async function saveHistory(
   records: RunRecord[],
   kv: Kv = defaultKv()
 ): Promise<void> {
-  await kv.set(KEY, records.slice(0, MAX_RECORDS))
+  await kv.set(KEY, records.slice(0, HISTORY_MAX_RECORDS))
 }
 
 function isRunRecord(value: unknown): value is RunRecord {

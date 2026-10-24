@@ -15,6 +15,13 @@ import {
 } from "@/generation/poll"
 
 import {
+  IMAGE_DEADLINE_MS,
+  MAX_QUEUED,
+  MAX_RUNNING,
+  SAVE_DEBOUNCE_MS,
+  VIDEO_DEADLINE_MS,
+} from "./limits"
+import {
   aspectFromSettings,
   loadHistory,
   readHistory,
@@ -22,10 +29,6 @@ import {
   type RunRecord,
 } from "./history"
 
-export const MAX_RUNNING = 2
-const MAX_QUEUED = 20
-const IMAGE_DEADLINE_MS = 15 * 60_000
-const VIDEO_DEADLINE_MS = 40 * 60_000
 const CHANNEL = "studio-history"
 
 /** Adds runs another tab created and takes its settled copy of any run still
@@ -133,7 +136,7 @@ export function useRuns({ onAuthError }: { onAuthError?: () => void } = {}) {
     const timer = setTimeout(
       () =>
         void saveHistory(records).then(() => channel.current?.postMessage(0)),
-      250
+      SAVE_DEBOUNCE_MS
     )
     return () => clearTimeout(timer)
   }, [loaded, records])
@@ -277,10 +280,13 @@ export function useRuns({ onAuthError }: { onAuthError?: () => void } = {}) {
       const record = records.find((r) => r.id === id)
       if (!record || record.status !== "running" || record.canceling) return
       update(id, { canceling: true })
-      try {
-        // Only queued jobs can be canceled; the next poll reports what happened.
-        await cancelGeneration({ requestIds: [record.requestId] })
-      } catch {
+      // Only queued jobs can be canceled; the next poll reports what happened.
+      const canceled = await cancelGeneration({
+        requestIds: [record.requestId],
+      })
+        .then((result) => result.ok)
+        .catch(() => false)
+      if (!canceled) {
         update(id, { canceling: false })
         setError("Already running, can't cancel")
       }

@@ -20,6 +20,8 @@ export interface GalleryItem {
   stalled?: boolean
   canceling?: boolean
   starred?: boolean
+  /** Platform request id of a failed run, for support. */
+  supportId?: string
   completedAt?: number
   /** 1-based place in the local queue, for runs not yet sent. */
   queued?: number

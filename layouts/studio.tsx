@@ -21,7 +21,6 @@ import { StudioSidebar, type StudioView } from "@/components/studio/sidebar"
 import { UserGenerations } from "@/components/studio/user-generations"
 import type { GalleryItem } from "@/components/studio/gallery/gallery-types"
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs"
-import { hasPlatformCredentials } from "@/generation/actions"
 import { MODELS, getModel, parseSettings } from "@/generation/catalog"
 import type {
   GenerationPlane,
@@ -53,6 +52,8 @@ import {
 import type { Command } from "@/components/studio/command-palette"
 import { ErrorBoundary } from "@/components/studio/error-boundary"
 import { useOnline } from "@/lib/studio/use-online"
+import { useKeyStatus } from "@/lib/studio/use-key-status"
+import { useStudioKeys } from "@/lib/studio/use-studio-keys"
 import { claimTip } from "@/lib/studio/tips"
 import { FeedControls } from "@/components/studio/feed-controls"
 import {
@@ -393,8 +394,8 @@ export function StudioTemplate({
   const [collapsed, setCollapsed] = useState(false)
   const [prompt, setPrompt] = useState("")
   const [media, setMedia] = useState<MediaItem[]>([])
-  const [keyOpen, setKeyOpen] = useState(false)
-  const [keyConfigured, setKeyConfigured] = useState(false)
+  const key = useKeyStatus()
+  const { configured: keyConfigured, setOpen: setKeyOpen } = key
   const [canceling, setCanceling] = useState(false)
   const [moving, setMoving] = useState<GalleryItem[] | null>(null)
   const [undo, setUndo] = useState<{
@@ -417,10 +418,7 @@ export function StudioTemplate({
   const projectsStore = useProjects()
   const uploads = useUploads((s) => s.items)
   const runs = useRuns({
-    onAuthError: () => {
-      setKeyConfigured(false)
-      setKeyOpen(true)
-    },
+    onAuthError: key.reject,
   })
 
   const surfaces = useMemo(
@@ -464,14 +462,6 @@ export function StudioTemplate({
       }
     }
   }, [inputMode, media, model, prompt, settings])
-
-  // The cookie can expire or be cleared in another tab; re-check on return.
-  useEffect(() => {
-    const check = () => void hasPlatformCredentials().then(setKeyConfigured)
-    check()
-    window.addEventListener("focus", check)
-    return () => window.removeEventListener("focus", check)
-  }, [])
 
   const galleryItems = useMemo(
     () => runs.records.flatMap(runToGalleryItems),
@@ -528,23 +518,10 @@ export function StudioTemplate({
 
   useRunSignals(runs.records)
 
-  useEffect(() => {
-    const onKey = (event: KeyboardEvent) => {
-      if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === "k") {
-        event.preventDefault()
-        setPaletteOpen((open) => !open)
-        return
-      }
-      const target = event.target as HTMLElement | null
-      const typing =
-        target?.isContentEditable ||
-        ["INPUT", "TEXTAREA", "SELECT"].includes(target?.tagName ?? "")
-      if (event.key === "?" && !typing && !event.metaKey && !event.ctrlKey)
-        setShortcutsOpen(true)
-    }
-    window.addEventListener("keydown", onKey)
-    return () => window.removeEventListener("keydown", onKey)
-  }, [])
+  useStudioKeys({
+    onPalette: () => setPaletteOpen((open) => !open),
+    onHelp: () => setShortcutsOpen(true),
+  })
 
   // One-time hints for features that have no visible control.
   useEffect(() => {
@@ -590,7 +567,15 @@ export function StudioTemplate({
       if (record && view.kind === "home") setView({ kind: "all" })
       if (record && projectId) projectsStore.touch(projectId)
     })
-  }, [canGenerate, keyConfigured, prepared.plane, projectsStore, runs, view])
+  }, [
+    canGenerate,
+    keyConfigured,
+    setKeyOpen,
+    prepared.plane,
+    projectsStore,
+    runs,
+    view,
+  ])
 
   const handleCancel = useCallback(() => {
     if (!generating || canceling) return
@@ -633,7 +618,7 @@ export function StudioTemplate({
       id: "key",
       label: "Manage API key",
       hint: "Settings",
-      run: () => setKeyOpen(true),
+      run: () => key.setOpen(true),
     },
     {
       id: "privacy",
@@ -767,8 +752,8 @@ export function StudioTemplate({
         }}
         collapsed={collapsed}
         onCollapsedChange={setCollapsed}
-        keyConfigured={keyConfigured}
-        onOpenKey={() => setKeyOpen(true)}
+        keyConfigured={key.configured}
+        onOpenKey={() => key.setOpen(true)}
       />
       <main className="relative flex min-w-0 flex-1 flex-col">
         {view.kind === "home" ? (
@@ -859,10 +844,10 @@ export function StudioTemplate({
         />
       ) : null}
       <KeyDialog
-        open={keyOpen}
-        onOpenChange={setKeyOpen}
-        configured={keyConfigured}
-        onChange={setKeyConfigured}
+        open={key.open}
+        onOpenChange={key.setOpen}
+        configured={key.configured}
+        onChange={key.setConfigured}
       />
     </div>
   )

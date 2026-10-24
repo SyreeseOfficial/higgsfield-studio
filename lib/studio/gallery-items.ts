@@ -51,6 +51,9 @@ export function runToGalleryItems(run: RunRecord): GalleryItem[] {
         ...(run.queued ? { queued: run.queued } : {}),
         src: "",
         ...(run.error ? { failureLabel: run.error } : {}),
+        ...(run.status === "failed" && run.requestId
+          ? { supportId: run.requestId }
+          : {}),
       },
     ]
   }

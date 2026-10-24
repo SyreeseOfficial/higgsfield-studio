@@ -17,6 +17,7 @@ jobs:
       - run: pnpm typecheck
       - run: pnpm lint
       - run: pnpm test
+      - run: pnpm dlx knip@6.42.1 --include files,dependencies,unlisted
       - run: pnpm build
         env:
           HF_API_BASE_URL: https://example.invalid

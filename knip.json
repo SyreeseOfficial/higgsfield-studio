@@ -1,0 +1,12 @@
+{
+  "$schema": "https://unpkg.com/knip@6/schema.json",
+  "entry": ["scripts/*.mjs", "tests/*.test.ts"],
+  "ignore": [
+    "components/theme-provider.tsx",
+    "components/ui/label.tsx",
+    "generation/plane.ts",
+    "generation/stores/media.ts",
+    "generation/stores/prompt.ts"
+  ],
+  "ignoreDependencies": ["next-themes", "radix-ui", "@tanstack/react-virtual"]
+}

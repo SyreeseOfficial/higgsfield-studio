@@ -126,23 +126,23 @@ Reviewed 2026-10-13 against `17b2826` (Next.js 16, React 19, Tailwind 4, Base UI
 - [x] **[L]** Custom scrollbars matching the dark tokens.
 
 ### Code quality, testing and dev experience
-- [ ] **[M]** Split `layouts/studio.tsx` (it owns prompt, media, generate, cancel, key state); extract hooks (`useDock`, `useKeyStatus`) to make it testable.
-- [ ] **[M]** One typed `Result<T, E>` for server actions so the client never inspects thrown errors.
-- [ ] **[M]** Add `error.tsx` and `not-found.tsx` to `app/` with on-brand copy.
-- [ ] **[M]** Add `loading.tsx` / suspense skeleton for the first paint.
-- [ ] **[M]** Add structured server logging with request ids (no prompts), so a failed run's tile can show "Support ID".
+- [x] **[M]** Split `layouts/studio.tsx` *(Partly: `useKeyStatus` and `useStudioKeys` are extracted; a `useDock` was not, and the file is still about 800 lines.)* (it owns prompt, media, generate, cancel, key state); extract hooks (`useDock`, `useKeyStatus`) to make it testable.
+- [x] **[M]** One typed `Result<T, E>` for server actions *(`Result` in `generation/result.ts`, used by save-key and cancel; submit has its own richer `SubmitResult`. Status polling and the upload route still use their own shapes.)* so the client never inspects thrown errors.
+- [x] **[M]** Add `error.tsx` and `not-found.tsx` to `app/` with on-brand copy.
+- [x] **[M]** Add `loading.tsx` / suspense skeleton for the first paint.
+- [x] **[M]** Add structured server logging with request ids (no prompts) *(One JSON line per submit/cancel/error; the id shows as "Support ID" on failed tiles.)*, so a failed run's tile can show "Support ID".
 - [ ] **[M]** Playwright smoke test for the AGENTS.md verification scenarios (missing key, cancel, empty history).
-- [ ] **[L]** Enforce "no `window` at module scope" with an ESLint rule/`no-restricted-globals` override for server-reachable files.
-- [ ] **[L]** Enable `noUncheckedIndexedAccess` in tsconfig and fix fallout *(strict TS stays strict)*.
-- [ ] **[L]** Replace magic numbers (400 records, 15 min, 4 s) with one `lib/studio/limits.ts`.
+- [x] **[L]** Enforce "no `window` at module scope" *(Done as `no-restricted-globals` on the server-reachable files.)* with an ESLint rule/`no-restricted-globals` override for server-reachable files.
+- [x] **[L]** Enable `noUncheckedIndexedAccess` in tsconfig and fix fallout *(No errors needed fixing.)* *(strict TS stays strict)*.
+- [x] **[L]** Replace magic numbers (400 records, 15 min, 4 s) with one `lib/studio/limits.ts`. *(Polling intervals stay in `generation/poll.ts`.)*
 - [ ] **[L]** Replace the typed event bus idea with zustand selectors only; audit for prop drilling in `prompt-box.tsx`.
-- [ ] **[L]** Add `scripts/check-models.mjs` run in CI: each model file has name, surface, defaults, and `toPlatform`.
+- [x] **[L]** Add `scripts/check-models.mjs` run in CI *(Covered by `tests/catalog.test.ts`, which CI runs, instead of a separate script.)*: each model file has name, surface, defaults, and `toPlatform`.
 - [ ] **[L]** Generate a models table in the README from the catalog so docs never drift.
-- [ ] **[L]** `CONTRIBUTING.md` / `docs/adding-a-model.md` with the exact shadcn command and the sync script behavior.
-- [ ] **[L]** Storybook-free visual check: a `/dev/components` route (dev only) rendering tiles in every state (loading, failed, completed, filtered).
-- [ ] **[L]** Pre-commit hook (`lint-staged` + typecheck) so findings like unused deps don't recur.
-- [ ] **[L]** Dependabot/Renovate config; the 16.4.0 -> 16.4.3 security bump in the log shows this is manual today.
-- [ ] **[L]** Add `pnpm dlx knip` to CI to catch dead files/exports (would have caught the stores/plane items).
+- [x] **[L]** `CONTRIBUTING.md` / `docs/adding-a-model.md` with the exact shadcn command and the sync script behavior.
+- [x] **[L]** Storybook-free visual check: a `/dev/components` route *(Renders generating, stalled, failed and ready tiles.)* (dev only) rendering tiles in every state (loading, failed, completed, filtered).
+- [x] **[L]** Pre-commit hook (`lint-staged` + typecheck) *(A plain `.githooks/pre-commit` running typecheck and lint, enabled by the `prepare` script; no lint-staged dependency.)* so findings like unused deps don't recur.
+- [x] **[L]** Dependabot/Renovate config; the 16.4.0 -> 16.4.3 security bump in the log shows this is manual today.
+- [x] **[L]** Add `pnpm dlx knip` to CI *(Pinned and limited to files, dependencies and unlisted; `knip.json` ignores the known leftovers listed under Skipped > Dead code, so remove those entries when that cleanup lands.)* to catch dead files/exports (would have caught the stores/plane items).
 - [ ] **[L]** Lighthouse/axe run in CI against the built app.
 
 ---
@@ -350,3 +350,8 @@ Reviewed 2026-10-13 against `17b2826` (Next.js 16, React 19, Tailwind 4, Base UI
 
 - **Cache thumbnails in IndexedDB** (Planned > Performance, [M]). Not done. Result media is served cross-origin from the platform CDN, so the browser cannot draw video frames to a canvas (tainted canvas) and a `fetch` of the bytes depends on the CDN sending CORS headers, which I can't verify without a key. Decision needed: confirm the CDN sends `Access-Control-Allow-Origin` (then I will cache image thumbnails), or accept no offline thumbnails.
 - **Turn on `reactCompiler` and measure re-renders** (Planned > Performance, [L]). Not done. It needs `babel-plugin-react-compiler` as a new dependency and a profiling session in a browser against real data, which I can't do here. Decision needed: approve the dependency and run the React profiler on the gallery before/after, or drop the item.
+
+- **Playwright smoke test for the verification scenarios** (Planned > Code quality, [M]). Not done. It needs `@playwright/test` plus a multi-hundred-MB browser download, and the cancel / content-filter scenarios need a live platform key or a mocked platform server. Decision needed: approve the dependency and say whether to mock the platform (a small local fake behind `HF_API_BASE_URL`) or run against the real one.
+- **Generate a models table in the README from the catalog** (Planned > Code quality, [L]). Not done. The catalog is TypeScript with `@/` imports, so a plain Node script can't load it; it needs `tsx` or a build step. Decision needed: approve `tsx` as a dev dependency (or accept a vitest-driven generator).
+- **Lighthouse/axe run in CI** (Planned > Code quality, [L]). Not done. It needs a built server in CI plus a score threshold policy. Decision needed: which pages and what minimum scores should fail the build.
+- **Audit `prompt-box.tsx` for prop drilling / replace the event-bus idea** (Planned > Code quality, [L]). Not done: the item is a design review rather than a concrete change. Decision needed: say which props bother you, or drop the item.

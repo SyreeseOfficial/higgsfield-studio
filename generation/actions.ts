@@ -15,20 +15,26 @@ import {
 import { friendlyError } from "./errors"
 import { PlatformError, createPlatformClient } from "./platform"
 import type { QueuedGeneration, StatusResult } from "./platform"
+import { fail, ok, type Result } from "./result"
 import { toPlatform } from "./to-platform"
 
 // Keep in step with STATUS_BATCH in poll.ts.
 const MAX_STATUS_IDS = 50
 const STATUS_CONCURRENCY = 8
 
-export async function savePlatformCredentials(data: unknown) {
-  const { apiKey } = parseCredentialInput(data)
-  const jar = await cookies()
-  jar.set(
-    PLATFORM_KEY_COOKIE,
-    encodeCredentials(apiKey),
-    PLATFORM_KEY_COOKIE_OPTIONS
-  )
+export async function savePlatformCredentials(data: unknown): Promise<Result> {
+  try {
+    const { apiKey } = parseCredentialInput(data)
+    const jar = await cookies()
+    jar.set(
+      PLATFORM_KEY_COOKIE,
+      encodeCredentials(apiKey),
+      PLATFORM_KEY_COOKIE_OPTIONS
+    )
+    return ok(undefined)
+  } catch (caught) {
+    return fail(caught)
+  }
 }
 
 export async function clearPlatformCredentials() {
@@ -133,9 +139,14 @@ export async function getGenerationStatuses(
   return results
 }
 
-export async function cancelGeneration(data: unknown) {
-  const [requestId] = parseRequestIds(data)
-  await createPlatformClient(await readCredentials()).cancel(requestId!)
+export async function cancelGeneration(data: unknown): Promise<Result> {
+  try {
+    const [requestId] = parseRequestIds(data)
+    await createPlatformClient(await readCredentials()).cancel(requestId!)
+    return ok(undefined)
+  } catch (caught) {
+    return fail(caught)
+  }
 }
 
 async function readStoredCredentials() {

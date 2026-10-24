@@ -6,6 +6,17 @@ const UPLOAD_PATH = "/files/generate-upload-url"
 const DEBUG = process.env.HF_DEBUG === "1"
 const MODEL_ID = /^[a-z0-9][a-z0-9._/-]*$/i
 
+/** One JSON line per event, never a prompt or reference URL. The request id doubles as the "Support ID" on failed tiles. */
+function log(event: string, fields: Record<string, unknown>) {
+  const line = JSON.stringify({
+    at: new Date().toISOString(),
+    event,
+    ...fields,
+  })
+  if (event === "error") console.error(line)
+  else console.info(line)
+}
+
 export class PlatformError extends Error {
   readonly status: number
   readonly body: unknown
@@ -85,11 +96,7 @@ export function createPlatformClient(options: PlatformClientOptions) {
         ...(path === UPLOAD_PATH ? {} : { body: payload }),
       })
     if (!response.ok) {
-      console.error("[platform] error", {
-        method,
-        path,
-        status: response.status,
-      })
+      log("error", { method, path, status: response.status })
       throw new PlatformError(response.status, payload)
     }
     return payload
@@ -110,8 +117,7 @@ export function createPlatformClient(options: PlatformClientOptions) {
     ): Promise<QueuedGeneration> {
       if (!isModelId(model))
         throw new PlatformError(400, { detail: "Invalid model" })
-      console.info("[platform] submit", { model })
-      return mapQueued(
+      const queued = mapQueued(
         await send(
           "POST",
           `/${model}`,
@@ -119,6 +125,8 @@ export function createPlatformClient(options: PlatformClientOptions) {
           idempotencyKey ? { "Idempotency-Key": idempotencyKey } : undefined
         )
       )
+      log("submit", { model, requestId: queued.requestId })
+      return queued
     },
     async status(requestId: string): Promise<GenerationStatus> {
       if (!requestId)
@@ -131,7 +139,7 @@ export function createPlatformClient(options: PlatformClientOptions) {
     async cancel(requestId: string): Promise<void> {
       if (!requestId)
         throw new PlatformError(400, { detail: "Missing request id" })
-      console.info("[platform] cancel", { requestId })
+      log("cancel", { requestId })
       await send(
         "POST",
         `/requests/${encodeURIComponent(requestId)}/cancel`,

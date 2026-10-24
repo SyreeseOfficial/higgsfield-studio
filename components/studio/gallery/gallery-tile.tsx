@@ -218,7 +218,16 @@ function GalleryTileComponent({
       <div className="studio-tile group" style={style}>
         <GenerationTile
           state="failed"
-          failureLabel={item.failureLabel}
+          failureLabel={
+            <>
+              {item.failureLabel}
+              {item.supportId ? (
+                <span className="mt-1 block font-mono text-[10px] opacity-60 select-all">
+                  Support ID: {item.supportId}
+                </span>
+              ) : null}
+            </>
+          }
           className="size-full"
         />
         {onDelete ? (
