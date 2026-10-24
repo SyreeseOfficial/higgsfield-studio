@@ -4,12 +4,14 @@ import { useEffect, useRef, useState } from "react"
 import type { ReactElement, ReactNode } from "react"
 import { Dialog as DialogPrimitive } from "@base-ui/react/dialog"
 import {
+  Bookmark,
   Braces,
   Check,
   Columns2,
   Copy,
   Download,
   ImageIcon,
+  ImagePlus,
   Loader2,
   Maximize,
   Minimize,
@@ -70,6 +72,9 @@ export interface GenerationDetailModalProps {
   rows?: GenerationDetailRow[]
   /** Replaces the default footer (Download · Copy · Share). */
   actions?: ReactNode
+  /** Offered above the footer on a finished result. */
+  onUseAsReference?: () => void
+  onSaveAsReference?: () => void
 }
 
 async function copyText(text: string) {
@@ -175,6 +180,8 @@ export function GenerationDetailModal({
   generation,
   rows,
   actions,
+  onUseAsReference,
+  onSaveAsReference,
 }: GenerationDetailModalProps) {
   const [ownOpen, setOwnOpen] = useState(false)
   const open = controlledOpen ?? ownOpen
@@ -415,7 +422,37 @@ export function GenerationDetailModal({
                 })}
               </dl>
             ) : null}
-            <div className="mt-auto flex flex-wrap items-center gap-2">
+            {generation.src && (onUseAsReference || onSaveAsReference) ? (
+              <div className="mt-auto flex flex-wrap gap-2">
+                {onUseAsReference ? (
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="flex-1"
+                    onClick={() => {
+                      onUseAsReference()
+                      setOpen(false)
+                    }}
+                  >
+                    <ImagePlus /> Use as reference
+                  </Button>
+                ) : null}
+                {onSaveAsReference ? (
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="flex-1"
+                    onClick={() => {
+                      onSaveAsReference()
+                      flash("Saved to your library")
+                    }}
+                  >
+                    <Bookmark /> Save as reference
+                  </Button>
+                ) : null}
+              </div>
+            ) : null}
+            <div className="flex flex-wrap items-center gap-2">
               {actions ?? (
                 <>
                   <Button

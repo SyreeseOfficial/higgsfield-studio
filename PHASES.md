@@ -16,7 +16,7 @@ Source of truth for details: [FINDINGS.md](FINDINGS.md). Do one phase at a time.
 | 4 | Security & downloads | 5 | ☑ |
 | 5 | Result viewer | 9 | ☑ |
 | 6 | Tiles & status look | 10 | ☑ |
-| 7 | Prompt box & references | 9 | ☐ |
+| 7 | Prompt box & references | 9 | ☑ (HEIC ⛔) |
 | 8 | Gallery, cost & usage | 8 | ☐ |
 | 9 | First-run & visual polish | 7 | ☐ |
 | 10 | Speed: rendering | 7 | ☐ |
@@ -95,14 +95,14 @@ Goal: one click = at most one paid job; one slow call never freezes the app.
 - [x] Glow behind running tiles
 
 ## Phase 7 — Prompt box & references
-- [ ] Aspect ratio previews (exact crop)
-- [ ] "Save as reference" on finished tiles (no re-upload)
-- [ ] "Use as reference" on tiles and in viewer
-- [ ] Crop and rotate before upload
-- [ ] Size/dimensions/length on each reference card
-- [ ] "Already uploaded, reusing" message
-- [ ] Drag a thumbnail to reorder or remove
-- [ ] Better drop zone when dragging files over the window
+- [x] Aspect ratio previews (exact crop)
+- [x] "Save as reference" on finished tiles (no re-upload)
+- [x] "Use as reference" on tiles and in viewer
+- [x] Crop and rotate before upload
+- [x] Size/dimensions/length on each reference card
+- [x] "Already uploaded, reusing" message
+- [x] Drag a thumbnail to reorder or remove
+- [x] Better drop zone when dragging files over the window
 - [ ] ⛔ Auto-convert HEIC → see Blocked
 
 ## Phase 8 — Gallery, cost & usage

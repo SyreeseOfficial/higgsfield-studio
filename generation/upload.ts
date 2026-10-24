@@ -10,6 +10,8 @@ export type UploadOptions = {
   /** 0..1 while the file is sent to storage. */
   onProgress?: (fraction: number) => void
   signal?: AbortSignal
+  /** Called instead of uploading when this browser already uploaded the same bytes. */
+  onReused?: () => void
 }
 
 export async function uploadMedia(

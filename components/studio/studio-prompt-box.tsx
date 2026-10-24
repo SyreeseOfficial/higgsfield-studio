@@ -1,11 +1,11 @@
 "use client"
 
 import {
+  useEffect,
   useRef,
   useState,
   type ChangeEvent,
   type ClipboardEvent,
-  type DragEvent,
   type ReactNode,
 } from "react"
 import {
@@ -13,6 +13,7 @@ import {
   Check,
   ChevronDown,
   Clapperboard,
+  Crop,
   Ellipsis,
   ImageIcon,
   Pause,
@@ -57,10 +58,11 @@ import {
 } from "@/generation/catalog/media-inputs"
 import type { UploadOptions } from "@/generation/upload"
 import { modelSummary } from "@/lib/studio/model-info"
-import { kindOf } from "@/lib/studio/uploads"
+import { kindOf, referenceFile } from "@/lib/studio/uploads"
 import type { AssetLibraryItem, AssetSelection } from "@/lib/studio/uploads"
 
 import { AssetLibraryModal } from "./asset-library"
+import { ImageEditor } from "./image-editor"
 import { PromptBox, type PromptBoxSurface } from "./prompt-box"
 import { SettingsDialog, settingLabel } from "./settings-dialog"
 
@@ -81,6 +83,10 @@ export interface StudioPromptBoxProps {
   media: MediaItem[]
   onMediaAdd: (role: MediaRole | "auto", selection: AssetSelection[]) => void
   onMediaRemove: (id: string) => void
+  /** Drop `fromId` into the place of `toId`. */
+  onMediaReorder: (fromId: string, toId: string) => void
+  /** Swap a reference for an edited upload, keeping its role and place. */
+  onMediaReplace: (id: string, selection: AssetSelection) => void
   onMediaRoleChange: (id: string, role: ImageRole) => void
   library: {
     items: AssetLibraryItem[]
@@ -192,23 +198,33 @@ function PillSelect({
 }
 
 /** A small outline in the shape of an aspect-ratio value like "16:9"; nothing for other values. */
-function aspectFrame(value: string): ReactNode {
+function aspectFrame(value: string, preview?: string): ReactNode {
   const [w, h] = value.split(":").map(Number)
   if (!w || !h) return undefined
-  const long = 14
+  // With an image attached, the frame shows it cropped exactly as this ratio would.
+  const long = preview ? 24 : 14
   return (
     <span
       aria-hidden="true"
-      className="rounded-[3px] border border-current"
+      className="rounded-[3px] border border-current bg-cover bg-center"
       style={{
         width: w >= h ? long : (long * w) / h,
         height: h >= w ? long : (long * h) / w,
+        ...(preview ? { backgroundImage: `url("${preview}")` } : {}),
       }}
     />
   )
 }
 
-function MediaPreview({ item }: { item: MediaItem }) {
+type RefMeta = { width?: number; height?: number; seconds?: number }
+
+function MediaPreview({
+  item,
+  onMeta,
+}: {
+  item: MediaItem
+  onMeta?: (meta: RefMeta) => void
+}) {
   const kind = item.kind ?? ROLE_KIND[item.role]
   if (kind === "video")
     return (
@@ -218,6 +234,13 @@ function MediaPreview({ item }: { item: MediaItem }) {
         playsInline
         preload="metadata"
         className="size-full object-cover"
+        onLoadedMetadata={(event) =>
+          onMeta?.({
+            width: event.currentTarget.videoWidth,
+            height: event.currentTarget.videoHeight,
+            seconds: event.currentTarget.duration,
+          })
+        }
       />
     )
   if (kind === "audio") return <AudioLines className="size-5" />
@@ -227,6 +250,12 @@ function MediaPreview({ item }: { item: MediaItem }) {
       src={item.url}
       alt={item.name ?? "Reference image"}
       className="size-full object-cover"
+      onLoad={(event) =>
+        onMeta?.({
+          width: event.currentTarget.naturalWidth,
+          height: event.currentTarget.naturalHeight,
+        })
+      }
     />
   )
 }
@@ -267,6 +296,34 @@ function AudioChip({ item, label }: { item: MediaItem; label: string }) {
       />
     </div>
   )
+}
+
+function formatBytes(bytes: number): string {
+  return bytes >= 1048576
+    ? `${(bytes / 1048576).toFixed(1)} MB`
+    : `${Math.max(1, Math.round(bytes / 1024))} KB`
+}
+
+/** Dimensions, length and size of a reference, as a short caption and a full tooltip. */
+function describeReference(
+  meta: RefMeta | undefined,
+  bytes: number | undefined
+) {
+  const parts = [
+    meta?.width && meta.height ? `${meta.width}×${meta.height}` : null,
+    meta?.seconds && Number.isFinite(meta.seconds)
+      ? `${meta.seconds.toFixed(1)} s`
+      : null,
+    bytes ? formatBytes(bytes) : null,
+  ].filter(Boolean)
+  return {
+    caption: meta?.seconds
+      ? `${meta.seconds.toFixed(1)} s`
+      : meta?.width && meta.height
+        ? `${meta.width}×${meta.height}`
+        : "",
+    detail: parts.join(" · "),
+  }
 }
 
 const controlClass =
@@ -369,6 +426,7 @@ function useReferenceIntake({
   )
   const busy = useRef(false)
   const abort = useRef<AbortController | null>(null)
+  const [dragging, setDragging] = useState(false)
 
   const take = async (files: File[]) => {
     if (!files.length || busy.current) return
@@ -391,10 +449,12 @@ function useReferenceIntake({
       abort.current = new AbortController()
       setStatus({ text: "Uploading reference…", error: false })
       const uploaded: AssetSelection[] = []
+      let reused = 0
       for (const file of files)
         uploaded.push(
           await library.onUpload(file, {
             signal: abort.current.signal,
+            onReused: () => reused++,
             onProgress: (fraction) =>
               setStatus({
                 text: `Uploading reference… ${Math.round(fraction * 100)}%`,
@@ -403,7 +463,16 @@ function useReferenceIntake({
           })
         )
       onMediaAdd("auto", uploaded)
-      setStatus(null)
+      if (reused) {
+        setStatus({
+          text:
+            reused === uploaded.length
+              ? "Already uploaded, reusing it."
+              : `${reused} already uploaded, reusing.`,
+          error: false,
+        })
+        window.setTimeout(() => setStatus(null), 2500)
+      } else setStatus(null)
     } catch (caught) {
       if (caught instanceof DOMException && caught.name === "AbortError")
         setStatus(null)
@@ -417,8 +486,51 @@ function useReferenceIntake({
     }
   }
 
+  // Files dragged anywhere over the window are taken; the overlay says so.
+  const takeRef = useRef(take)
+  useEffect(() => {
+    takeRef.current = take
+  })
+  useEffect(() => {
+    let depth = 0
+    const hasFiles = (event: globalThis.DragEvent) =>
+      !!event.dataTransfer?.types.includes("Files")
+    const enter = (event: globalThis.DragEvent) => {
+      if (!hasFiles(event)) return
+      depth++
+      setDragging(true)
+    }
+    const leave = (event: globalThis.DragEvent) => {
+      if (!hasFiles(event)) return
+      depth = Math.max(0, depth - 1)
+      if (!depth) setDragging(false)
+    }
+    const over = (event: globalThis.DragEvent) => {
+      if (hasFiles(event)) event.preventDefault() // else the browser opens the file
+    }
+    const drop = (event: globalThis.DragEvent) => {
+      depth = 0
+      setDragging(false)
+      // A drop zone inside a dialog (the library's upload tile) handles its own files.
+      if (!hasFiles(event) || event.defaultPrevented) return
+      event.preventDefault()
+      void takeRef.current(Array.from(event.dataTransfer?.files ?? []))
+    }
+    window.addEventListener("dragenter", enter)
+    window.addEventListener("dragleave", leave)
+    window.addEventListener("dragover", over)
+    window.addEventListener("drop", drop)
+    return () => {
+      window.removeEventListener("dragenter", enter)
+      window.removeEventListener("dragleave", leave)
+      window.removeEventListener("dragover", over)
+      window.removeEventListener("drop", drop)
+    }
+  }, [])
+
   return {
     status,
+    dragging,
     cancel: () => abort.current?.abort(),
     onPaste: (event: ClipboardEvent) => {
       const files = Array.from(event.clipboardData.files)
@@ -426,15 +538,89 @@ function useReferenceIntake({
       event.preventDefault()
       void take(files)
     },
-    onDragOver: (event: DragEvent) => {
-      if (event.dataTransfer.types.includes("Files")) event.preventDefault()
-    },
-    onDrop: (event: DragEvent) => {
-      if (!event.dataTransfer.files.length) return
-      event.preventDefault()
-      void take(Array.from(event.dataTransfer.files))
-    },
   }
+}
+
+const REF_MIME = "application/x-studio-reference"
+
+function ReferenceCard({
+  item,
+  kind,
+  label,
+  bytes,
+  roleMenu,
+  remove,
+  dragging,
+  onDragStart,
+  onDragEnd,
+  onDropOn,
+  onEdit,
+}: {
+  item: MediaItem
+  kind: MediaKind
+  label: string
+  bytes: number | undefined
+  roleMenu: ReactNode
+  remove: ReactNode
+  dragging: boolean
+  onDragStart: () => void
+  onDragEnd: () => void
+  onDropOn: (fromId: string) => void
+  onEdit: (() => void) | undefined
+}) {
+  const [meta, setMeta] = useState<RefMeta>()
+  const { caption, detail } = describeReference(meta, bytes)
+  return (
+    <div
+      className={`group relative flex shrink-0 flex-col items-center ${dragging ? "opacity-40" : ""}`}
+      title={`${label}: ${item.name ?? item.url}${detail ? `\n${detail}` : ""}`}
+      data-media-role={item.role}
+      draggable
+      onDragStart={(event) => {
+        event.dataTransfer.setData(REF_MIME, item.id)
+        event.dataTransfer.effectAllowed = "move"
+        onDragStart()
+      }}
+      onDragEnd={onDragEnd}
+      onDragOver={(event) => {
+        if (event.dataTransfer.types.includes(REF_MIME)) event.preventDefault()
+      }}
+      onDrop={(event) => {
+        const from = event.dataTransfer.getData(REF_MIME)
+        if (!from || from === item.id) return
+        event.preventDefault()
+        onDropOn(from)
+      }}
+    >
+      {kind === "audio" ? (
+        <AudioChip item={item} label={label} />
+      ) : (
+        <div className="relative size-12 overflow-hidden rounded-xl bg-white/5">
+          <MediaPreview item={item} onMeta={setMeta} />
+          {kind === "video" ? (
+            <Play className="pointer-events-none absolute bottom-1 left-1 size-3 fill-white text-white drop-shadow" />
+          ) : null}
+        </div>
+      )}
+      {caption ? (
+        <span className="mt-0.5 text-[10px] leading-none text-muted-foreground tabular-nums">
+          {caption}
+        </span>
+      ) : null}
+      {roleMenu}
+      {remove}
+      {onEdit ? (
+        <button
+          type="button"
+          aria-label={`Crop or rotate ${item.name ?? label}`}
+          className={`${controlClass} top-7 -right-1`}
+          onClick={onEdit}
+        >
+          <Crop className="size-3" />
+        </button>
+      ) : null}
+    </div>
+  )
 }
 
 function MediaInputs({
@@ -443,6 +629,8 @@ function MediaInputs({
   media,
   onMediaAdd,
   onMediaRemove,
+  onMediaReorder,
+  onMediaReplace,
   onMediaRoleChange,
   library,
   tilesOnly = false,
@@ -453,9 +641,27 @@ function MediaInputs({
   | "media"
   | "onMediaAdd"
   | "onMediaRemove"
+  | "onMediaReorder"
+  | "onMediaReplace"
   | "onMediaRoleChange"
   | "library"
 > & { tilesOnly?: boolean }) {
+  const [dragId, setDragId] = useState<string | null>(null)
+  const [editing, setEditing] = useState<{
+    item: MediaItem
+    file: File
+  } | null>(null)
+  const [editError, setEditError] = useState<string | null>(null)
+  const onEdit = (item: MediaItem) => {
+    setEditError(null)
+    void referenceFile(item.url, item.name)
+      .then((file) => setEditing({ item, file }))
+      .catch(() =>
+        setEditError(
+          "Can't open this image for editing (the host blocks it). Remove it and add the file again."
+        )
+      )
+  }
   const allSlots = mediaSlots(model, inputMode)
   const slots = allSlots.filter(
     (role) =>
@@ -576,27 +782,39 @@ function MediaInputs({
           ).length
         const label = `${kind === "image" ? "Image" : kind === "video" ? "Video" : "Audio"} ${ordinal}`
         return (
-          <div
+          <ReferenceCard
             key={item.id}
-            className="group relative shrink-0"
-            title={`${label}: ${item.name ?? item.url}`}
-            data-media-role={item.role}
-          >
-            {kind === "audio" ? (
-              <AudioChip item={item} label={label} />
-            ) : (
-              <div className="relative size-12 overflow-hidden rounded-xl bg-white/5">
-                <MediaPreview item={item} />
-                {kind === "video" ? (
-                  <Play className="pointer-events-none absolute bottom-1 left-1 size-3 fill-white text-white drop-shadow" />
-                ) : null}
-              </div>
-            )}
-            {roleMenu(item)}
-            {remove(item)}
-          </div>
+            item={item}
+            kind={kind}
+            label={label}
+            bytes={library.items.find((entry) => entry.src === item.url)?.bytes}
+            roleMenu={roleMenu(item)}
+            remove={remove(item)}
+            dragging={dragId === item.id}
+            onDragStart={() => setDragId(item.id)}
+            onDragEnd={() => setDragId(null)}
+            onDropOn={(fromId) => onMediaReorder(fromId, item.id)}
+            onEdit={kind === "image" ? () => onEdit(item) : undefined}
+          />
         )
       })}
+      {dragId ? (
+        <div
+          className="flex h-12 items-center gap-1.5 rounded-xl border border-dashed border-red-400/60 px-3 text-xs text-red-300"
+          onDragOver={(event) => {
+            if (event.dataTransfer.types.includes(REF_MIME))
+              event.preventDefault()
+          }}
+          onDrop={(event) => {
+            event.preventDefault()
+            const id = event.dataTransfer.getData(REF_MIME)
+            if (id) onMediaRemove(id)
+            setDragId(null)
+          }}
+        >
+          <Trash2 className="size-3.5" /> Drop to remove
+        </div>
+      ) : null}
       {!tilesOnly && media.length > 1 ? (
         <button
           type="button"
@@ -618,6 +836,21 @@ function MediaInputs({
       aria-label="Attached media"
     >
       {content}
+      {editError ? (
+        <p role="alert" className="w-full text-xs text-q-state-error-fg">
+          {editError}
+        </p>
+      ) : null}
+      {editing ? (
+        <ImageEditor
+          file={editing.file}
+          onCancel={() => setEditing(null)}
+          onApply={async (edited) => {
+            onMediaReplace(editing.item.id, await library.onUpload(edited))
+            setEditing(null)
+          }}
+        />
+      ) : null}
     </div>
   )
 }
@@ -635,6 +868,8 @@ export function StudioPromptBox({
   media,
   onMediaAdd,
   onMediaRemove,
+  onMediaReorder,
+  onMediaReplace,
   onMediaRoleChange,
   library,
   placeholder = "Describe the scene you imagine...",
@@ -663,12 +898,22 @@ export function StudioPromptBox({
     library,
   })
   return (
-    <div
-      className="contents"
-      onPaste={intake.onPaste}
-      onDragOver={intake.onDragOver}
-      onDrop={intake.onDrop}
-    >
+    <div className="contents" onPaste={intake.onPaste}>
+      {intake.dragging ? (
+        <div
+          aria-hidden="true"
+          className="pointer-events-none fixed inset-0 z-50 flex items-center justify-center bg-background/70 backdrop-blur-sm"
+        >
+          <div className="rounded-2xl border-2 border-dashed border-primary px-10 py-8 text-center">
+            <p className="text-lg font-semibold">Drop to add as a reference</p>
+            <p className="text-sm text-muted-foreground">
+              {referenceRoom(model, inputMode, media).kinds.length
+                ? "Images, video and audio the model accepts are uploaded."
+                : `${model.label} doesn't take reference files.`}
+            </p>
+          </div>
+        </div>
+      ) : null}
       <PromptBox.Root surface={skin} className={className}>
         <PromptBox.ModeRail hidden={surfaces.length < 2}>
           {surfaces.map((value) => (
@@ -690,6 +935,8 @@ export function StudioPromptBox({
               media,
               onMediaAdd,
               onMediaRemove,
+              onMediaReorder,
+              onMediaReplace,
               onMediaRoleChange,
               library,
             }}
@@ -763,7 +1010,11 @@ export function StudioPromptBox({
                 options={headlineField.values.map((value) => ({
                   value,
                   label: value,
-                  icon: aspectFrame(value),
+                  icon: aspectFrame(
+                    value,
+                    media.find((m) => (m.kind ?? ROLE_KIND[m.role]) === "image")
+                      ?.url
+                  ),
                 }))}
               />
             ) : null}
@@ -798,6 +1049,8 @@ export function StudioPromptBox({
             media,
             onMediaAdd,
             onMediaRemove,
+            onMediaReorder,
+            onMediaReplace,
             onMediaRoleChange,
             library,
           }}

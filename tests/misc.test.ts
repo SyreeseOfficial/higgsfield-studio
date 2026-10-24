@@ -213,3 +213,22 @@ describe("runToCurl", () => {
     expect(runToCurl({ modelId: "nope-0", prompt: "x" })).toBeNull()
   })
 })
+
+describe("crop math", () => {
+  it("locks the ratio, stays inside the image, and centres a fit", async () => {
+    const { rectFromCorners, centeredRect, moveRect } =
+      await import("@/lib/studio/crop")
+    const dims = { w: 1000, h: 500 }
+    const r = rectFromCorners({ x: 0.5, y: 0.5 }, { x: 1.4, y: 0.6 }, dims, 1)
+    expect((r.w * dims.w) / (r.h * dims.h)).toBeCloseTo(1)
+    expect(r.x + r.w).toBeLessThanOrEqual(1.0000001)
+    expect(r.y + r.h).toBeLessThanOrEqual(1.0000001)
+    expect(centeredRect(dims, 1)).toEqual({ x: 0.25, y: 0, w: 0.5, h: 1 })
+    expect(moveRect({ x: 0.5, y: 0, w: 0.5, h: 1 }, 0.4, -1)).toEqual({
+      x: 0.5,
+      y: 0,
+      w: 0.5,
+      h: 1,
+    })
+  })
+})

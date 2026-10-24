@@ -109,7 +109,7 @@ Keeping your work safe and getting it out of the app.
 
 ## 7. Models & settings
 
-- [ ] 🟡 **Aspect ratio previews** showing the exact crop, plus "match my reference image". ⏱ 15 min
+- [x] 🟡 **Aspect ratio previews** showing the exact crop, plus "match my reference image". ⏱ 15 min
 
 ## 8. Gallery & finding things
 
@@ -132,13 +132,13 @@ Keeping your work safe and getting it out of the app.
 
 Pictures, videos and audio you give the AI as input.
 
-- [ ] 🔴 **"Save as reference"** on any finished tile, with no re-upload.
-- [ ] 🟡 **"Use as reference"** on tiles and in the viewer. ⏱ 15 min
+- [x] 🔴 **"Save as reference"** on any finished tile, with no re-upload.
+- [x] 🟡 **"Use as reference"** on tiles and in the viewer. ⏱ 15 min
 - [ ] ⚪ **Auto-convert iPhone photos (HEIC).** *(see Decisions)*
-- [ ] ⚪ **Crop and rotate** before upload.
+- [x] ⚪ **Crop and rotate** before upload.
 - [ ] ⚪ **Show size, dimensions, length** on each card.
-- [ ] ⚪ **"Already uploaded, reusing" message.**
-- [ ] ⚪ **Drag a thumbnail** to reorder or remove.
+- [x] ⚪ **"Already uploaded, reusing" message.**
+- [x] ⚪ **Drag a thumbnail** to reorder or remove.
 
 ## 12. Sharing, export & backup
 
@@ -157,7 +157,7 @@ Pictures, videos and audio you give the AI as input.
 - [x] 🟡 **Gentle completion animation** (off for reduced motion).
 - [x] 🟡 **Consistent status chips** (running, queued, failed, starred).
 - [x] 🟡 **Smooth reflow** when tiles are added.
-- [ ] 🟡 **Better drop zone** when dragging files over the window.
+- [x] 🟡 **Better drop zone** when dragging files over the window.
 - [x] ⚪ **Clearer failed tiles** with reason and Retry/Delete.
 - [x] ⚪ **Consistent model badges** per company.
 - [ ] ⚪ **Toast stack with Undo,** max 3 visible.
@@ -442,7 +442,7 @@ Not doing these. Moved here from the sections above; kept in case you change you
 **9. Viewing results**
 - [ ] 🟡 **Filmstrip of related runs** below the media.
 - [x] 🟡 **Copy buttons** for each field.
-- [ ] 🟡 **Show size and dimensions;** download original vs WebP.
+- [x] 🟡 **Show size and dimensions;** download original vs WebP.
 - [ ] 🟡 **Color swatches** from the image.
 - [ ] 🟡 **"Describe this image"** to reuse as a prompt.
 - [ ] 🟡 **Picture-in-picture** button.

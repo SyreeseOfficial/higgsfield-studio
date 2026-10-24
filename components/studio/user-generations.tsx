@@ -27,6 +27,8 @@ export interface UserGenerationsProps {
   onVariation?: (item: GalleryItem) => void
   onStar?: (item: GalleryItem) => void
   onMeasured?: (item: GalleryItem, aspect: number) => void
+  onUseAsReference?: (item: GalleryItem) => void
+  onSaveAsReference?: (item: GalleryItem) => void
   toolbar?: ReactNode
   grouped?: boolean
 }

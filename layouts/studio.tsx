@@ -259,6 +259,8 @@ function FeedState({
   onVariation,
   onStar,
   onMeasured,
+  onUseAsReference,
+  onSaveAsReference,
   loading,
 }: {
   loading: boolean
@@ -274,6 +276,8 @@ function FeedState({
   onVariation: (item: GalleryItem) => void
   onStar: (item: GalleryItem) => void
   onMeasured: (item: GalleryItem, aspect: number) => void
+  onUseAsReference: (item: GalleryItem) => void
+  onSaveAsReference: (item: GalleryItem) => void
 }) {
   const [feedView, setFeedView] = useState<FeedView>(DEFAULT_FEED_VIEW)
   const shownItems = useMemo(
@@ -352,6 +356,8 @@ function FeedState({
               onDeleteMany={onDeleteMany}
               onVariation={onVariation}
               onMeasured={onMeasured}
+              onUseAsReference={onUseAsReference}
+              onSaveAsReference={onSaveAsReference}
               emptyState={{
                 images,
                 title: filtered
@@ -474,10 +480,12 @@ export function StudioTemplate({
     () => runs.records.flatMap(runToGalleryItems),
     [runs.records]
   )
-  const libraryItems = useMemo(
-    () => [...uploads, ...runs.records.flatMap(runToLibraryItems)],
-    [runs.records, uploads]
-  )
+  const libraryItems = useMemo(() => {
+    const seen = new Set<string>()
+    return [...uploads, ...runs.records.flatMap(runToLibraryItems)].filter(
+      (item) => !seen.has(item.src) && !!seen.add(item.src)
+    )
+  }, [runs.records, uploads])
   const byProject = useMemo(() => {
     const map = new Map<string, GalleryItem[]>()
     for (const item of galleryItems) {
@@ -658,6 +666,33 @@ export function StudioTemplate({
     },
   ]
 
+  const referenceOf = (item: GalleryItem): AssetSelection => ({
+    id: item.id,
+    src: item.kind === "video" ? (item.videoSrc ?? item.src) : item.src,
+    kind: item.kind,
+    name: item.prompt.slice(0, 60),
+  })
+  /** The result goes straight into the prompt box; no re-upload, it is already public. */
+  const attachAsReference = (item: GalleryItem) => {
+    try {
+      dock.onMediaAdd("auto", [referenceOf(item)])
+    } catch (caught) {
+      setLocalError(
+        caught instanceof Error
+          ? caught.message
+          : "This model can't use that as a reference."
+      )
+    }
+  }
+  const saveAsReference = (item: GalleryItem) => {
+    useUploads.getState().add({
+      ...referenceOf(item),
+      source: "generation",
+      createdAt: Date.now(),
+    })
+    setTip("Saved to your library. Find it under Add references.")
+  }
+
   const handleUseTemplate = (t: TemplateItem) => {
     setPrompt(t.prompt)
     if (t.modelId && MODELS.some((m) => m.id === t.modelId)) {
@@ -717,6 +752,30 @@ export function StudioTemplate({
       setLocalError(null)
       setMedia((current) => current.filter((item) => item.id !== id))
     },
+    onMediaReorder: (fromId, toId) =>
+      setMedia((current) => {
+        const from = current.findIndex((item) => item.id === fromId)
+        const to = current.findIndex((item) => item.id === toId)
+        if (from < 0 || to < 0) return current
+        const next = [...current]
+        next.splice(to, 0, next.splice(from, 1)[0]!)
+        return next
+      }),
+    onMediaReplace: (id, selection) =>
+      setMedia((current) =>
+        current.map((item) =>
+          item.id === id
+            ? {
+                ...item,
+                id: item.id.startsWith(`${item.role}:`)
+                  ? `${item.role}:${selection.id}`
+                  : selection.id,
+                url: selection.src,
+                ...(selection.name ? { name: selection.name } : {}),
+              }
+            : item
+        )
+      ),
     onMediaRoleChange: (id, role) => {
       try {
         setMedia(changeImageRole(model, media, id, role))
@@ -804,6 +863,8 @@ export function StudioTemplate({
             onVariation={(item) => runs.variation(item.runId)}
             onStar={(item) => runs.toggleStar(item.runId)}
             onMeasured={(item, aspect) => runs.setAspect(item.runId, aspect)}
+            onUseAsReference={attachAsReference}
+            onSaveAsReference={saveAsReference}
             onMove={(items) => setMoving(items)}
             onCancel={(item) => void runs.cancel(item.runId)}
             onRecheck={(item) => runs.recheck(item.runId)}

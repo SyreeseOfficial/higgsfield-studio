@@ -44,6 +44,10 @@ export interface JustifiedGalleryProps {
   onStar?: (item: GalleryItem) => void
   /** A tile's loaded media is a different shape than the run asked for. */
   onMeasured?: (item: GalleryItem, aspect: number) => void
+  /** Attach a finished result to the prompt box as a reference. */
+  onUseAsReference?: (item: GalleryItem) => void
+  /** Keep a finished result in the reference library. */
+  onSaveAsReference?: (item: GalleryItem) => void
   /** Filter and sort controls, shown beside the title. */
   toolbar?: ReactNode
 }
@@ -64,6 +68,8 @@ export function JustifiedGallery({
   onVariation,
   onStar,
   onMeasured,
+  onUseAsReference,
+  onSaveAsReference,
   toolbar,
 }: JustifiedGalleryProps) {
   const [viewing, setViewing] = useState<{
@@ -245,6 +251,8 @@ export function JustifiedGallery({
                     onVariation={onVariation}
                     onStar={onStar}
                     onMeasured={onMeasured}
+                    onUseAsReference={onUseAsReference}
+                    onSaveAsReference={onSaveAsReference}
                     onOpen={(i) => setViewing({ itemId: i.id, runId: i.runId })}
                     {...(onMove
                       ? { onMove: (i: GalleryItem) => onMove([i]) }
@@ -289,6 +297,12 @@ export function JustifiedGallery({
           open
           onOpenChange={(open) => !open && setViewing(null)}
           generation={toDetail(viewed)}
+          {...(onUseAsReference
+            ? { onUseAsReference: () => onUseAsReference(viewed) }
+            : {})}
+          {...(onSaveAsReference
+            ? { onSaveAsReference: () => onSaveAsReference(viewed) }
+            : {})}
         />
       ) : null}
     </div>

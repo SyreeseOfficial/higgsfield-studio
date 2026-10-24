@@ -28,6 +28,8 @@ export interface AssetLibraryItem extends AssetSelection {
   source: "upload" | "generation"
   /** SHA-256 of the uploaded bytes; the same file is never uploaded twice. */
   hash?: string
+  /** Size of the uploaded file, for the reference card. */
+  bytes?: number
   createdAt: number
 }
 
@@ -55,6 +57,20 @@ export const useUploads = create<UploadsState>()(
     { name: "hf.uploads.v1", storage: browserStorage(), ...persistVersion }
   )
 )
+
+/** Files uploaded in this session, so a reference can be cropped without downloading it back. */
+const originals = new Map<string, File>()
+
+/** The bytes behind a reference URL: the file uploaded this session, else the URL fetched. */
+export async function referenceFile(url: string, name?: string): Promise<File> {
+  const local = originals.get(url)
+  if (local) return local
+  const response = await fetch(url)
+  if (!response.ok)
+    throw new Error(`Could not load the file (${response.status}).`)
+  const blob = await response.blob()
+  return new File([blob], name ?? "reference", { type: blob.type })
+}
 
 export function kindOf(file: File): AssetKind {
   try {
@@ -91,7 +107,10 @@ export async function uploadAsset(
   const known = hash
     ? useUploads.getState().items.find((i) => i.hash === hash)
     : undefined
-  if (known) return known
+  if (known) {
+    options?.onReused?.()
+    return known
+  }
   const { url } = await uploadMedia(file, options)
   const item: AssetLibraryItem = {
     id: newId(),
@@ -100,8 +119,10 @@ export async function uploadAsset(
     name: original.name,
     source: "upload",
     createdAt: Date.now(),
+    bytes: file.size,
     ...(hash ? { hash } : {}),
   }
+  originals.set(url, file)
   useUploads.getState().add(item)
   return item
 }

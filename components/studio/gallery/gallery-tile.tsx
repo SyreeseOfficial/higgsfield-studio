@@ -4,9 +4,11 @@
 import { memo, useEffect, useRef, useState } from "react"
 import type { CSSProperties } from "react"
 import {
+  Bookmark,
   Copy,
   Download,
   FolderInput,
+  ImagePlus,
   RotateCcw,
   Share2,
   Shuffle,
@@ -48,6 +50,8 @@ export interface GalleryTileProps {
   onOpen?: (item: GalleryItem) => void
   /** The loaded media's real aspect ratio, when it differs from the one the run asked for. */
   onMeasured?: (item: GalleryItem, aspect: number) => void
+  onUseAsReference?: (item: GalleryItem) => void
+  onSaveAsReference?: (item: GalleryItem) => void
 }
 
 const TILE_BUTTON =
@@ -288,6 +292,8 @@ function GalleryTileComponent({
   onStar,
   onOpen,
   onMeasured,
+  onUseAsReference,
+  onSaveAsReference,
 }: GalleryTileProps) {
   const [hovered, setHovered] = useState(false)
   const style = rectStyle(rect, top)
@@ -441,6 +447,26 @@ function GalleryTileComponent({
             label: item.starred ? "Unstar" : "Star",
             icon: Star,
             onSelect: () => onStar(item),
+          },
+        ]
+      : []),
+    ...(onUseAsReference
+      ? [
+          {
+            id: "use-reference",
+            label: "Use as reference",
+            icon: ImagePlus,
+            onSelect: () => onUseAsReference(item),
+          },
+        ]
+      : []),
+    ...(onSaveAsReference
+      ? [
+          {
+            id: "save-reference",
+            label: "Save as reference",
+            icon: Bookmark,
+            onSelect: () => onSaveAsReference(item),
           },
         ]
       : []),
