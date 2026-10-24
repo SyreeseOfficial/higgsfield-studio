@@ -25,6 +25,8 @@ export interface GalleryTileProps {
   tier: LoadTier
   reducedMotion: boolean
   onDelete?: (item: GalleryItem) => void
+  onCancel?: (item: GalleryItem) => void
+  onRecheck?: (item: GalleryItem) => void
 }
 
 function rectStyle(rect: TileRect, top: number): CSSProperties {
@@ -122,14 +124,46 @@ function GalleryTileComponent({
   tier,
   reducedMotion,
   onDelete,
+  onCancel,
+  onRecheck,
 }: GalleryTileProps) {
   const [hovered, setHovered] = useState(false)
   const style = rectStyle(rect, top)
 
   if (item.status === "generating") {
     return (
-      <div className="studio-tile" style={style}>
-        <GenerationTile state="generating" className="size-full" />
+      <div className="studio-tile group" style={style}>
+        <GenerationTile
+          state="generating"
+          generatingLabel={
+            item.canceling
+              ? "Canceling…"
+              : item.stalled
+                ? "Still working"
+                : "Generating"
+          }
+          className="size-full"
+        />
+        <div className="absolute right-2 bottom-2 z-[2] flex gap-2">
+          {item.stalled && onRecheck ? (
+            <button
+              type="button"
+              className="rounded-full bg-black/40 px-3 py-1.5 text-xs font-medium text-white backdrop-blur-md hover:bg-black/60"
+              onClick={() => onRecheck(item)}
+            >
+              Check again
+            </button>
+          ) : null}
+          {onCancel && !item.canceling ? (
+            <button
+              type="button"
+              className="rounded-full bg-black/40 px-3 py-1.5 text-xs font-medium text-white backdrop-blur-md hover:bg-black/60"
+              onClick={() => onCancel(item)}
+            >
+              Cancel
+            </button>
+          ) : null}
+        </div>
       </div>
     )
   }

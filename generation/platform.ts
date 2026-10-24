@@ -33,10 +33,11 @@ export type GenerationStatus = {
 }
 
 /** One request's answer inside a batched status poll. A request that errors
-    carries its reason alone, so it cannot lose the answers standing beside it. */
+    carries its reason alone, so it cannot lose the answers standing beside it.
+    `terminal` is true only when retrying cannot help (unknown request, bad key). */
 export type StatusResult =
   | { requestId: string; status: GenerationStatus }
-  | { requestId: string; error: string }
+  | { requestId: string; error: string; terminal: boolean }
 
 export type PlatformClientOptions = {
   apiKey: string

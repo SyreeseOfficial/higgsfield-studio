@@ -16,6 +16,9 @@ export interface GalleryItem {
   width: number
   height: number
   failureLabel?: string
+  /** Generating tiles: deadline passed, job may still finish. */
+  stalled?: boolean
+  canceling?: boolean
   prompt: string
   alt: string
   modelLabel: string

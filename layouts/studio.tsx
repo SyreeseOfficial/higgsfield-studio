@@ -49,7 +49,7 @@ import {
   useUploads,
   type AssetSelection,
 } from "@/lib/studio/uploads"
-import { useRuns } from "@/lib/studio/use-runs"
+import { MAX_RUNNING, useRuns } from "@/lib/studio/use-runs"
 
 /**
  * StudioTemplate — the full creative workspace: projects-first sidebar, hero,
@@ -198,12 +198,16 @@ function FeedState({
   title,
   dock,
   onDelete,
+  onCancel,
+  onRecheck,
 }: {
   items: GalleryItem[]
   previewItems: GalleryItem[]
   title: string
   dock: DockProps
   onDelete: (item: GalleryItem) => void
+  onCancel: (item: GalleryItem) => void
+  onRecheck: (item: GalleryItem) => void
 }) {
   const images = useMemo(() => heroImages(previewItems), [previewItems])
   const dockRef = useRef<HTMLDivElement>(null)
@@ -227,6 +231,8 @@ function FeedState({
           items={items}
           title={title}
           onDelete={onDelete}
+          onCancel={onCancel}
+          onRecheck={onRecheck}
           emptyState={{
             images,
             title:
@@ -284,7 +290,12 @@ export function StudioTemplate({
   const setSetting = useSettings((s) => s.set)
   const projectsStore = useProjects()
   const uploads = useUploads((s) => s.items)
-  const runs = useRuns()
+  const runs = useRuns({
+    onAuthError: () => {
+      setKeyConfigured(false)
+      setKeyOpen(true)
+    },
+  })
 
   const surfaces = useMemo(
     () =>
@@ -328,8 +339,12 @@ export function StudioTemplate({
     }
   }, [inputMode, media, model, prompt, settings])
 
+  // The cookie can expire or be cleared in another tab; re-check on return.
   useEffect(() => {
-    void hasPlatformCredentials().then(setKeyConfigured)
+    const check = () => void hasPlatformCredentials().then(setKeyConfigured)
+    check()
+    window.addEventListener("focus", check)
+    return () => window.removeEventListener("focus", check)
   }, [])
 
   const galleryItems = useMemo(
@@ -374,7 +389,8 @@ export function StudioTemplate({
       ? (byProject.get(view.projectId) ?? [])
       : galleryItems
 
-  const generating = runs.running.length > 0
+  // At the cap the dock offers Cancel instead of Generate.
+  const generating = runs.running.length >= MAX_RUNNING
   const canGenerate =
     prepared.plane !== null && (prompt.trim().length > 0 || media.length > 0)
   const missingRequiredInput =
@@ -541,6 +557,8 @@ export function StudioTemplate({
             title={selectedProject?.name ?? "All Generations"}
             dock={dock}
             onDelete={(item) => runs.remove(item.runId)}
+            onCancel={(item) => void runs.cancel(item.runId)}
+            onRecheck={(item) => runs.recheck(item.runId)}
           />
         )}
       </main>

@@ -20,6 +20,8 @@ export interface UserGenerationsProps {
   loadingMore?: boolean
   onLoadMore?: () => void | Promise<unknown>
   onDelete?: (item: GalleryItem) => void
+  onCancel?: (item: GalleryItem) => void
+  onRecheck?: (item: GalleryItem) => void
 }
 
 export function UserGenerations(props: UserGenerationsProps) {

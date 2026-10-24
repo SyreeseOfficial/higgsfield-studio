@@ -25,6 +25,8 @@ export function runToGalleryItems(run: RunRecord): GalleryItem[] {
         id: run.id,
         kind: run.surface,
         status: run.status === "running" ? "generating" : "failed",
+        ...(run.stalled ? { stalled: true } : {}),
+        ...(run.canceling ? { canceling: true } : {}),
         src: "",
         ...(run.error ? { failureLabel: run.error } : {}),
       },

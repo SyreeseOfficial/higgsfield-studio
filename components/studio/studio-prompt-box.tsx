@@ -639,7 +639,7 @@ export function StudioPromptBox({
         disabled={canceling || (!generating && generateDisabled)}
         title={!generating && generateDisabled ? disabledReason : undefined}
       >
-        {canceling ? "Cancelling…" : generating ? "Cancel" : "Generate"}
+        {canceling ? "Cancelling…" : generating ? "Cancel all" : "Generate"}
       </PromptBox.Generate>
     </PromptBox.Root>
   )

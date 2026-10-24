@@ -6,7 +6,11 @@ import { cancelGeneration, submitGeneration } from "@/generation/actions"
 import { getModel } from "@/generation/catalog"
 import type { GenerationPlane } from "@/generation/catalog"
 import type { GenerationStatus } from "@/generation/platform"
-import { stopWatching, watchRequest } from "@/generation/poll"
+import {
+  WatchTimeoutError,
+  stopWatching,
+  watchRequest,
+} from "@/generation/poll"
 
 import {
   aspectFromSettings,
@@ -15,17 +19,49 @@ import {
   type RunRecord,
 } from "./history"
 
+export const MAX_RUNNING = 2
+const IMAGE_DEADLINE_MS = 15 * 60_000
+const VIDEO_DEADLINE_MS = 40 * 60_000
+const CHANNEL = "studio-history"
+
+/** Adds runs another tab created and takes its settled copy of any run still
+    running here. Returns `current` untouched when nothing changed, so the
+    save → broadcast → merge loop between tabs ends.
+    ponytail: deletes in one tab are not propagated; add tombstones if needed. */
+function mergeRecords(current: RunRecord[], stored: RunRecord[]): RunRecord[] {
+  const byId = new Map(current.map((r) => [r.id, r]))
+  let changed = false
+  const merged = current.map((r) => {
+    const other = stored.find((s) => s.id === r.id)
+    if (r.status === "running" && other && other.status !== "running") {
+      changed = true
+      return other
+    }
+    return r
+  })
+  const added = stored.filter((s) => !byId.has(s.id))
+  if (added.length === 0 && !changed) return current
+  return [...merged, ...added].sort((a, b) => b.createdAt - a.createdAt)
+}
+
 /**
  * The studio's generation controller: submits planes to the platform through
  * the server action, keeps every run in IndexedDB-backed history, and resumes
  * polls for runs that were still in flight when the page reloaded.
  */
-export function useRuns() {
+export function useRuns({ onAuthError }: { onAuthError?: () => void } = {}) {
   const [records, setRecords] = useState<RunRecord[]>([])
   const [loaded, setLoaded] = useState(false)
   const [error, setError] = useState<string | null>(null)
   // Blocks a second submit while the first is still awaiting the platform.
   const submitting = useRef(false)
+  // Key of an attempt whose outcome is unknown, reused if the same plane is retried.
+  const pending = useRef<{ fingerprint: string; key: string } | null>(null)
+  const channel = useRef<BroadcastChannel | null>(null)
+  const onAuthErrorRef = useRef(onAuthError)
+  useEffect(() => {
+    onAuthErrorRef.current = onAuthError
+  })
 
   const update = useCallback((id: string, patch: Partial<RunRecord>) => {
     setRecords((current) =>
@@ -34,14 +70,18 @@ export function useRuns() {
   }, [])
 
   const watch = useCallback(
-    (record: RunRecord) => {
-      watchRequest(record.requestId, {
-        deadline: record.createdAt + 15 * 60_000,
-      })
+    (record: RunRecord, from = record.createdAt) => {
+      const limit =
+        record.surface === "video" ? VIDEO_DEADLINE_MS : IMAGE_DEADLINE_MS
+      watchRequest(record.requestId, { deadline: from + limit })
         .then((status) => update(record.id, settle(status)))
         .catch((caught: unknown) => {
+          // Slow is not failed: the platform may still finish (and bill) it.
+          if (caught instanceof WatchTimeoutError)
+            return update(record.id, { stalled: true })
           update(record.id, {
             status: "failed",
+            canceling: false,
             error: caught instanceof Error ? caught.message : String(caught),
           })
         })
@@ -58,14 +98,22 @@ export function useRuns() {
       for (const record of stored)
         if (record.status === "running") watch(record)
     })
+    const bc = new BroadcastChannel(CHANNEL)
+    channel.current = bc
+    bc.onmessage = () =>
+      void loadHistory().then((stored) =>
+        setRecords((current) => mergeRecords(current, stored))
+      )
     return () => {
       alive = false
+      bc.close()
+      channel.current = null
       stopWatching()
     }
   }, [watch])
 
   useEffect(() => {
-    if (loaded) void saveHistory(records)
+    if (loaded) void saveHistory(records).then(() => channel.current?.postMessage(0))
   }, [loaded, records])
 
   const submit = useCallback(
@@ -77,9 +125,23 @@ export function useRuns() {
       submitting.current = true
       setError(null)
       const model = getModel(plane.model)
+      const fingerprint = JSON.stringify([plane, projectId])
+      const key =
+        pending.current?.fingerprint === fingerprint
+          ? pending.current.key
+          : crypto.randomUUID()
+      pending.current = { fingerprint, key }
       try {
-        // One key per click: the platform dedupes if the request is replayed.
-        const queued = await submitGeneration(plane, crypto.randomUUID())
+        const result = await submitGeneration(plane, key)
+        if (!result.ok) {
+          // Keep the key unless the platform definitely refused the job.
+          if (result.kind !== "unknown") pending.current = null
+          if (result.kind === "auth") onAuthErrorRef.current?.()
+          setError(result.error)
+          return null
+        }
+        pending.current = null
+        const { queued } = result
         const record: RunRecord = {
           id: queued.requestId,
           requestId: queued.requestId,
@@ -98,6 +160,7 @@ export function useRuns() {
         watch(record)
         return record
       } catch (caught) {
+        // The call itself dropped: the job may exist, so the key stays.
         setError(caught instanceof Error ? caught.message : String(caught))
         return null
       } finally {
@@ -110,15 +173,28 @@ export function useRuns() {
   const cancel = useCallback(
     async (id: string) => {
       const record = records.find((r) => r.id === id)
-      if (!record || record.status !== "running") return
+      if (!record || record.status !== "running" || record.canceling) return
+      update(id, { canceling: true })
       try {
+        // Only queued jobs can be canceled; the next poll reports what happened.
         await cancelGeneration({ requestIds: [record.requestId] })
-        update(id, { status: "failed", error: "Canceled" })
-      } catch (caught) {
-        setError(caught instanceof Error ? caught.message : String(caught))
+      } catch {
+        update(id, { canceling: false })
+        setError("Already running, can't cancel")
       }
     },
     [records, update]
+  )
+
+  /** Starts a fresh watch for a run that outlived its deadline. */
+  const recheck = useCallback(
+    (id: string) => {
+      const record = records.find((r) => r.id === id)
+      if (!record || record.status !== "running") return
+      update(id, { stalled: false })
+      watch(record, Date.now())
+    },
+    [records, update, watch]
   )
 
   const remove = useCallback((id: string) => {
@@ -127,7 +203,17 @@ export function useRuns() {
 
   const running = records.filter((r) => r.status === "running")
 
-  return { records, running, loaded, error, submit, cancel, remove, setError }
+  return {
+    records,
+    running,
+    loaded,
+    error,
+    submit,
+    cancel,
+    recheck,
+    remove,
+    setError,
+  }
 }
 
 function settle(status: GenerationStatus): Partial<RunRecord> {
@@ -136,7 +222,7 @@ function settle(status: GenerationStatus): Partial<RunRecord> {
     ...(status.video ? [status.video.url] : []),
   ]
   if (status.status === "completed" && urls.length > 0)
-    return { status: "completed", urls }
+    return { status: "completed", urls, stalled: false, canceling: false }
   const reason =
     status.status === "nsfw"
       ? "Blocked by the content filter"
@@ -144,7 +230,7 @@ function settle(status: GenerationStatus): Partial<RunRecord> {
         ? "Canceled"
         : (describeError(status.error) ??
           "The generation did not produce media")
-  return { status: "failed", error: reason }
+  return { status: "failed", error: reason, stalled: false, canceling: false }
 }
 
 function describeError(error: unknown): string | undefined {

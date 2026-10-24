@@ -12,9 +12,13 @@ import {
   encodeCredentials,
   parseCredentialInput,
 } from "./credentials"
-import { createPlatformClient } from "./platform"
-import type { StatusResult } from "./platform"
+import { PlatformError, createPlatformClient } from "./platform"
+import type { QueuedGeneration, StatusResult } from "./platform"
 import { toPlatform } from "./to-platform"
+
+// Keep in step with STATUS_BATCH in poll.ts.
+const MAX_STATUS_IDS = 50
+const STATUS_CONCURRENCY = 8
 
 export async function savePlatformCredentials(data: unknown) {
   const { apiKey } = parseCredentialInput(data)
@@ -38,17 +42,39 @@ export async function hasPlatformCredentials() {
   return (await readStoredCredentials()) !== null
 }
 
+/** `auth`: the key is missing or refused. `rejected`: the platform definitely
+    did not take the job, so a retry may use a fresh idempotency key. `unknown`:
+    it may have taken it (5xx, dropped connection), so the retry must reuse the key. */
+export type SubmitFailure = "auth" | "rejected" | "unknown"
+
+export type SubmitResult =
+  | { ok: true; queued: QueuedGeneration }
+  | { ok: false; kind: SubmitFailure; error: string }
+
 export async function submitGeneration(
   plane: GenerationPlane,
   idempotencyKey?: string
-) {
-  const model = getModel(plane.model)
-  const parsed: GenerationPlane = {
-    ...plane,
-    settings: parseSettings(model, plane.settings),
+): Promise<SubmitResult> {
+  try {
+    const model = getModel(plane.model)
+    const parsed: GenerationPlane = {
+      ...plane,
+      settings: parseSettings(model, plane.settings),
+    }
+    const { path, body } = toPlatform(parsed)
+    const client = createPlatformClient(await readCredentials())
+    return { ok: true, queued: await client.submit(path, body, idempotencyKey) }
+  } catch (caught) {
+    const error = caught instanceof Error ? caught.message : String(caught)
+    if (caught instanceof MissingCredentialsError)
+      return { ok: false, kind: "auth", error }
+    if (caught instanceof PlatformError) {
+      if (caught.status === 401 || caught.status === 403)
+        return { ok: false, kind: "auth", error }
+      return { ok: false, kind: caught.status < 500 ? "rejected" : "unknown", error }
+    }
+    return { ok: false, kind: "rejected", error }
   }
-  const { path, body } = toPlatform(parsed)
-  return createPlatformClient(await readCredentials()).submit(path, body, idempotencyKey)
 }
 
 /** Every request in flight, answered in one round trip. Next dispatches server
@@ -58,20 +84,37 @@ export async function submitGeneration(
 export async function getGenerationStatuses(
   data: unknown
 ): Promise<StatusResult[]> {
-  const requestIds = parseRequestIds(data)
+  const requestIds = [...new Set(parseRequestIds(data))]
+  if (requestIds.length > MAX_STATUS_IDS) throw new Error("Too many request ids")
   const client = createPlatformClient(await readCredentials())
-  return Promise.all(
-    requestIds.map(async (requestId): Promise<StatusResult> => {
-      try {
-        return { requestId, status: await client.status(requestId) }
-      } catch (caught) {
-        return {
-          requestId,
-          error: caught instanceof Error ? caught.message : String(caught),
-        }
-      }
-    })
-  )
+  const results: StatusResult[] = []
+  for (let i = 0; i < requestIds.length; i += STATUS_CONCURRENCY) {
+    results.push(
+      ...(await Promise.all(
+        requestIds.slice(i, i + STATUS_CONCURRENCY).map(
+          async (requestId): Promise<StatusResult> => {
+            try {
+              return { requestId, status: await client.status(requestId) }
+            } catch (caught) {
+              return {
+                requestId,
+                error:
+                  caught instanceof Error ? caught.message : String(caught),
+                // A 5xx, 429 or dropped connection says nothing about the job.
+                terminal:
+                  caught instanceof PlatformError &&
+                  caught.status >= 400 &&
+                  caught.status < 500 &&
+                  caught.status !== 408 &&
+                  caught.status !== 429,
+              }
+            }
+          }
+        )
+      ))
+    )
+  }
+  return results
 }
 
 export async function cancelGeneration(data: unknown) {

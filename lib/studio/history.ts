@@ -22,6 +22,10 @@ export interface RunRecord {
   /** Result URLs: one video or N images. */
   urls: string[]
   error?: string
+  /** Deadline passed but the platform never said it failed: offer "Check again". */
+  stalled?: boolean
+  /** Cancel requested; the next poll decides the final state. */
+  canceling?: boolean
   createdAt: number
 }
 
