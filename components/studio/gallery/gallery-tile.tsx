@@ -3,7 +3,14 @@
 
 import { memo, useEffect, useRef, useState } from "react"
 import type { CSSProperties } from "react"
-import { Copy, Download, FolderInput, Share2, Trash2 } from "lucide-react"
+import {
+  Copy,
+  Download,
+  FolderInput,
+  Share2,
+  Shuffle,
+  Trash2,
+} from "lucide-react"
 
 import {
   GenerationTile,
@@ -28,6 +35,7 @@ export interface GalleryTileProps {
   onCancel?: (item: GalleryItem) => void
   onRecheck?: (item: GalleryItem) => void
   onMove?: (item: GalleryItem) => void
+  onVariation?: (item: GalleryItem) => void
 }
 
 function rectStyle(rect: TileRect, top: number): CSSProperties {
@@ -128,6 +136,7 @@ function GalleryTileComponent({
   onCancel,
   onRecheck,
   onMove,
+  onVariation,
 }: GalleryTileProps) {
   const [hovered, setHovered] = useState(false)
   const style = rectStyle(rect, top)
@@ -138,11 +147,13 @@ function GalleryTileComponent({
         <GenerationTile
           state="generating"
           generatingLabel={
-            item.canceling
-              ? "Canceling…"
-              : item.stalled
-                ? "Still working"
-                : "Generating"
+            item.queued
+              ? `Queued · ${item.queued}`
+              : item.canceling
+                ? "Canceling…"
+                : item.stalled
+                  ? "Still working"
+                  : "Generating"
           }
           className="size-full"
         />
@@ -225,6 +236,16 @@ function GalleryTileComponent({
         else void copyText(`${item.prompt}\n${url}`)
       },
     },
+    ...(onVariation
+      ? [
+          {
+            id: "variation",
+            label: "More like this",
+            icon: Shuffle,
+            onSelect: () => onVariation(item),
+          },
+        ]
+      : []),
     ...(onMove
       ? [
           {

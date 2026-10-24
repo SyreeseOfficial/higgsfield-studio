@@ -1,4 +1,4 @@
-import type { Surface } from "@/generation/catalog"
+import type { MediaItem, Surface } from "@/generation/catalog"
 
 import { defaultKv, type Kv } from "./kv"
 
@@ -22,6 +22,11 @@ export interface RunRecord {
   /** Result URLs: one video or N images. */
   urls: string[]
   error?: string
+  /** Reference inputs and input mode the run was submitted with, so "More like this" can resubmit it. */
+  media?: MediaItem[]
+  inputMode?: string
+  /** 1-based place in the local queue; set only on waiting placeholders, never persisted. */
+  queued?: number
   /** Deadline passed but the platform never said it failed: offer "Check again". */
   stalled?: boolean
   /** Cancel requested; the next poll decides the final state. */

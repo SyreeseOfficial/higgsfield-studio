@@ -35,6 +35,7 @@ export interface JustifiedGalleryProps {
   /** Ask to file these tiles under a project (the caller shows the picker). */
   onMove?: (items: GalleryItem[]) => void
   onDeleteMany?: (items: GalleryItem[]) => void
+  onVariation?: (item: GalleryItem) => void
 }
 
 export function JustifiedGallery({
@@ -50,6 +51,7 @@ export function JustifiedGallery({
   onRecheck,
   onMove,
   onDeleteMany,
+  onVariation,
 }: JustifiedGalleryProps) {
   const [selecting, setSelecting] = useState(false)
   const [selected, setSelected] = useState<ReadonlySet<string>>(new Set())
@@ -200,6 +202,7 @@ export function JustifiedGallery({
                     onDelete={onDelete}
                     onCancel={onCancel}
                     onRecheck={onRecheck}
+                    onVariation={onVariation}
                     {...(onMove
                       ? { onMove: (i: GalleryItem) => onMove([i]) }
                       : {})}

@@ -4,6 +4,7 @@ import { useCallback, useEffect, useRef, useState } from "react"
 
 import { cancelGeneration, submitGeneration } from "@/generation/actions"
 import { getModel } from "@/generation/catalog"
+import { groupMedia } from "@/generation/catalog/media-inputs"
 import type { GenerationPlane } from "@/generation/catalog"
 import type { GenerationStatus } from "@/generation/platform"
 import {
@@ -20,6 +21,7 @@ import {
 } from "./history"
 
 export const MAX_RUNNING = 2
+const MAX_QUEUED = 20
 const IMAGE_DEADLINE_MS = 15 * 60_000
 const VIDEO_DEADLINE_MS = 40 * 60_000
 const CHANNEL = "studio-history"
@@ -51,6 +53,11 @@ function mergeRecords(current: RunRecord[], stored: RunRecord[]): RunRecord[] {
  */
 export function useRuns({ onAuthError }: { onAuthError?: () => void } = {}) {
   const [records, setRecords] = useState<RunRecord[]>([])
+  // Planes waiting for a free slot; lost on reload (only sent runs are history).
+  const [queue, setQueue] = useState<
+    { record: RunRecord; plane: GenerationPlane; projectId?: string }[]
+  >([])
+  const [pump, setPump] = useState(0)
   const [loaded, setLoaded] = useState(false)
   const [error, setError] = useState<string | null>(null)
   // Blocks a second submit while the first is still awaiting the platform.
@@ -117,12 +124,12 @@ export function useRuns({ onAuthError }: { onAuthError?: () => void } = {}) {
       void saveHistory(records).then(() => channel.current?.postMessage(0))
   }, [loaded, records])
 
-  const submit = useCallback(
+  const start = useCallback(
     async (
       plane: GenerationPlane,
-      projectId?: string
-    ): Promise<RunRecord | null> => {
-      if (submitting.current) return null
+      projectId: string | undefined,
+      queuedId: string
+    ) => {
       submitting.current = true
       setError(null)
       const model = getModel(plane.model)
@@ -139,7 +146,7 @@ export function useRuns({ onAuthError }: { onAuthError?: () => void } = {}) {
           if (result.kind !== "unknown") pending.current = null
           if (result.kind === "auth") onAuthErrorRef.current?.()
           setError(result.error)
-          return null
+          return
         }
         pending.current = null
         const { queued } = result
@@ -151,6 +158,8 @@ export function useRuns({ onAuthError }: { onAuthError?: () => void } = {}) {
           modelLabel: model.label,
           prompt: plane.prompt.text,
           settings: plane.settings,
+          media: Object.values(plane.media).flatMap((items) => items ?? []),
+          ...(plane.inputMode ? { inputMode: plane.inputMode } : {}),
           ...(projectId ? { projectId } : {}),
           aspect: aspectFromSettings(plane.settings),
           status: "running",
@@ -159,20 +168,91 @@ export function useRuns({ onAuthError }: { onAuthError?: () => void } = {}) {
         }
         setRecords((current) => [record, ...current])
         watch(record)
-        return record
       } catch (caught) {
         // The call itself dropped: the job may exist, so the key stays.
         setError(caught instanceof Error ? caught.message : String(caught))
-        return null
       } finally {
         submitting.current = false
+        setQueue((current) => current.filter((q) => q.record.id !== queuedId))
+        setPump((n) => n + 1)
       }
     },
     [watch]
   )
 
+  // Sends the next queued plane whenever a slot is free.
+  useEffect(() => {
+    const next = queue[0]
+    if (!loaded || !next || submitting.current) return
+    if (records.filter((r) => r.status === "running").length >= MAX_RUNNING)
+      return
+    // Claim the slot now, send on a microtask: start() sets state.
+    submitting.current = true
+    queueMicrotask(() => void start(next.plane, next.projectId, next.record.id))
+  }, [loaded, queue, records, pump, start])
+
+  /** Queues a plane; it goes to the platform as soon as fewer than MAX_RUNNING runs are active. */
+  const submit = useCallback(
+    async (
+      plane: GenerationPlane,
+      projectId?: string
+    ): Promise<RunRecord | null> => {
+      if (queue.length >= MAX_QUEUED) {
+        setError(
+          `Too many waiting generations (${MAX_QUEUED}). Wait or cancel some.`
+        )
+        return null
+      }
+      setError(null)
+      const model = getModel(plane.model)
+      const record: RunRecord = {
+        id: `queued-${crypto.randomUUID()}`,
+        requestId: "",
+        surface: model.surface,
+        modelId: model.id,
+        modelLabel: model.label,
+        prompt: plane.prompt.text,
+        settings: plane.settings,
+        ...(projectId ? { projectId } : {}),
+        aspect: aspectFromSettings(plane.settings),
+        status: "running",
+        urls: [],
+        createdAt: Date.now(),
+      }
+      setQueue((current) => [
+        ...current,
+        { record, plane, ...(projectId ? { projectId } : {}) },
+      ])
+      return record
+    },
+    [queue.length]
+  )
+
+  /** Resubmits a finished run's prompt, settings and references; the platform picks a new seed. */
+  const variation = useCallback(
+    (id: string) => {
+      const record = records.find((r) => r.id === id)
+      if (!record) return
+      void submit(
+        {
+          model: record.modelId,
+          ...(record.inputMode ? { inputMode: record.inputMode } : {}),
+          prompt: { text: record.prompt },
+          media: groupMedia(record.media ?? []),
+          settings: record.settings,
+        },
+        record.projectId
+      )
+    },
+    [records, submit]
+  )
+
   const cancel = useCallback(
     async (id: string) => {
+      if (queue.some((q) => q.record.id === id)) {
+        setQueue((current) => current.filter((q) => q.record.id !== id))
+        return
+      }
       const record = records.find((r) => r.id === id)
       if (!record || record.status !== "running" || record.canceling) return
       update(id, { canceling: true })
@@ -184,8 +264,16 @@ export function useRuns({ onAuthError }: { onAuthError?: () => void } = {}) {
         setError("Already running, can't cancel")
       }
     },
-    [records, update]
+    [queue, records, update]
   )
+
+  /** Drops everything waiting and cancels everything running. */
+  const cancelAll = useCallback(async () => {
+    setQueue([])
+    await Promise.all(
+      records.filter((r) => r.status === "running").map((r) => cancel(r.id))
+    )
+  }, [cancel, records])
 
   /** Starts a fresh watch for a run that outlived its deadline. */
   const recheck = useCallback(
@@ -231,10 +319,17 @@ export function useRuns({ onAuthError }: { onAuthError?: () => void } = {}) {
   }, [])
 
   const running = records.filter((r) => r.status === "running")
+  // Waiting placeholders lead the list, newest first, each numbered by queue place.
+  const waiting = queue
+    .map((q, i) => ({ ...q.record, queued: i + 1 }))
+    .reverse()
 
   return {
-    records,
+    records: waiting.length ? [...waiting, ...records] : records,
     running,
+    queuedCount: queue.length,
+    variation,
+    cancelAll,
     loaded,
     error,
     submit,

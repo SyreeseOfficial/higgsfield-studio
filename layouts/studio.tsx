@@ -56,7 +56,7 @@ import {
   requestNotificationPermission,
   useRunSignals,
 } from "@/lib/studio/use-run-signals"
-import { MAX_RUNNING, useRuns } from "@/lib/studio/use-runs"
+import { useRuns } from "@/lib/studio/use-runs"
 
 /**
  * StudioTemplate — the full creative workspace: projects-first sidebar, hero,
@@ -209,6 +209,7 @@ function FeedState({
   onRecheck,
   onMove,
   onDeleteMany,
+  onVariation,
 }: {
   items: GalleryItem[]
   previewItems: GalleryItem[]
@@ -219,6 +220,7 @@ function FeedState({
   onRecheck: (item: GalleryItem) => void
   onMove: (items: GalleryItem[]) => void
   onDeleteMany: (items: GalleryItem[]) => void
+  onVariation: (item: GalleryItem) => void
 }) {
   const images = useMemo(() => heroImages(previewItems), [previewItems])
   const dockRef = useRef<HTMLDivElement>(null)
@@ -246,6 +248,7 @@ function FeedState({
           onRecheck={onRecheck}
           onMove={onMove}
           onDeleteMany={onDeleteMany}
+          onVariation={onVariation}
           emptyState={{
             images,
             title:
@@ -407,10 +410,11 @@ export function StudioTemplate({
       ? (byProject.get(view.projectId) ?? [])
       : galleryItems
 
-  // At the cap the dock offers Cancel instead of Generate.
-  const generating = runs.running.length >= MAX_RUNNING
   const canGenerate =
     prepared.plane !== null && (prompt.trim().length > 0 || media.length > 0)
+  // New prompts queue behind running ones; with nothing to send, the dock offers Cancel all.
+  const generating =
+    !canGenerate && (runs.running.length > 0 || runs.queuedCount > 0)
   const missingRequiredInput =
     model.requiredRoles?.some(
       (role) => !media.some((item) => item.role === role)
@@ -432,7 +436,7 @@ export function StudioTemplate({
   }
 
   const handleGenerate = useCallback(() => {
-    if (!canGenerate || generating || !prepared.plane) return
+    if (!canGenerate || !prepared.plane) return
     setLocalError(null)
     requestNotificationPermission()
     if (!keyConfigured) {
@@ -444,22 +448,12 @@ export function StudioTemplate({
       if (record && view.kind === "home") setView({ kind: "all" })
       if (record && projectId) projectsStore.touch(projectId)
     })
-  }, [
-    canGenerate,
-    generating,
-    keyConfigured,
-    prepared.plane,
-    projectsStore,
-    runs,
-    view,
-  ])
+  }, [canGenerate, keyConfigured, prepared.plane, projectsStore, runs, view])
 
   const handleCancel = useCallback(() => {
     if (!generating || canceling) return
     setCanceling(true)
-    void Promise.all(runs.running.map((r) => runs.cancel(r.id))).finally(() =>
-      setCanceling(false)
-    )
+    void runs.cancelAll().finally(() => setCanceling(false))
   }, [canceling, generating, runs])
 
   const handleUseTemplate = (t: TemplateItem) => {
@@ -599,6 +593,7 @@ export function StudioTemplate({
             dock={dock}
             onDelete={(item) => deleteRuns([item])}
             onDeleteMany={deleteRuns}
+            onVariation={(item) => runs.variation(item.runId)}
             onMove={(items) => setMoving(items)}
             onCancel={(item) => void runs.cancel(item.runId)}
             onRecheck={(item) => runs.recheck(item.runId)}

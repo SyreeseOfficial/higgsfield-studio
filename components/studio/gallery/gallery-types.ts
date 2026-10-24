@@ -19,6 +19,8 @@ export interface GalleryItem {
   /** Generating tiles: deadline passed, job may still finish. */
   stalled?: boolean
   canceling?: boolean
+  /** 1-based place in the local queue, for runs not yet sent. */
+  queued?: number
   prompt: string
   alt: string
   modelLabel: string

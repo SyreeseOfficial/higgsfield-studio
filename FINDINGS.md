@@ -62,13 +62,13 @@ Reviewed 2026-10-13 against `17b2826` (Next.js 16, React 19, Tailwind 4, Base UI
 ## Ideas
 
 ### Generation workflow
-- [ ] **[H]** Variations: "More like this" on any tile, re-run with the same prompt and settings, new seed.
-- [ ] **[M]** Queue: accept new prompts while others run and show queue position per tile.
-- [ ] **[L]** Remember settings per model, not per surface, so switching back restores them.
+- [x] **[H]** Variations: "More like this" on any tile, re-run with the same prompt and settings, new seed. *(Done: tile menu "More like this"; the platform picks a new seed, the catalog has no seed setting.)*
+- [x] **[M]** Queue: accept new prompts while others run and show queue position per tile. *(Done: client-side queue, 2 run at once, "Queued · n" tiles; the queue is lost on reload and the dock shows "Cancel all" when there is nothing new to send.)*
+- [x] **[L]** Remember settings per model, not per surface, so switching back restores them. *(Already true: `useSettings` is keyed by model.)*
 
 ### Prompt box and input
-- [ ] **[L]** Auto-grow textarea with max height and internal scroll.
-- [ ] **[L]** Spellcheck toggle and language hint.
+- [x] **[L]** Auto-grow textarea with max height and internal scroll. *(Done with `field-sizing: content`; Chromium only, other browsers keep the fixed height and scroll.)*
+- [x] **[L]** Spellcheck toggle and language hint. *(Spellcheck toggle done; the language hint was left out, the field follows the page language.)*
 
 ### Models and settings
 - [ ] **[M]** Model info popover: what it is best at, max duration, supported inputs, relative speed.
