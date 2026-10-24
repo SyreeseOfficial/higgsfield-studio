@@ -8,6 +8,7 @@ Reviewed 2026-10-13 against `17b2826` (Next.js 16, React 19, Tailwind 4, Base UI
 
 ## How this file is organized
 
+- **New ideas (2026-10-23):** fresh brainstorm, after Skipped; same categories, sorted H/M/L.
 - **Planned:** what we want to do eventually.
 - **Skipped for now:** everything else. Kept for reference, not rejected.
 - Both split into **Verified findings** (checked by reading the code or grepping) and **Ideas** (brainstorm, not verified bugs; *(check)* marks behavior I did not confirm in code). Ideas respect `AGENTS.md` (server boundary, dark only, all models visible).
@@ -338,6 +339,193 @@ Every **Planned** item is either done (`[x]`, with notes where it was partial) o
 - [ ] **[L]** Webhook/notify URL when a run finishes *(needs server; only if asked)*.
 - [ ] **[L]** Public read-only API route to submit prompts (server-key mode for teams) *(security review first)*.
 - [ ] **[L]** Team mode: shared key held server-side instead of per-browser cookie *(changes AGENTS.md boundary; ask first)*.
+
+---
+
+# New ideas (added 2026-10-23)
+
+Brainstorm only: nothing here is verified or started, and each item is new (not a repeat of the lists above). Same categories as above, each sorted H, then M, then L. All respect `AGENTS.md` (server boundary, dark only, all models visible). *(check)* = depends on platform behavior I have not confirmed.
+
+## Generation workflow
+- [ ] **[H]** "Retry with edits": on a failed tile, open the dock prefilled with the run's prompt and settings, with the error reason shown above the box.
+- [ ] **[H]** Duplicate-submit guard: if the prompt, model, settings and references are identical to a run submitted in the last 10 s, ask before sending a second paid job.
+- [ ] **[M]** Persist the queue (the "Queued · n" tiles) in IndexedDB so a reload resumes it instead of dropping it.
+- [ ] **[M]** Reorder and remove queued tiles by drag, before they start.
+- [ ] **[M]** Pause the queue (let running jobs finish, hold the rest) with a single toggle.
+- [ ] **[M]** Auto-retry transient submit failures (5xx, 429) once with the same idempotency key and a visible "Retrying…" state.
+- [ ] **[M]** Sequential "chain" mode: output of run A becomes the reference of run B (image -> image -> video) from a saved list of steps.
+- [ ] **[M]** Re-run a whole project's prompts on a different model to compare.
+- [ ] **[L]** "Re-run failed only" button for a selection or project.
+- [ ] **[L]** Show a per-run timeline in the detail modal (queued, started, finished) from timestamps we already record.
+- [ ] **[L]** Run notes: a free-text field on the dock that is saved with the run ("client wants warmer").
+- [ ] **[L]** Concurrency setting (1-4) in app Settings instead of the fixed 2.
+
+## Prompt box and input
+- [ ] **[H]** Persist the unsent prompt and attached references per surface (draft survives reload). Overlaps the dead `stores/prompt.ts` item; this is the user-facing outcome.
+- [ ] **[M]** Prompt diff: when re-using a prompt from a tile, highlight what changed against the original before submit.
+- [ ] **[M]** Insert-from-history picker (`@@`) that pastes a previous prompt at the cursor.
+- [ ] **[M]** Prompt linting hints: warn on contradictions ("day" and "night"), duplicated words, or text the model cannot render *(check)*.
+- [ ] **[M]** Undo/redo that survives "Enhance"/template inserts (own history stack, not browser default).
+- [ ] **[L]** Word-wrap-aware token estimate shown under the box for models with a limit.
+- [ ] **[L]** Drag text from a tile's prompt into the dock to reuse it.
+- [ ] **[L]** Paste a URL to an image and have the server fetch and attach it as a reference (needs an SSRF-safe allowlist).
+- [ ] **[L]** Smart quotes / whitespace cleanup on paste (toggle).
+- [ ] **[L]** Rotating placeholder text that shows a real example per surface.
+
+## Models and settings
+- [ ] **[H]** "Why this model" compare drawer: side-by-side table of all models for the current surface (inputs, max duration, speed, aspect ratios).
+- [ ] **[M]** Per-model "last used settings" summary line in the picker so the user sees what they will get before selecting.
+- [ ] **[M]** Hide-model toggle in app Settings (visual only, still installed, always reachable via search; keeps the AGENTS.md "all models visible" rule by showing a "n hidden" row).
+- [ ] **[M]** Settings presets the user names and recalls ("Reels 9:16 High").
+- [ ] **[M]** Copy settings from one model to another where the keys match.
+- [ ] **[L]** Show a "needs reference" badge on models that require an input image or video.
+- [ ] **[L]** Model deprecation notice if the platform stops returning a model *(check)*.
+- [ ] **[L]** Group the picker by vendor with collapsible sections.
+
+## Assets and references
+- [ ] **[H]** Reference role picker with plain-language names ("First frame", "Last frame", "Style", "Character") instead of raw role keys.
+- [ ] **[M]** Reference limit meter ("2 of 4 images") per model, with the reason when full.
+- [ ] **[M]** Bulk delete and bulk tag in the asset library.
+- [ ] **[M]** "Used in" list on an asset: which runs referenced it.
+- [ ] **[M]** Sort and filter the library by type, date, size and last used.
+- [ ] **[M]** Paste-from-clipboard video thumbnail preview before upload so a wrong file is caught early.
+- [ ] **[L]** Show file size, dimensions and duration on each library card.
+- [ ] **[L]** Duplicate-detection toast ("already uploaded, reusing") when the hash matches.
+- [ ] **[L]** Drag a reference thumbnail from the dock to reorder or remove.
+- [ ] **[L]** Remove-all-references one-click in the dock.
+
+## Gallery and organization
+- [ ] **[H]** Text search over prompts in the feed header (client-side over the 400 records), debounced, with match highlight. Narrower than the "search history" item above and cheap to ship first.
+- [ ] **[M]** Saved filters ("Starred videos, Kling") as chips the user can pin.
+- [ ] **[M]** Select-range with Shift+click in multi-select.
+- [ ] **[M]** "Select all in this day" from the day heading.
+- [ ] **[M]** Collapse a day group to a one-line summary ("12 images, 2 failed").
+- [ ] **[M]** Pin a run to the top of the feed regardless of sort.
+- [ ] **[M]** Show a count badge next to each project in the sidebar and in the filter chips.
+- [ ] **[M]** Drag a tile onto a sidebar project to move it.
+- [ ] **[M]** Smart collections: auto-projects such as "All videos from this week" (saved query, no copying).
+- [ ] **[L]** "Jump to date" control and a mini scroll-rail with day ticks.
+- [ ] **[L]** Hide failed runs with one toggle (without deleting; the AGENTS.md rule still holds for runs the user already saw generating).
+- [ ] **[L]** Row-height / density slider with live relayout.
+- [ ] **[L]** "Recently deleted" bin kept for 7 days with restore, backing the Undo toast.
+- [ ] **[L]** Show the project name as a small chip on tiles when viewing "All".
+
+## Detail modal and viewers
+- [ ] **[H]** Keep the detail modal open and update it live when its run finishes (running -> ready) instead of requiring a close and reopen.
+- [ ] **[M]** Side-by-side "reference vs result" layout in the modal for image-to-image and image-to-video runs.
+- [ ] **[M]** Filmstrip of siblings (same project or same prompt) under the media for quick browsing.
+- [ ] **[M]** Fullscreen button and `F` shortcut for both images and videos.
+- [ ] **[M]** Copy-settings buttons per field (prompt, model, aspect ratio) rather than only "Copy as JSON".
+- [ ] **[L]** Show the platform request id with a copy button for support.
+- [ ] **[L]** Swipe-down to close on touch.
+- [ ] **[L]** Preload the next and previous media while the modal is open.
+- [ ] **[L]** Remember zoom level while paging between images.
+- [ ] **[L]** Show "ago" and exact timestamp on hover for created and finished times.
+
+## Editing and post-processing
+- [ ] **[M]** "Edit with prompt" on image tiles: attach the image as a reference and focus the dock in one click (works with any image-edit model).
+- [ ] **[M]** Relight or restyle presets as tile-menu items that prefill the prompt.
+- [ ] **[M]** Aspect-ratio crop preview for 9:16, 1:1, 4:5, 16:9 with save-as-new-asset (client canvas only for same-origin or uploaded files).
+- [ ] **[L]** Flip / rotate for reference images before upload.
+- [ ] **[L]** Mask import (upload a PNG mask) for inpainting-capable models *(check)*.
+- [ ] **[L]** Speed up or slow down a finished video (client playback only, not a re-encode) for review.
+- [ ] **[L]** Add captions overlay preview (text on top of video, not burned in).
+- [ ] **[L]** Compare two takes with an A/B toggle key (`1`/`2`) in the modal.
+
+## Sharing, export and sync
+- [ ] **[M]** "Download all in project" as a zip with progress and a cancel button.
+- [ ] **[M]** Filename template setting (`{project}-{model}-{date}-{n}`) used by every download.
+- [ ] **[M]** Copy result URL with a note about its lifetime *(check platform TTL)*.
+- [ ] **[M]** Export history as CSV (prompt, model, status, created, finished) for spreadsheets.
+- [ ] **[L]** Import prompts from a text file, one per line, into the prompt library.
+- [ ] **[L]** Auto-backup reminder: "Last export 30 days ago" nudge when history is large.
+- [ ] **[L]** Share sheet that builds a markdown snippet (prompt + link) for chat tools.
+- [ ] **[L]** Email-to-self of a recipe link via `mailto:`.
+
+## Onboarding and first run
+- [ ] **[M]** Empty-state hero shows the three actions that matter (add key, make an image, make a video) with real state (done or not).
+- [ ] **[M]** Inline "what does this setting do" help text under each setting in the dialog, from the catalog description.
+- [ ] **[M]** Key dialog test button after the Issues item is resolved ("Check key"), with a clear pass or fail.
+- [ ] **[L]** Contextual tip when the user's first video is slow: "Videos take a few minutes; you can leave the tab".
+- [ ] **[L]** "Replay tour" entry in the command palette.
+- [ ] **[L]** Link to docs/help from the shortcuts dialog.
+
+## Cost and usage awareness
+- [ ] **[M]** Weekly summary in the Usage dialog (runs, success rate, failures by reason).
+- [ ] **[M]** Failure-reason breakdown (content filter, credits, timeout) with counts.
+- [ ] **[M]** Busiest-hour and busiest-day heatmap from local history.
+- [ ] **[L]** Average wait per model, so the "typical time" hint becomes per model after enough runs.
+- [ ] **[L]** Export the usage stats as CSV.
+- [ ] **[L]** Streak / habit counter (days with at least one generation); opt-in, off by default.
+
+## Resilience, safety and privacy
+- [ ] **[H]** Show a clear "runs recovered after reload" notice when in-flight runs resume polling, so the user knows nothing was lost.
+- [ ] **[M]** Detect IndexedDB being blocked (private window) and show "History won't be saved in this window" once.
+- [ ] **[M]** Conflict-safe import: merge by run id instead of replacing history.
+- [ ] **[M]** Log a local, user-visible "activity log" of submit/cancel/error events (no prompts) for debugging.
+- [ ] **[M]** Rate-limit key-save attempts server-side to blunt brute-force of the key dialog.
+- [ ] **[M]** Verify that error messages never echo the key or a signed URL (add a test with a fake key).
+- [ ] **[L]** Auto-clear clipboard-pasted images from memory (revoke object URLs) once uploaded.
+- [ ] **[L]** "Private mode" toggle: do not write new runs to history until switched off.
+- [ ] **[L]** Warn when the origin is not HTTPS (cookie `secure` flag will not apply).
+- [ ] **[L]** Version the exported file format and reject files from the future with a clear message.
+
+## Accessibility and i18n
+- [ ] **[H]** Keyboard path to every tile action (menu button reachable by Tab, not hover-only).
+- [ ] **[M]** Skip link to the prompt box and to the feed.
+- [ ] **[M]** Roving tabindex across the tile grid so Tab does not walk 400 tiles.
+- [ ] **[M]** Announce queue position changes ("Queued, 2nd") politely, throttled.
+- [ ] **[M]** High-contrast check for status colors (failed, running, queued) without relying on hue alone; add icons.
+- [ ] **[L]** Provide text equivalents for the elapsed-time ring on running tiles.
+- [ ] **[L]** `lang` and `dir` attributes tied to a locale setting for future RTL.
+- [ ] **[L]** Pluralization helper for "1 run / 2 runs" instead of string concatenation.
+
+## Mobile and PWA
+- [ ] **[M]** Dock collapses to a single "+" sheet on narrow screens, keeping one app shell.
+- [ ] **[M]** Pull-to-refresh disabled inside the feed so scrolling does not reload the page.
+- [ ] **[L]** Share-sheet "Add to Studio" for images from the camera roll *(overlaps Web Share Target)*.
+- [ ] **[L]** Install prompt shown once after the third completed run.
+- [ ] **[L]** Reduce motion and autoplay by default on data-saver connections (`navigator.connection.saveData`).
+
+## Visual design polish
+- [ ] **[M]** Tile status as a small consistent chip system (running, queued, failed, starred) with one shared component.
+- [ ] **[M]** Smooth reflow when tiles are added at the top (FLIP-style, off under reduced motion).
+- [ ] **[M]** Better drop-zone overlay when files are dragged over the window, not just the dock.
+- [ ] **[L]** Subtle gradient glow behind running tiles keyed to the model vendor.
+- [ ] **[L]** Consistent icon set audit (one stroke width and size across the app).
+- [ ] **[L]** Typographic scale review: one set of sizes for labels, metadata and headings.
+- [ ] **[L]** Empty-state illustrations replaced with on-brand art (ties to the placeholders Issue).
+- [ ] **[L]** Page-load fade of the first row only, so there is no large layout flash.
+
+## Performance
+- [ ] **[M]** Measure and cap the number of `<video>` elements alive at once (virtualization already helps; add a hard ceiling and test it).
+- [ ] **[M]** Move SHA-256 hashing and EXIF stripping into a Web Worker for large files.
+- [ ] **[M]** Memoize tile props so a single run update re-renders one tile, not the row.
+- [ ] **[L]** `content-visibility: auto` on off-screen sections of the detail modal.
+- [ ] **[L]** Use `fetchpriority="high"` for the first row of images and `low` for the rest.
+- [ ] **[L]** Service-worker cache for static assets only (not signed URLs).
+
+## Code quality, testing and dev experience
+- [ ] **[H]** Unit-test `errors.ts` mapping with a table of real platform responses (content filter, credits, rate limit, unknown).
+- [ ] **[M]** Unit tests for history load/migrate (corrupt row skipped, order kept, cap respected).
+- [ ] **[M]** Component test for the gallery's rule "failed terminal runs stay visible" so it cannot regress.
+- [ ] **[M]** Test for idempotency-key reuse and rotation (ties to the double-charge fix).
+- [ ] **[M]** `pnpm check` script that runs typecheck, lint, test and knip in one command.
+- [ ] **[M]** Fake platform server (tiny Node script behind `HF_API_BASE_URL`) usable by tests and local dev without a key.
+- [ ] **[L]** Mock mode flag (`HF_MOCK=1`) that returns canned results, for screenshots and demos.
+- [ ] **[L]** Typed `env.ts` that validates `HF_API_BASE_URL` at boot with a readable error.
+- [ ] **[L]** Remove `console.*` from client code via an ESLint rule, routing through one logger.
+- [ ] **[L]** Add a `docs/architecture.md` with one diagram of submit -> poll -> history.
+
+## Product expansion
+- [ ] **[M]** Prompt marketplace-style "Recipes" page built from the user's own best (starred) runs.
+- [ ] **[M]** Shot list view for a project: ordered cards of prompt + result, printable.
+- [ ] **[M]** Reference-pack presets (a character's front, side, back images attach together).
+- [ ] **[M]** Scheduled batch at a quiet hour *(skip unless asked; needs the tab open)*.
+- [ ] **[L]** Project templates ("Product ad", "Social reel") that create a project with starter prompts.
+- [ ] **[L]** Public "gallery mode" fullscreen slideshow of a project for presenting.
+- [ ] **[L]** Plugin point for custom post-processing actions in the tile menu.
+- [ ] **[L]** Read-only "client review" export: a static HTML file with the project's media embedded.
 
 ---
 
