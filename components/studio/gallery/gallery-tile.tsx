@@ -25,6 +25,7 @@ import {
 import { cn } from "@/lib/utils"
 import { brandColor } from "@/lib/studio/model-brand"
 
+import { RUN_MIME } from "../sidebar"
 import { StatusChip } from "./status-chip"
 import type { TileRect } from "./justified-engine"
 import type { GalleryItem, LoadTier } from "./gallery-types"
@@ -507,6 +508,12 @@ function GalleryTileComponent({
     <div
       className={cn("studio-tile", justFinished && "studio-finish")}
       style={style}
+      draggable
+      onDragStart={(event) => {
+        // Drop it on a project in the sidebar to file it there.
+        event.dataTransfer.setData(RUN_MIME, item.runId)
+        event.dataTransfer.effectAllowed = "move"
+      }}
     >
       <GenerationTile
         className="size-full"

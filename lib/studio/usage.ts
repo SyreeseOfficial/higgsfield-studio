@@ -17,6 +17,33 @@ export interface Usage {
   byModel: ModelUsage[]
   /** Runs per day, oldest first, for the last `days` days. */
   perDay: { day: string; runs: number }[]
+  /** The last 14 days, each split by model. */
+  timeline: { day: string; total: number; models: TimelineModel[] }[]
+  /** The last 7 days in one place. */
+  weekly: {
+    runs: number
+    completed: number
+    failed: number
+    successRate: number | null
+    /** Why runs failed, most common first (top 5). */
+    byReason: { reason: string; count: number }[]
+  }
+}
+
+export interface TimelineModel {
+  modelId: string
+  label: string
+  runs: number
+}
+
+const TIMELINE_DAYS = 14
+const WEEK_DAYS = 7
+
+/** Local midnight `ago` calendar days before `today`; calendar maths, so a 23- or 25-hour day does not shift the buckets. */
+function dayStart(today: number, ago: number): number {
+  const d = new Date(today)
+  d.setDate(d.getDate() - ago)
+  return d.getTime()
 }
 
 function median(values: number[]): number | null {
@@ -46,15 +73,52 @@ export function usageStats(
     byModel.set(r.modelLabel, [...(byModel.get(r.modelLabel) ?? []), r])
 
   const today = new Date(now).setHours(0, 0, 0, 0)
+  const inDay = (ago: number) => {
+    const start = dayStart(today, ago)
+    const end = dayStart(today, ago - 1)
+    return {
+      start,
+      runs: records.filter((r) => r.createdAt >= start && r.createdAt < end),
+    }
+  }
   const perDay = Array.from({ length: days }, (_, i) => {
-    const start = today - (days - 1 - i) * 86_400_000
+    const { start, runs } = inDay(days - 1 - i)
     return {
       day: new Date(start).toLocaleDateString(undefined, { weekday: "short" }),
-      runs: records.filter(
-        (r) => r.createdAt >= start && r.createdAt < start + 86_400_000
-      ).length,
+      runs: runs.length,
     }
   })
+  const timeline = Array.from({ length: TIMELINE_DAYS }, (_, i) => {
+    const { start, runs } = inDay(TIMELINE_DAYS - 1 - i)
+    const models = new Map<string, TimelineModel>()
+    for (const r of runs) {
+      const m = models.get(r.modelId) ?? {
+        modelId: r.modelId,
+        label: r.modelLabel,
+        runs: 0,
+      }
+      m.runs++
+      models.set(r.modelId, m)
+    }
+    return {
+      day: new Date(start).toLocaleDateString(undefined, {
+        month: "numeric",
+        day: "numeric",
+      }),
+      total: runs.length,
+      models: [...models.values()].sort((a, b) => b.runs - a.runs),
+    }
+  })
+  const week = records.filter(
+    (r) => r.createdAt >= dayStart(today, WEEK_DAYS - 1)
+  )
+  const weekDone = week.filter((r) => r.status !== "running")
+  const reasons = new Map<string, number>()
+  for (const r of week)
+    if (r.status === "failed") {
+      const reason = r.error || "Unknown reason"
+      reasons.set(reason, (reasons.get(reason) ?? 0) + 1)
+    }
 
   return {
     total: records.length,
@@ -70,5 +134,18 @@ export function usageStats(
       }))
       .sort((a, b) => b.runs - a.runs),
     perDay,
+    timeline,
+    weekly: {
+      runs: week.length,
+      completed: finished(week),
+      failed: week.filter((r) => r.status === "failed").length,
+      successRate: weekDone.length
+        ? finished(weekDone) / weekDone.length
+        : null,
+      byReason: [...reasons]
+        .map(([reason, count]) => ({ reason, count }))
+        .sort((a, b) => b.count - a.count)
+        .slice(0, 5),
+    },
   }
 }

@@ -17,7 +17,7 @@ Source of truth for details: [FINDINGS.md](FINDINGS.md). Do one phase at a time.
 | 5 | Result viewer | 9 | ☑ |
 | 6 | Tiles & status look | 10 | ☑ |
 | 7 | Prompt box & references | 9 | ☑ (HEIC ⛔) |
-| 8 | Gallery, cost & usage | 8 | ☐ |
+| 8 | Gallery, cost & usage | 8 | ☑ (3 ⛔) |
 | 9 | First-run & visual polish | 7 | ☐ |
 | 10 | Speed: rendering | 7 | ☐ |
 | 11 | Speed: loading & bundle | 7 | ☐ |
@@ -106,14 +106,14 @@ Goal: one click = at most one paid job; one slow call never freezes the app.
 - [ ] ⛔ Auto-convert HEIC → see Blocked
 
 ## Phase 8 — Gallery, cost & usage
-- [ ] Count badge next to each project
-- [ ] Drag a tile onto a project
-- [ ] Credit balance in sidebar + pre-run warning (check first that the balance call is free)
-- [ ] Activity timeline per day and model
-- [ ] Session spend counter
-- [ ] Weekly summary
-- [ ] "Not charged" note on failed runs when known
-- [ ] "Recent errors" panel in Settings (last 20, reason, support ID, retry)
+- [x] Count badge next to each project
+- [x] Drag a tile onto a project
+- [ ] ⛔ Credit balance in sidebar + pre-run warning (check first that the balance call is free)
+- [x] Activity timeline per day and model
+- [ ] ⛔ Session spend counter
+- [x] Weekly summary
+- [ ] ⛔ "Not charged" note on failed runs when known
+- [x] "Recent errors" panel in Settings (last 20, reason, support ID, retry)
 
 ## Phase 9 — First-run & visual polish
 - [ ] Help text under each setting
@@ -205,6 +205,9 @@ Goal: one click = at most one paid job; one slow call never freezes the app.
 ## ⛔ Blocked on you
 Also listed in FINDINGS.md → *Waiting on your decision*. Start these only after you answer.
 - [ ] Check the API key when it's saved (need Higgsfield's response to a safe test request)
+- [ ] Show credit balance + pre-run warning (need the balance endpoint, free?)
+- [ ] Session spend counter (need credit prices per model)
+- [ ] "Not charged" note on failed runs (need to know which failures are refunded)
 - [ ] Auto-convert iPhone photos (HEIC): approve ~1 MB add-on, or keep current message
 - [ ] Replace placeholder media (brand direction; images from you or credits approval)
 - [ ] Store small thumbnails (needs confirmation Higgsfield's servers allow it)

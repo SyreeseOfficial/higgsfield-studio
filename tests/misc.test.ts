@@ -232,3 +232,42 @@ describe("crop math", () => {
     })
   })
 })
+
+describe("usage timeline and weekly summary", () => {
+  it("buckets by day and model and ranks failure reasons", async () => {
+    const { usageStats } = await import("@/lib/studio/usage")
+    const now = new Date(2026, 2, 8, 12).getTime() // a spring-forward day in many zones
+    const run = (
+      daysAgo: number,
+      status: "completed" | "failed",
+      error?: string
+    ) => ({
+      id: `${daysAgo}${status}${error}`,
+      requestId: "r",
+      surface: "image" as const,
+      modelId: "m1",
+      modelLabel: "M1",
+      prompt: "p",
+      settings: {},
+      aspect: 1,
+      status,
+      urls: [],
+      createdAt: now - daysAgo * 86_400_000 + 1000,
+      ...(error ? { error } : {}),
+    })
+    const u = usageStats(
+      [
+        run(0, "completed"),
+        run(1, "failed", "Rate limit"),
+        run(2, "failed", "Rate limit"),
+        run(20, "completed"),
+      ],
+      7,
+      now
+    )
+    expect(u.timeline.at(-1)?.total).toBe(1)
+    expect(u.timeline.reduce((n, d) => n + d.total, 0)).toBe(3) // the 20-day-old run is outside
+    expect(u.weekly).toMatchObject({ runs: 3, failed: 2 })
+    expect(u.weekly.byReason).toEqual([{ reason: "Rate limit", count: 2 }])
+  })
+})

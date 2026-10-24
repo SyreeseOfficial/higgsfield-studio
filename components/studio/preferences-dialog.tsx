@@ -17,6 +17,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog"
+import type { RunRecord } from "@/lib/studio/history"
 import { usePreferences } from "@/generation/stores/preferences"
 import { requestNotificationPermission } from "@/lib/studio/use-run-signals"
 import { cn } from "@/lib/utils"
@@ -91,7 +92,12 @@ export function PreferencesDialog({
   onOpenUsage,
   onOpenShortcuts,
   onOpenPrivacy,
+  errors,
+  onRetry,
 }: {
+  /** The latest failed runs, newest first. */
+  errors: RunRecord[]
+  onRetry: (runId: string) => void
   open: boolean
   onOpenChange: (open: boolean) => void
   keyConfigured: boolean
@@ -198,6 +204,46 @@ export function PreferencesDialog({
                 checked={prefs.mute}
                 onChange={(mute) => prefs.set({ mute })}
               />
+            </Section>
+            <Section title="Recent errors">
+              {errors.length === 0 ? (
+                <p className="py-2 text-xs text-muted-foreground">
+                  No failed runs.
+                </p>
+              ) : (
+                <ul className="flex max-h-56 flex-col divide-y divide-white/10 overflow-y-auto">
+                  {errors.map((run) => (
+                    <li
+                      key={run.id}
+                      className="flex items-start justify-between gap-3 py-2"
+                    >
+                      <div className="min-w-0 text-xs">
+                        <p className="font-medium">
+                          {run.modelLabel} ·{" "}
+                          <span className="font-normal text-muted-foreground">
+                            {new Date(run.createdAt).toLocaleString()}
+                          </span>
+                        </p>
+                        <p className="text-muted-foreground">
+                          {run.error ?? "Unknown reason"}
+                        </p>
+                        {run.requestId ? (
+                          <p className="font-mono text-[10px] text-muted-foreground select-all">
+                            Support ID: {run.requestId}
+                          </p>
+                        ) : null}
+                      </div>
+                      <Button
+                        variant="outline"
+                        size="xs"
+                        onClick={() => onRetry(run.id)}
+                      >
+                        <RotateCcw className="size-3" /> Retry
+                      </Button>
+                    </li>
+                  ))}
+                </ul>
+              )}
             </Section>
             <div className="flex justify-end border-t border-white/10 pt-3">
               <Button variant="ghost" size="sm" onClick={prefs.reset}>

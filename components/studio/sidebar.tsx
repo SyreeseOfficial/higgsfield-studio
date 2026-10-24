@@ -1,7 +1,7 @@
 /* eslint-disable @next/next/no-img-element */
 "use client"
 
-import type { ReactNode } from "react"
+import { useState, type ReactNode } from "react"
 import {
   CircleDollarSign,
   House,
@@ -46,7 +46,12 @@ export interface StudioSidebarProps {
   keyConfigured: boolean
   onOpenKey: () => void
   onOpenSettings: () => void
+  /** A tile was dragged onto a project: file that run under it. */
+  onDropRun?: (runId: string, projectId: string) => void
 }
+
+/** Drag payload of a gallery tile (its run id). */
+export const RUN_MIME = "application/x-studio-run"
 
 function Row({
   selected,
@@ -58,7 +63,13 @@ function Row({
   onClick,
   href,
   ariaLabel,
+  badge = false,
+  onDropRun,
 }: {
+  /** Show `meta` as a count pill that stays visible while the row's actions are shown. */
+  badge?: boolean
+  /** A gallery tile dropped on this row. */
+  onDropRun?: (runId: string) => void
   selected?: boolean
   collapsed: boolean
   start: ReactNode
@@ -69,14 +80,34 @@ function Row({
   href?: string
   ariaLabel?: string
 }) {
+  const [dropTarget, setDropTarget] = useState(false)
+  const dropProps = onDropRun
+    ? {
+        onDragOver: (event: React.DragEvent) => {
+          if (!event.dataTransfer.types.includes(RUN_MIME)) return
+          event.preventDefault()
+          setDropTarget(true)
+        },
+        onDragLeave: () => setDropTarget(false),
+        onDrop: (event: React.DragEvent) => {
+          setDropTarget(false)
+          const id = event.dataTransfer.getData(RUN_MIME)
+          if (!id) return
+          event.preventDefault()
+          onDropRun(id)
+        },
+      }
+    : {}
   const row = (
     <div
+      {...dropProps}
       className={cn(
         "group relative flex h-9 items-center gap-2.5 rounded-lg px-1.5 text-sm transition-colors",
         selected
           ? "bg-white/8 text-foreground"
           : "text-muted-foreground hover:bg-white/5 hover:text-foreground",
-        collapsed && "justify-center px-0"
+        collapsed && "justify-center px-0",
+        dropTarget && "bg-primary/20 text-foreground ring-2 ring-primary"
       )}
     >
       {href ? (
@@ -106,7 +137,9 @@ function Row({
             <span
               className={cn(
                 "pointer-events-none relative text-xs text-muted-foreground tabular-nums",
+                badge && "rounded-full bg-white/8 px-1.5 py-0.5",
                 action &&
+                  !badge &&
                   "group-focus-within:hidden group-hover:hidden group-has-[[data-popup-open]]:hidden"
               )}
             >
@@ -145,6 +178,7 @@ export function StudioSidebar({
   keyConfigured,
   onOpenKey,
   onOpenSettings,
+  onDropRun,
 }: StudioSidebarProps) {
   return (
     <aside
@@ -238,20 +272,29 @@ export function StudioSidebar({
               }
               ariaLabel={project.name}
               start={
-                <span className="flex size-6 items-center justify-center overflow-hidden rounded-md border border-white/10 bg-white/5 text-[11px] font-semibold text-muted-foreground">
+                <span className="relative flex size-6 items-center justify-center rounded-md border border-white/10 bg-white/5 text-[11px] font-semibold text-muted-foreground">
                   {project.cover ? (
                     <img
                       src={project.cover}
                       alt=""
-                      className="size-full object-cover"
+                      className="size-full rounded-[inherit] object-cover"
                     />
                   ) : (
                     project.name.slice(0, 1).toUpperCase()
                   )}
+                  {collapsed && project.generationCount > 0 ? (
+                    <span className="absolute -top-1.5 -right-1.5 min-w-4 rounded-full bg-primary px-1 text-center text-[9px] leading-4 font-semibold text-primary-foreground tabular-nums">
+                      {project.generationCount > 99
+                        ? "99+"
+                        : project.generationCount}
+                    </span>
+                  ) : null}
                 </span>
               }
               title={project.name}
               meta={project.generationCount.toLocaleString("en-US")}
+              badge
+              onDropRun={(runId) => onDropRun?.(runId, project.id)}
               action={
                 <ProjectActions
                   projectName={project.name}

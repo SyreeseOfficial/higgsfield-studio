@@ -51,6 +51,9 @@ I couldn't do these without an answer from you. Each says what I need.
 - [ ] **Auto-generate a model list in the README.** Needs a small developer tool (`tsx`). *Need:* approve it.
 - [ ] **Automatic accessibility/speed scoring (Lighthouse).** *Need:* which pages to check and what minimum scores should fail a build.
 - [ ] **Clean up how the prompt box passes data around.** This one is a vague review, not a clear task. *Need:* tell me what bothers you, or drop it.
+- [ ] **Show credit balance in the sidebar, with a warning before a run you can't afford.** I don't know which request returns the balance in the Higgsfield platform API (the one the API key calls), or whether it is free. *Need:* the endpoint (or a docs link) and confirmation it costs no credits.
+- [ ] **Session spend counter ("14 generations, ~320 credits today").** The model catalog has no credit prices. *Need:* a price per model/setting (or the endpoint that returns a quote), or accept a count of generations only.
+- [ ] **"Not charged" note on failed runs.** I don't know if Higgsfield refunds failed or filtered runs. *Need:* confirmation of which failure statuses are not charged.
 
 ---
 
@@ -75,7 +78,7 @@ Jobs getting stuck, charged twice, or failing for no reason.
 - [x] 🟡 **Pause the queue automatically** when Higgsfield says "slow down", with a visible countdown. ⏱ 15 min
 - [x] 🟡 **Keep the queue after a page reload** instead of dropping it.
 - [x] 🔴 **Show a notice after reload:** "Your runs were recovered."
-- [ ] 🟡 **"Recent errors" panel** in Settings: last 20 failures, with reason, support ID and a one-click retry. ⏱ 15 min
+- [x] 🟡 **"Recent errors" panel** in Settings: last 20 failures, with reason, support ID and a one-click retry. ⏱ 15 min
 
 ## 2. Saving, history & downloads
 
@@ -113,8 +116,8 @@ Keeping your work safe and getting it out of the app.
 
 ## 8. Gallery & finding things
 
-- [ ] 🟡 **Count badge** next to each project.
-- [ ] 🟡 **Drag a tile onto a project** to move it.
+- [x] 🟡 **Count badge** next to each project.
+- [x] 🟡 **Drag a tile onto a project** to move it.
 
 ## 9. Viewing results
 
@@ -146,10 +149,7 @@ Pictures, videos and audio you give the AI as input.
 
 ## 13. Cost & usage
 
-- [ ] 🔴 **Credit balance in the sidebar** (if Higgsfield provides it), with a warning before a run you can't afford.
-- [ ] 🟡 **Activity timeline** per day and model. ⏱ 15 min
-- [ ] 🟡 **Session spend counter** ("14 generations, ~320 credits today").
-- [ ] ⚪ **"Not charged" note** on failed runs when known.
+- [x] 🟡 **Activity timeline** per day and model. ⏱ 15 min
 
 ## 15. Look & feel
 
@@ -548,7 +548,7 @@ Not doing these. Moved here from the sections above; kept in case you change you
 - [ ] 🟡 **Per-model credit estimates** feeding a weekly summary. ⏱ 15 min
 - [ ] 🟡 **Confirm expensive combos** (long 4K, batches over 2).
 - [ ] 🟡 **Per-project budget cap.**
-- [ ] 🟡 **Weekly summary** (runs, success rate, failures by reason).
+- [x] 🟡 **Weekly summary** (runs, success rate, failures by reason).
 - [ ] 🟡 **Failure reasons breakdown** with counts.
 - [ ] 🟡 **Busiest hour/day heatmap.**
 - [ ] ⚪ **Mark runs free vs paid.**

@@ -833,6 +833,10 @@ export function StudioTemplate({
         keyConfigured={key.configured}
         onOpenKey={() => key.setOpen(true)}
         onOpenSettings={() => setSettingsOpen(true)}
+        onDropRun={(runId, projectId) => {
+          runs.move([runId], projectId)
+          projectsStore.touch(projectId)
+        }}
       />
       <main className="relative flex min-w-0 flex-1 flex-col">
         {view.kind === "home" ? (
@@ -912,6 +916,13 @@ export function StudioTemplate({
           onOpenUsage={() => setUsageOpen(true)}
           onOpenShortcuts={() => setShortcutsOpen(true)}
           onOpenPrivacy={() => setPrivacyOpen(true)}
+          errors={runs.records
+            .filter((r) => r.status === "failed")
+            .slice(0, 20)}
+          onRetry={(id) => {
+            setSettingsOpen(false)
+            void runs.variation(id)
+          }}
         />
       ) : null}
       {privacyOpen ? (
