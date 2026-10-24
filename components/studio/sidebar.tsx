@@ -3,6 +3,7 @@
 
 import type { ReactNode } from "react"
 import {
+  CircleDollarSign,
   House,
   Images,
   KeyRound,
@@ -10,6 +11,7 @@ import {
   PanelLeftClose,
   PanelLeftOpen,
   Plus,
+  Wallet,
 } from "lucide-react"
 
 import {
@@ -54,6 +56,7 @@ function Row({
   meta,
   action,
   onClick,
+  href,
   ariaLabel,
 }: {
   selected?: boolean
@@ -63,6 +66,7 @@ function Row({
   meta?: ReactNode
   action?: ReactNode
   onClick?: () => void
+  href?: string
   ariaLabel?: string
 }) {
   const row = (
@@ -75,13 +79,23 @@ function Row({
         collapsed && "justify-center px-0"
       )}
     >
-      <button
-        type="button"
-        aria-label={ariaLabel}
-        aria-current={selected ? "page" : undefined}
-        className="absolute inset-0 z-[1] rounded-lg focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none"
-        onClick={onClick}
-      />
+      {href ? (
+        <a
+          href={href}
+          target="_blank"
+          rel="noreferrer"
+          aria-label={ariaLabel}
+          className="absolute inset-0 z-[1] rounded-lg focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none"
+        />
+      ) : (
+        <button
+          type="button"
+          aria-label={ariaLabel}
+          aria-current={selected ? "page" : undefined}
+          className="absolute inset-0 z-[1] rounded-lg focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none"
+          onClick={onClick}
+        />
+      )}
       <span className="pointer-events-none relative shrink-0">{start}</span>
       {!collapsed ? (
         <>
@@ -256,6 +270,28 @@ export function StudioSidebar({
       </nav>
 
       <div className="flex flex-col gap-0.5 pt-2">
+        <Row
+          collapsed={collapsed}
+          href="https://open.higgsfield.ai/pricing"
+          ariaLabel="API pricing (opens in a new tab)"
+          start={
+            <span className="flex size-6 items-center justify-center rounded-md border border-white/10 bg-white/5 text-muted-foreground">
+              <CircleDollarSign className="size-3.5" />
+            </span>
+          }
+          title="API pricing"
+        />
+        <Row
+          collapsed={collapsed}
+          href="https://open.higgsfield.ai/billing"
+          ariaLabel="Billing and balance (opens in a new tab)"
+          start={
+            <span className="flex size-6 items-center justify-center rounded-md border border-white/10 bg-white/5 text-muted-foreground">
+              <Wallet className="size-3.5" />
+            </span>
+          }
+          title="Billing & balance"
+        />
         <Row
           collapsed={collapsed}
           onClick={onOpenSettings}
