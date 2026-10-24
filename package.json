@@ -15,7 +15,7 @@
   },
   "dependencies": {
     "@base-ui/react": "^1.9.0",
-    "@tanstack/react-virtual": "^3.14.17",
+    "@tanstack/react-virtual": "^3.14.21",
     "class-variance-authority": "^0.7.1",
     "cn": "^0.4.0",
     "lucide-react": "^1.55.0",
