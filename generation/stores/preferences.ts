@@ -10,6 +10,8 @@ type PreferencesState = {
   tabTitle: boolean
   /** Play feed videos (muted) on hover. */
   hoverPlay: boolean
+  /** Open videos in the viewer with sound off. Feed previews are always silent. */
+  mute: boolean
   /** Short chime when any run finishes. */
   chime: boolean
   /** Leave Home for the feed after pressing Generate. */
@@ -24,6 +26,7 @@ const DEFAULTS: PreferencesValues = {
   notify: true,
   tabTitle: true,
   hoverPlay: true,
+  mute: true,
   chime: false,
   jumpToFeed: true,
 }
@@ -39,10 +42,18 @@ export const usePreferences = create<PreferencesState>()(
       name: "hf.preferences.v1",
       storage: browserStorage(),
       ...persistVersion,
-      partialize: ({ notify, tabTitle, hoverPlay, chime, jumpToFeed }) => ({
+      partialize: ({
         notify,
         tabTitle,
         hoverPlay,
+        mute,
+        chime,
+        jumpToFeed,
+      }) => ({
+        notify,
+        tabTitle,
+        hoverPlay,
+        mute,
         chime,
         jumpToFeed,
       }),

@@ -1,6 +1,8 @@
 import type { GalleryItem } from "@/components/studio/gallery/gallery-types"
 import type { AssetLibraryItem } from "@/lib/studio/uploads"
 
+import { getModel } from "@/generation/catalog"
+
 import type { RunRecord } from "./history"
 
 /** Day bucket for the feed's date headings. */
@@ -23,9 +25,36 @@ function dayGroup(createdAt: number) {
   }
 }
 
+const SOUND_KEYS = ["sound", "generateAudio", "keepOriginalSound"]
+
+/** Model icon plus, for video, duration / resolution / sound read from the settings the run used. */
+function tileFacts(run: RunRecord) {
+  let icon: string | undefined
+  try {
+    icon = getModel(run.modelId).icon
+  } catch {
+    /* model no longer installed */
+  }
+  const { duration, resolution } = run.settings
+  return {
+    ...(icon ? { modelIcon: icon } : {}),
+    ...(run.surface === "video"
+      ? {
+          ...(typeof duration === "number" ? { durationSec: duration } : {}),
+          ...(typeof resolution === "string" ? { resolution } : {}),
+          ...(SOUND_KEYS.some((key) => run.settings[key] === true)
+            ? { hasSound: true }
+            : {}),
+        }
+      : {}),
+  }
+}
+
 /** One feed tile per result URL; a running or failed run is a single placeholder tile. */
 export function runToGalleryItems(run: RunRecord): GalleryItem[] {
+  const facts = tileFacts(run)
   const base = {
+    ...facts,
     runId: run.id,
     ...(run.projectId ? { projectId: run.projectId } : {}),
     createdAt: run.createdAt,

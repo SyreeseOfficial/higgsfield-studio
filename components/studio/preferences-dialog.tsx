@@ -192,6 +192,12 @@ export function PreferencesDialog({
                 checked={prefs.hoverPlay}
                 onChange={(hoverPlay) => prefs.set({ hoverPlay })}
               />
+              <Toggle
+                label="Mute videos"
+                description="Open videos with the sound off. The mute button in the viewer changes this too."
+                checked={prefs.mute}
+                onChange={(mute) => prefs.set({ mute })}
+              />
             </Section>
             <div className="flex justify-end border-t border-white/10 pt-3">
               <Button variant="ghost" size="sm" onClick={prefs.reset}>

@@ -7,10 +7,12 @@ import {
   Copy,
   Download,
   FolderInput,
+  RotateCcw,
   Share2,
   Shuffle,
   Star,
   Trash2,
+  Volume2,
 } from "lucide-react"
 
 import {
@@ -18,6 +20,10 @@ import {
   type CardAction,
 } from "@/components/studio/generation-card"
 
+import { cn } from "@/lib/utils"
+import { brandColor } from "@/lib/studio/model-brand"
+
+import { StatusChip } from "./status-chip"
 import type { TileRect } from "./justified-engine"
 import type { GalleryItem, LoadTier } from "./gallery-types"
 
@@ -40,7 +46,12 @@ export interface GalleryTileProps {
   onStar?: (item: GalleryItem) => void
   /** Open the result viewer (also for a run still generating, which updates live). */
   onOpen?: (item: GalleryItem) => void
+  /** The loaded media's real aspect ratio, when it differs from the one the run asked for. */
+  onMeasured?: (item: GalleryItem, aspect: number) => void
 }
+
+const TILE_BUTTON =
+  "inline-flex items-center gap-1.5 rounded-full bg-black/45 px-3 py-1.5 text-xs font-medium text-white backdrop-blur-md hover:bg-black/65 focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none"
 
 function rectStyle(rect: TileRect, top: number): CSSProperties {
   return { left: rect.x, top, width: rect.width, height: rect.height }
@@ -85,11 +96,70 @@ function OpenButton({
   )
 }
 
+/** Reports the media's true shape once, so the layout settles after the first load. */
+function reportShape(
+  item: GalleryItem,
+  width: number,
+  height: number,
+  onMeasured?: (item: GalleryItem, aspect: number) => void
+) {
+  if (!onMeasured || !width || !height) return
+  const aspect = width / height
+  if (Math.abs(aspect / (item.width / item.height) - 1) > 0.02)
+    onMeasured(item, aspect)
+}
+
+/** Company badge, plus duration / resolution / sound for video. */
+function TileBadges({ item }: { item: GalleryItem }) {
+  const facts = [
+    item.durationSec ? `${item.durationSec}s` : null,
+    item.resolution ?? null,
+  ].filter(Boolean)
+  return (
+    <div className="pointer-events-none absolute bottom-2 left-2 z-[2] flex max-w-[calc(100%-1rem)] items-center gap-1">
+      {item.modelIcon ? (
+        <StatusChip
+          tone="info"
+          className="size-6 justify-center p-0"
+          title={item.modelLabel}
+        >
+          <img
+            src={`/model-icons/${item.modelIcon}.svg`}
+            alt=""
+            className="size-3.5"
+          />
+        </StatusChip>
+      ) : null}
+      {facts.length > 0 ? (
+        <StatusChip tone="info">{facts.join(" · ")}</StatusChip>
+      ) : null}
+      {item.hasSound ? (
+        <StatusChip
+          tone="info"
+          icon={Volume2}
+          className="size-6 justify-center p-0"
+          role="img"
+          aria-label="Has sound"
+          title="Has sound"
+        />
+      ) : null}
+    </div>
+  )
+}
+
 function Placeholder() {
   return <span className="absolute inset-0 bg-card" aria-hidden="true" />
 }
 
-function StillMedia({ item, tier }: { item: GalleryItem; tier: LoadTier }) {
+function StillMedia({
+  item,
+  tier,
+  onMeasured,
+}: {
+  item: GalleryItem
+  tier: LoadTier
+  onMeasured?: (item: GalleryItem, aspect: number) => void
+}) {
   return (
     <>
       <Placeholder />
@@ -99,6 +169,14 @@ function StillMedia({ item, tier }: { item: GalleryItem; tier: LoadTier }) {
         alt={item.alt}
         loading={tier === "full" ? "eager" : "lazy"}
         decoding="async"
+        onLoad={(event) =>
+          reportShape(
+            item,
+            event.currentTarget.naturalWidth,
+            event.currentTarget.naturalHeight,
+            onMeasured
+          )
+        }
       />
     </>
   )
@@ -113,11 +191,13 @@ function HoverVideo({
   tier,
   playing,
   reducedMotion,
+  onMeasured,
 }: {
   item: GalleryItem
   tier: LoadTier
   playing: boolean
   reducedMotion: boolean
+  onMeasured?: (item: GalleryItem, aspect: number) => void
 }) {
   const ref = useRef<HTMLVideoElement | null>(null)
   const [loaded, setLoaded] = useState(false)
@@ -128,6 +208,9 @@ function HoverVideo({
   const hasPoster = item.src.length > 0
   // Without a poster the first frame is the still, so keep the video visible.
   const showVideo = !hasPoster || (active && loaded)
+  // With a poster the tile is just an image until hovered; no player is created
+  // (or downloaded) for the hundreds of videos that are never pointed at.
+  const mountVideo = hasPoster ? active : armed
 
   useEffect(() => {
     const v = ref.current
@@ -142,7 +225,7 @@ function HoverVideo({
         v.currentTime = 0
       } catch {}
     }
-  }, [active])
+  }, [active, mountVideo])
 
   return (
     <>
@@ -155,20 +238,38 @@ function HoverVideo({
           loading={tier === "full" ? "eager" : "lazy"}
           decoding="async"
           style={{ opacity: showVideo ? 0 : 1 }}
+          onLoad={(event) =>
+            reportShape(
+              item,
+              event.currentTarget.naturalWidth,
+              event.currentTarget.naturalHeight,
+              onMeasured
+            )
+          }
         />
       ) : null}
-      <video
-        ref={ref}
-        className="absolute inset-0 size-full object-cover"
-        muted
-        loop
-        playsInline
-        src={armed ? item.videoSrc : undefined}
-        preload={hasPoster ? "none" : "metadata"}
-        poster={hasPoster ? item.src : undefined}
-        onLoadedData={() => setLoaded(true)}
-        style={{ opacity: showVideo ? 1 : 0 }}
-      />
+      {mountVideo ? (
+        <video
+          ref={ref}
+          className="absolute inset-0 size-full object-cover"
+          muted
+          loop
+          playsInline
+          src={item.videoSrc}
+          preload={hasPoster ? "auto" : "metadata"}
+          poster={hasPoster ? item.src : undefined}
+          onLoadedData={() => setLoaded(true)}
+          onLoadedMetadata={(event) =>
+            reportShape(
+              item,
+              event.currentTarget.videoWidth,
+              event.currentTarget.videoHeight,
+              onMeasured
+            )
+          }
+          style={{ opacity: showVideo ? 1 : 0 }}
+        />
+      ) : null}
     </>
   )
 }
@@ -186,15 +287,31 @@ function GalleryTileComponent({
   onVariation,
   onStar,
   onOpen,
+  onMeasured,
 }: GalleryTileProps) {
   const [hovered, setHovered] = useState(false)
   const style = rectStyle(rect, top)
+  const glow = brandColor(item.modelIcon)
+  // A short fade-in the moment a running tile turns into its result.
+  const [seen, setSeen] = useState(item.status)
+  const [justFinished, setJustFinished] = useState(false)
+  if (seen !== item.status) {
+    setSeen(item.status)
+    if (seen === "generating" && item.status === "ready") setJustFinished(true)
+  }
+  useEffect(() => {
+    if (!justFinished) return
+    const timer = setTimeout(() => setJustFinished(false), 700)
+    return () => clearTimeout(timer)
+  }, [justFinished])
 
   if (item.status === "generating") {
     return (
       <div className="studio-tile group" style={style}>
         <GenerationTile
           state="generating"
+          generatingKind={item.queued ? "queue" : item.stalled ? "warn" : "run"}
+          {...(glow ? { glow } : {})}
           generatingLabel={
             item.queued ? (
               `Queued · ${item.queued}`
@@ -218,7 +335,7 @@ function GalleryTileComponent({
           {item.stalled && onRecheck ? (
             <button
               type="button"
-              className="rounded-full bg-black/40 px-3 py-1.5 text-xs font-medium text-white backdrop-blur-md hover:bg-black/60"
+              className={TILE_BUTTON}
               onClick={() => onRecheck(item)}
             >
               Check again
@@ -227,7 +344,7 @@ function GalleryTileComponent({
           {onCancel && !item.canceling ? (
             <button
               type="button"
-              className="rounded-full bg-black/40 px-3 py-1.5 text-xs font-medium text-white backdrop-blur-md hover:bg-black/60"
+              className={TILE_BUTTON}
               onClick={() => onCancel(item)}
             >
               Cancel
@@ -254,16 +371,26 @@ function GalleryTileComponent({
           }
           className="size-full"
         />
-        {onDelete ? (
-          <button
-            type="button"
-            aria-label="Remove"
-            className="absolute top-2 right-2 z-[2] flex size-8 items-center justify-center rounded-full bg-black/40 text-white opacity-0 backdrop-blur-md transition-opacity group-hover:opacity-100 hover:bg-black/60"
-            onClick={() => onDelete(item)}
-          >
-            <Trash2 className="size-4" />
-          </button>
-        ) : null}
+        <div className="absolute inset-x-2 bottom-2 z-[2] flex justify-center gap-2">
+          {onVariation ? (
+            <button
+              type="button"
+              className={TILE_BUTTON}
+              onClick={() => onVariation(item)}
+            >
+              <RotateCcw className="size-3.5" /> Retry
+            </button>
+          ) : null}
+          {onDelete ? (
+            <button
+              type="button"
+              className={TILE_BUTTON}
+              onClick={() => onDelete(item)}
+            >
+              <Trash2 className="size-3.5" /> Delete
+            </button>
+          ) : null}
+        </div>
       </div>
     )
   }
@@ -275,9 +402,14 @@ function GalleryTileComponent({
       tier={tier}
       playing={hovered}
       reducedMotion={reducedMotion}
+      {...(onMeasured ? { onMeasured } : {})}
     />
   ) : (
-    <StillMedia item={item} tier={tier} />
+    <StillMedia
+      item={item}
+      tier={tier}
+      {...(onMeasured ? { onMeasured } : {})}
+    />
   )
 
   const actions: CardAction[] = [
@@ -346,7 +478,10 @@ function GalleryTileComponent({
   ]
 
   return (
-    <div className="studio-tile" style={style}>
+    <div
+      className={cn("studio-tile", justFinished && "studio-finish")}
+      style={style}
+    >
       <GenerationTile
         className="size-full"
         media={media}
@@ -358,10 +493,14 @@ function GalleryTileComponent({
         onBlur={isVideo ? () => setHovered(false) : undefined}
       />
       {onOpen ? <OpenButton item={item} onOpen={onOpen} /> : null}
+      <TileBadges item={item} />
       {item.starred ? (
-        <Star
+        <StatusChip
+          tone="star"
+          icon={Star}
+          role="img"
           aria-label="Starred"
-          className="pointer-events-none absolute top-2 left-2 z-[2] size-4 fill-yellow-300 text-yellow-300 drop-shadow"
+          className="pointer-events-none absolute top-2 left-2 z-[2] size-6 justify-center p-0 [&_svg]:fill-current"
         />
       ) : null}
     </div>

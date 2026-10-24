@@ -519,6 +519,17 @@ export function useRuns({ onAuthError }: { onAuthError?: () => void } = {}) {
     )
   }, [])
 
+  /** Corrects a run's layout shape to its loaded media (e.g. image-to-video keeps the source's ratio). */
+  const setAspect = useCallback((id: string, aspect: number) => {
+    setRecords((current) =>
+      current.map((r) =>
+        r.id === id && Math.abs(r.aspect / aspect - 1) > 0.02
+          ? { ...r, aspect }
+          : r
+      )
+    )
+  }, [])
+
   const toggleStar = useCallback((id: string) => {
     setRecords((current) =>
       current.map((r) => (r.id === id ? { ...r, starred: !r.starred } : r))
@@ -563,6 +574,7 @@ export function useRuns({ onAuthError }: { onAuthError?: () => void } = {}) {
     restore,
     move,
     toggleStar,
+    setAspect,
     setError,
   }
 }

@@ -42,6 +42,8 @@ export interface JustifiedGalleryProps {
   onDeleteMany?: (items: GalleryItem[]) => void
   onVariation?: (item: GalleryItem) => void
   onStar?: (item: GalleryItem) => void
+  /** A tile's loaded media is a different shape than the run asked for. */
+  onMeasured?: (item: GalleryItem, aspect: number) => void
   /** Filter and sort controls, shown beside the title. */
   toolbar?: ReactNode
 }
@@ -61,6 +63,7 @@ export function JustifiedGallery({
   onDeleteMany,
   onVariation,
   onStar,
+  onMeasured,
   toolbar,
 }: JustifiedGalleryProps) {
   const [viewing, setViewing] = useState<{
@@ -241,6 +244,7 @@ export function JustifiedGallery({
                     onRecheck={onRecheck}
                     onVariation={onVariation}
                     onStar={onStar}
+                    onMeasured={onMeasured}
                     onOpen={(i) => setViewing({ itemId: i.id, runId: i.runId })}
                     {...(onMove
                       ? { onMove: (i: GalleryItem) => onMove([i]) }

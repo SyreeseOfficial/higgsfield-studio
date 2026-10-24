@@ -26,6 +26,7 @@ export interface UserGenerationsProps {
   onDeleteMany?: (items: GalleryItem[]) => void
   onVariation?: (item: GalleryItem) => void
   onStar?: (item: GalleryItem) => void
+  onMeasured?: (item: GalleryItem, aspect: number) => void
   toolbar?: ReactNode
   grouped?: boolean
 }

@@ -95,7 +95,7 @@ Keeping your work safe and getting it out of the app.
 ## 3. Small bugs & glitches
 
 - [x] 🟡 **Error messages guess wrong.** A prompt containing "credit card" gets treated as "not enough credits". Check the real error code first. ⏱ 5 min
-- [ ] 🟡 **Video tiles are heavy.** Each one loads a full video player. Show a still frame until hover. ⏱ 15 min
+- [x] 🟡 **Video tiles are heavy.** Each one loads a full video player. Show a still frame until hover. ⏱ 15 min
 
 ## 4. Security & privacy
 
@@ -124,8 +124,8 @@ Keeping your work safe and getting it out of the app.
 - [x] 🟡 **Reference vs result side by side** in the detail window.
 - [x] 🟡 **Fullscreen button** and `F` shortcut.
 - [x] 🟡 **Zoom and pan** with a minimap.
-- [ ] 🟡 **Sound badge** on videos; mute globally.
-- [ ] 🟡 **Duration/resolution badge** on video tiles.
+- [x] 🟡 **Sound badge** on videos; mute globally.
+- [x] 🟡 **Duration/resolution badge** on video tiles.
 - [x] ⚪ **Support ID with a copy button** in the detail window.
 
 ## 11. Reference files
@@ -153,15 +153,15 @@ Pictures, videos and audio you give the AI as input.
 
 ## 15. Look & feel
 
-- [ ] 🟡 **Skeleton tiles in the right shape** so the layout doesn't jump.
-- [ ] 🟡 **Gentle completion animation** (off for reduced motion).
-- [ ] 🟡 **Consistent status chips** (running, queued, failed, starred).
-- [ ] 🟡 **Smooth reflow** when tiles are added.
+- [x] 🟡 **Skeleton tiles in the right shape** so the layout doesn't jump.
+- [x] 🟡 **Gentle completion animation** (off for reduced motion).
+- [x] 🟡 **Consistent status chips** (running, queued, failed, starred).
+- [x] 🟡 **Smooth reflow** when tiles are added.
 - [ ] 🟡 **Better drop zone** when dragging files over the window.
-- [ ] ⚪ **Clearer failed tiles** with reason and Retry/Delete.
-- [ ] ⚪ **Consistent model badges** per company.
+- [x] ⚪ **Clearer failed tiles** with reason and Retry/Delete.
+- [x] ⚪ **Consistent model badges** per company.
 - [ ] ⚪ **Toast stack with Undo,** max 3 visible.
-- [ ] ⚪ **Glow behind running tiles** by company color.
+- [x] ⚪ **Glow behind running tiles** by company color.
 - [ ] ⚪ **One icon style** across the app.
 - [ ] ⚪ **One set of text sizes.**
 - [ ] ⚪ **Fade in the first row only** on load.

@@ -8,7 +8,14 @@ import type {
   MouseEventHandler,
   ReactNode,
 } from "react"
-import { EllipsisVertical, Loader2, type LucideIcon } from "lucide-react"
+import {
+  AlertTriangle,
+  Clock,
+  EllipsisVertical,
+  Hourglass,
+  Loader2,
+  type LucideIcon,
+} from "lucide-react"
 
 import {
   DropdownMenu,
@@ -16,6 +23,7 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
+import { StatusChip } from "./gallery/status-chip"
 import { downloadMedia } from "@/lib/studio/download-media"
 import { cn } from "@/lib/utils"
 
@@ -45,6 +53,10 @@ export interface GenerationCardProps {
   media?: ReactNode
   title?: ReactNode
   generatingLabel?: ReactNode
+  /** Which kind of wait the chip shows: running, queued locally, or slower than usual. */
+  generatingKind?: "run" | "queue" | "warn"
+  /** Accent colour of the glow behind a running tile (the model company's). */
+  glow?: string
   failureLabel?: ReactNode
   children?: ReactNode
   className?: string
@@ -60,6 +72,8 @@ export function GenerationCard({
   media,
   title,
   generatingLabel = "Generating",
+  generatingKind = "run",
+  glow,
   failureLabel = "The generation did not produce previewable media.",
   className,
   children,
@@ -97,27 +111,40 @@ export function GenerationCard({
         <span className="pointer-events-none absolute inset-0 overflow-hidden rounded-[inherit]">
           <span
             className="studio-glow absolute inset-x-0 top-0 h-[45%]"
+            style={glow ? ({ "--glow": glow } as CSSProperties) : undefined}
             aria-hidden="true"
           />
-          <span
-            className="absolute top-2 left-2 inline-flex items-center gap-2 rounded-full bg-white/8 py-1.5 pr-4 pl-2.5 backdrop-blur-md"
+          <StatusChip
+            tone={
+              generatingKind === "queue"
+                ? "queue"
+                : generatingKind === "warn"
+                  ? "warn"
+                  : "run"
+            }
+            icon={
+              generatingKind === "queue"
+                ? Clock
+                : generatingKind === "warn"
+                  ? Hourglass
+                  : Loader2
+            }
+            spin={generatingKind === "run"}
             role="status"
+            className="absolute top-2 left-2"
           >
-            <Loader2 className="size-3.5 animate-spin text-primary" />
-            <span className="text-sm font-medium text-primary">
-              {generatingLabel}
-            </span>
-          </span>
+            {generatingLabel}
+          </StatusChip>
         </span>
       ) : null}
       {state === "failed" ? (
         <span
-          className="absolute inset-0 flex flex-col items-center justify-center gap-1 bg-white/5 p-4 text-center"
+          className="absolute inset-0 flex flex-col items-center justify-center gap-2 bg-red-500/5 p-4 pb-14 text-center"
           role="status"
         >
-          <span className="text-sm font-semibold text-foreground">
-            Generation unavailable
-          </span>
+          <StatusChip tone="fail" icon={AlertTriangle}>
+            Couldn&apos;t generate
+          </StatusChip>
           <span className="text-xs text-muted-foreground">{failureLabel}</span>
         </span>
       ) : null}
@@ -206,6 +233,8 @@ export interface GenerationTileProps {
   media?: ReactNode
   title?: ReactNode
   generatingLabel?: ReactNode
+  generatingKind?: "run" | "queue" | "warn"
+  glow?: string
   failureLabel?: ReactNode
   actions?: CardAction[]
   children?: ReactNode
@@ -227,6 +256,8 @@ export function GenerationTile({
   media,
   title,
   generatingLabel = "Generating",
+  generatingKind,
+  glow,
   failureLabel,
   actions,
   children,
@@ -244,6 +275,8 @@ export function GenerationTile({
       <GenerationCard
         state={state}
         generatingLabel={generatingLabel}
+        {...(generatingKind ? { generatingKind } : {})}
+        {...(glow ? { glow } : {})}
         failureLabel={failureLabel}
         className={className}
         style={style}

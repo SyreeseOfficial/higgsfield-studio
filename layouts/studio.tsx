@@ -22,11 +22,7 @@ import { UserGenerations } from "@/components/studio/user-generations"
 import type { GalleryItem } from "@/components/studio/gallery/gallery-types"
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { MODELS, getModel, parseSettings } from "@/generation/catalog"
-import type {
-  GenerationPlane,
-  MediaRole,
-  Surface,
-} from "@/generation/catalog"
+import type { GenerationPlane, MediaRole, Surface } from "@/generation/catalog"
 import {
   changeImageRole,
   groupMedia,
@@ -262,6 +258,7 @@ function FeedState({
   onDeleteMany,
   onVariation,
   onStar,
+  onMeasured,
   loading,
 }: {
   loading: boolean
@@ -276,6 +273,7 @@ function FeedState({
   onDeleteMany: (items: GalleryItem[]) => void
   onVariation: (item: GalleryItem) => void
   onStar: (item: GalleryItem) => void
+  onMeasured: (item: GalleryItem, aspect: number) => void
 }) {
   const [feedView, setFeedView] = useState<FeedView>(DEFAULT_FEED_VIEW)
   const shownItems = useMemo(
@@ -353,6 +351,7 @@ function FeedState({
               onMove={onMove}
               onDeleteMany={onDeleteMany}
               onVariation={onVariation}
+              onMeasured={onMeasured}
               emptyState={{
                 images,
                 title: filtered
@@ -804,6 +803,7 @@ export function StudioTemplate({
             onDeleteMany={deleteRuns}
             onVariation={(item) => runs.variation(item.runId)}
             onStar={(item) => runs.toggleStar(item.runId)}
+            onMeasured={(item, aspect) => runs.setAspect(item.runId, aspect)}
             onMove={(items) => setMoving(items)}
             onCancel={(item) => void runs.cancel(item.runId)}
             onRecheck={(item) => runs.recheck(item.runId)}

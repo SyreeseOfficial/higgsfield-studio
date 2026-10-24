@@ -70,10 +70,11 @@
 /* Studio primitives that plain utilities cannot express. */
 @layer components {
   .studio-glow {
+    /* --glow is the model company's colour; lime when unknown. */
     background-image: radial-gradient(
       120% 100% at 50% 0%,
-      var(--hf-color-transparent-lime-40) 0%,
-      var(--hf-color-transparent-lime-15) 45%,
+      color-mix(in oklab, var(--glow, #c8f031) 40%, transparent) 0%,
+      color-mix(in oklab, var(--glow, #c8f031) 15%, transparent) 45%,
       transparent 82%
     );
     animation: studio-pulse 2600ms ease-in-out infinite;
@@ -84,7 +85,21 @@
     border-radius: var(--radius);
     background-color: var(--card);
     content-visibility: auto;
+    /* Tiles glide to their new place when the layout reflows. */
+    transition:
+      left 220ms ease,
+      top 220ms ease,
+      width 220ms ease,
+      height 220ms ease;
   }
+  .studio-finish {
+    animation: studio-finish 600ms ease-out;
+  }
+}
+
+@keyframes studio-finish {
+  from { opacity: 0.5; transform: scale(0.97); }
+  to { opacity: 1; transform: scale(1); }
 }
 
 @keyframes studio-pulse {
@@ -94,6 +109,8 @@
 
 @media (prefers-reduced-motion: reduce) {
   .studio-glow { animation: none; opacity: 0.7; }
+  .studio-tile { transition: none; }
+  .studio-finish { animation: none; }
 }
 
 :root {

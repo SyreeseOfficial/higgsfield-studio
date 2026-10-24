@@ -12,6 +12,7 @@ import {
 } from "lucide-react"
 
 import { Button } from "@/components/ui/button"
+import { usePreferences } from "@/generation/stores/preferences"
 import { cn } from "@/lib/utils"
 
 const RATES = [0.5, 1, 1.5, 2]
@@ -43,7 +44,12 @@ export function ViewerVideo({
   const [playing, setPlaying] = useState(true)
   const [rate, setRate] = useState(1)
   const [loop, setLoop] = useState(true)
-  const [muted, setMuted] = useState(false)
+  // Sound is a global preference, so muting here sticks for every video.
+  const muted = usePreferences((s) => s.mute)
+  const setMuted = (next: boolean | ((m: boolean) => boolean)) =>
+    usePreferences
+      .getState()
+      .set({ mute: typeof next === "function" ? next(muted) : next })
 
   // The time readout follows every frame, not the browser's ~4 Hz timeupdate.
   useEffect(() => {

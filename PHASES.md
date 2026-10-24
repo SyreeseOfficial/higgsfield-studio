@@ -15,7 +15,7 @@ Source of truth for details: [FINDINGS.md](FINDINGS.md). Do one phase at a time.
 | 3 | History & data safety | 9 | ☑ |
 | 4 | Security & downloads | 5 | ☑ |
 | 5 | Result viewer | 9 | ☑ |
-| 6 | Tiles & status look | 10 | ☐ |
+| 6 | Tiles & status look | 10 | ☑ |
 | 7 | Prompt box & references | 9 | ☐ |
 | 8 | Gallery, cost & usage | 8 | ☐ |
 | 9 | First-run & visual polish | 7 | ☐ |
@@ -83,16 +83,16 @@ Goal: one click = at most one paid job; one slow call never freezes the app.
 - [x] Copy image to clipboard
 
 ## Phase 6 — Tiles & status look
-- [ ] Video tiles: still frame until hover (no full player each)
-- [ ] Sound badge; global mute
-- [ ] Duration/resolution badge on video tiles
-- [ ] Skeleton tiles in the right shape
-- [ ] Consistent status chips
-- [ ] Clearer failed tiles (reason, Retry/Delete)
-- [ ] Smooth reflow when tiles are added
-- [ ] Gentle completion animation (respects reduced motion)
-- [ ] Consistent model badges per company
-- [ ] Glow behind running tiles
+- [x] Video tiles: still frame until hover (no full player each)
+- [x] Sound badge; global mute
+- [x] Duration/resolution badge on video tiles
+- [x] Skeleton tiles in the right shape
+- [x] Consistent status chips
+- [x] Clearer failed tiles (reason, Retry/Delete)
+- [x] Smooth reflow when tiles are added
+- [x] Gentle completion animation (respects reduced motion)
+- [x] Consistent model badges per company
+- [x] Glow behind running tiles
 
 ## Phase 7 — Prompt box & references
 - [ ] Aspect ratio previews (exact crop)

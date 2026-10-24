@@ -36,6 +36,12 @@ export interface GalleryItem {
   /** Reference inputs the run was submitted with. */
   references?: MediaItem[]
   inputMode?: string
+  /** Catalog icon key of the model's company; picks its badge and glow colour. */
+  modelIcon?: string
+  /** Video facts from the run's settings, for the tile badges. */
+  durationSec?: number
+  resolution?: string
+  hasSound?: boolean
   settings: Record<string, unknown>
   groupId: string
   groupLabel: string
