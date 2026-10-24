@@ -6,6 +6,9 @@ import { syncModels, watchModels } from "./scripts/sync-models.mjs"
 syncModels()
 if (process.env.NODE_ENV === "development") watchModels()
 
-const nextConfig: NextConfig = { agentRules: false }
+const nextConfig: NextConfig = {
+  agentRules: false,
+  experimental: { agentUpgrade: "security" },
+}
 
 export default nextConfig
