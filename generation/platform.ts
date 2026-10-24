@@ -3,6 +3,7 @@ import { parseUploadTicket, requireUploadContentType } from "./upload-contract"
 import type { UploadTicket } from "./upload-contract"
 
 const UPLOAD_PATH = "/files/generate-upload-url"
+const DEBUG = process.env.HF_DEBUG === "1"
 const MODEL_ID = /^[a-z0-9][a-z0-9._/-]*$/i
 
 export class PlatformError extends Error {
@@ -61,7 +62,9 @@ export function createPlatformClient(options: PlatformClientOptions) {
     extraHeaders?: Record<string, string>
   ) {
     const url = `${baseUrl}${path}`
-    console.info("[platform] request", { method, url, body: body ?? null })
+    // Prompts and reference URLs live in bodies; only HF_DEBUG=1 logs them.
+    if (DEBUG)
+      console.info("[platform] request", { method, url, body: body ?? null })
     const response = await fetchImpl(url, {
       method,
       headers: {
@@ -74,13 +77,21 @@ export function createPlatformClient(options: PlatformClientOptions) {
 
     const payload = await readJson(response)
     // Signed upload URLs are credentials; do not write them to logs.
-    console.info("[platform] response", {
-      method,
-      url,
-      status: response.status,
-      ...(path === UPLOAD_PATH ? {} : { body: payload }),
-    })
-    if (!response.ok) throw new PlatformError(response.status, payload)
+    if (DEBUG)
+      console.info("[platform] response", {
+        method,
+        url,
+        status: response.status,
+        ...(path === UPLOAD_PATH ? {} : { body: payload }),
+      })
+    if (!response.ok) {
+      console.error("[platform] error", {
+        method,
+        path,
+        status: response.status,
+      })
+      throw new PlatformError(response.status, payload)
+    }
     return payload
   }
 
@@ -99,6 +110,7 @@ export function createPlatformClient(options: PlatformClientOptions) {
     ): Promise<QueuedGeneration> {
       if (!isModelId(model))
         throw new PlatformError(400, { detail: "Invalid model" })
+      console.info("[platform] submit", { model })
       return mapQueued(
         await send(
           "POST",
@@ -119,6 +131,7 @@ export function createPlatformClient(options: PlatformClientOptions) {
     async cancel(requestId: string): Promise<void> {
       if (!requestId)
         throw new PlatformError(400, { detail: "Missing request id" })
+      console.info("[platform] cancel", { requestId })
       await send(
         "POST",
         `/requests/${encodeURIComponent(requestId)}/cancel`,

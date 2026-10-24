@@ -18,6 +18,14 @@ export type UploadTicket = {
   upload_headers: Record<string, string>
 }
 
+/** Largest file the browser will try to upload, by kind. Generous guesses, not platform
+    documentation: tune them to the platform's real limits. */
+export const MAX_UPLOAD_BYTES: Record<MediaKind, number> = {
+  image: 25 * 1024 * 1024,
+  video: 200 * 1024 * 1024,
+  audio: 50 * 1024 * 1024,
+}
+
 export function requireUploadContentType(value: unknown): string {
   if (typeof value !== "string" || !CONTENT_TYPES.has(value)) {
     throw new Error(

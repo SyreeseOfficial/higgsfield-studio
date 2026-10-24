@@ -1,4 +1,6 @@
 import {
+  MAX_UPLOAD_BYTES,
+  mediaKindFromMime,
   parseUploadTicket,
   requireUploadContentType,
   unsupportedFileMessage,
@@ -11,6 +13,11 @@ export async function uploadMedia(file: File): Promise<{ url: string }> {
   } catch {
     throw new Error(unsupportedFileMessage(file))
   }
+  const limit = MAX_UPLOAD_BYTES[mediaKindFromMime(contentType)]
+  if (file.size > limit)
+    throw new Error(
+      `That file is ${Math.ceil(file.size / 1048576)} MB; the limit is ${limit / 1048576} MB.`
+    )
   const res = await fetch("/api/upload", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
