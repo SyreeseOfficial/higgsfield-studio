@@ -8,8 +8,10 @@ export function UndoToast({
   onUndo,
   onDismiss,
   ms = 5000,
+  actionLabel = "Undo",
 }: {
   message: string
+  actionLabel?: string
   onUndo: () => void
   onDismiss: () => void
   ms?: number
@@ -29,7 +31,7 @@ export function UndoToast({
         className="font-medium text-primary hover:underline focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none"
         onClick={onUndo}
       >
-        Undo
+        {actionLabel}
       </button>
     </div>
   )

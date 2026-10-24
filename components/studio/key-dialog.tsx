@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useEffect, useState } from "react"
 import type { FormEvent } from "react"
 import { KeyRound } from "lucide-react"
 
@@ -16,6 +16,7 @@ import {
 import { Input } from "@/components/ui/input"
 import {
   clearPlatformCredentials,
+  platformKeyTail,
   savePlatformCredentials,
 } from "@/generation/actions"
 
@@ -37,6 +38,16 @@ export function KeyDialog({
   const [apiKey, setApiKey] = useState("")
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [tail, setTail] = useState<string | null>(null)
+
+  useEffect(() => {
+    if (!open || !configured) return
+    let alive = true
+    void platformKeyTail().then((value) => alive && setTail(value))
+    return () => {
+      alive = false
+    }
+  }, [open, configured])
 
   const submit = async (event: FormEvent) => {
     event.preventDefault()
@@ -79,6 +90,14 @@ export function KeyDialog({
           </DialogHeader>
           <DialogBody>
             <div className="flex flex-col gap-3">
+              {configured && tail ? (
+                <p
+                  className="text-q-body-sm-medium text-q-state-success-fg"
+                  role="status"
+                >
+                  Connected · key ending in {tail}
+                </p>
+              ) : null}
               <p className="text-q-body-sm-regular text-q-text-secondary">
                 Paste the API key copied from{" "}
                 <a
@@ -88,9 +107,10 @@ export function KeyDialog({
                   className="text-q-text-link underline"
                 >
                   open.higgsfield.ai
-                </a>
-                . Paste it as-is. It is stored in an HTTP-only cookie in
-                this browser and used by the server for API requests.
+                </a>{" "}
+                (sign in, open API keys, create a key). Paste it as-is. It is
+                stored in an HTTP-only cookie in this browser and used by the
+                server for API requests.
               </p>
               <Input
                 autoFocus

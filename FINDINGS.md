@@ -92,10 +92,10 @@ Reviewed 2026-10-13 against `17b2826` (Next.js 16, React 19, Tailwind 4, Base UI
 - [x] **[L]** Detail modal shows all settings used, seed, model, duration, and timing, with "Copy as JSON". *(Done except seed: the catalog has no seed setting. "Took" is shown for runs finished after this change.)*
 
 ### Onboarding and first run
-- [ ] **[H]** Key dialog explains where to get a key and links there; show "connected" state with masked key tail.
-- [ ] **[L]** One-time tip toasts for hidden features (paste image, Up-arrow recall), each shown once.
-- [ ] **[L]** Keyboard shortcut cheat sheet on `?`.
-- [ ] **[L]** Command palette (`Cmd/Ctrl+K`): switch model, project, surface, open settings, search history.
+- [x] **[H]** Key dialog explains where to get a key and links there; show "connected" state with masked key tail.
+- [x] **[L]** One-time tip toasts for hidden features *(Done for shortcuts and paste/drop; Up-arrow recall does not exist yet.)* (paste image, Up-arrow recall), each shown once.
+- [x] **[L]** Keyboard shortcut cheat sheet on `?`.
+- [x] **[L]** Command palette (`Cmd/Ctrl+K`): switch model, project, surface, open settings, search history. *(Done for models, projects, surfaces, API key and shortcuts. "Open settings" and history search are left out: the settings dialog is opened by its own trigger and the feed has no text search yet.)*
 
 ### Cost and usage awareness
 - [ ] **[L]** Usage dashboard: runs per model/day, success rate, median time-to-complete (local data).
@@ -108,7 +108,7 @@ Reviewed 2026-10-13 against `17b2826` (Next.js 16, React 19, Tailwind 4, Base UI
 - [ ] **[M]** Storage quota warning (`navigator.storage.estimate`) with "Clear cache" and Export.
 - [ ] **[M]** Privacy panel: states exactly what is stored where (cookie, IndexedDB, localStorage) with a "Wipe everything" button.
 - [ ] **[M]** "Wipe everything" also clears the httpOnly cookie via a server action.
-- [ ] **[L]** "Sign out" in the Key dialog that clears the cookie server side (confirm it exists and works).
+- [x] **[L]** "Sign out" in the Key dialog that clears the cookie server side (confirm it exists and works). *(Confirmed: "Remove API key" calls `clearPlatformCredentials`.)*
 
 ### Performance
 - [ ] **[M]** Use `loading="lazy"` plus a low-res poster/thumbnail for videos; only attach `src` when near the viewport (keeps AGENTS.md rule: never unmount *loaded* media).

@@ -38,6 +38,12 @@ export async function clearPlatformCredentials() {
   })
 }
 
+/** Last four characters of the saved key, for a "connected" badge; the rest never leaves the server. */
+export async function platformKeyTail(): Promise<string | null> {
+  const stored = await readStoredCredentials()
+  return stored ? stored.apiKey.slice(-4) : null
+}
+
 export async function hasPlatformCredentials() {
   return (await readStoredCredentials()) !== null
 }

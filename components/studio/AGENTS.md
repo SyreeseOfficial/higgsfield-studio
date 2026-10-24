@@ -5,7 +5,7 @@ the component here, backward compatible.
 
 - **`PromptBox`** (`prompt-box.tsx`): composition primitive
   (`Root / ModeRail / Mode / Body / Field / Actions / Pill / Uploads / Upload /
-  Generate`). `StudioPromptBox` is the prop-driven composition on top; it caps
+Generate`). `StudioPromptBox` is the prop-driven composition on top; it caps
   inline settings at `MAX_INLINE_SETTINGS`. Use one mixed reference picker with
   compact thumbnails/audio chips; infer input mode from attachments instead of
   showing mode or role-counter controls. Image menus offer frame roles only when

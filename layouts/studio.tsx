@@ -49,6 +49,12 @@ import {
   useUploads,
   type AssetSelection,
 } from "@/lib/studio/uploads"
+import {
+  CommandPalette,
+  type Command,
+} from "@/components/studio/command-palette"
+import { ShortcutsDialog } from "@/components/studio/shortcuts-dialog"
+import { claimTip } from "@/lib/studio/tips"
 import { FeedControls } from "@/components/studio/feed-controls"
 import {
   DEFAULT_FEED_VIEW,
@@ -336,6 +342,9 @@ export function StudioTemplate({
     records: RunRecord[]
   } | null>(null)
   const [localError, setLocalError] = useState<string | null>(null)
+  const [paletteOpen, setPaletteOpen] = useState(false)
+  const [shortcutsOpen, setShortcutsOpen] = useState(false)
+  const [tip, setTip] = useState<string | null>(null)
 
   const surface = useActive((s) => s.surface)
   const modelId = useActive((s) => s.model)
@@ -456,6 +465,43 @@ export function StudioTemplate({
 
   useRunSignals(runs.records)
 
+  useEffect(() => {
+    const onKey = (event: KeyboardEvent) => {
+      if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === "k") {
+        event.preventDefault()
+        setPaletteOpen((open) => !open)
+        return
+      }
+      const target = event.target as HTMLElement | null
+      const typing =
+        target?.isContentEditable ||
+        ["INPUT", "TEXTAREA", "SELECT"].includes(target?.tagName ?? "")
+      if (event.key === "?" && !typing && !event.metaKey && !event.ctrlKey)
+        setShortcutsOpen(true)
+    }
+    window.addEventListener("keydown", onKey)
+    return () => window.removeEventListener("keydown", onKey)
+  }, [])
+
+  // One-time hints for features that have no visible control.
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      if (claimTip("shortcuts"))
+        setTip(
+          "Tip: Ctrl/⌘+Enter generates, Ctrl/⌘+K opens the command palette, ? lists shortcuts."
+        )
+    }, 2000)
+    return () => clearTimeout(timer)
+  }, [])
+  const completed = runs.records.some((r) => r.status === "completed")
+  useEffect(() => {
+    if (completed && claimTip("paste"))
+      // eslint-disable-next-line react-hooks/set-state-in-effect -- one-shot, gated by localStorage
+      setTip(
+        "Tip: paste an image or drop a file on the prompt box to use it as a reference."
+      )
+  }, [completed])
+
   const deleteRuns = (items: GalleryItem[]) => {
     const gone = runs.remove([...new Set(items.map((i) => i.runId))])
     if (gone.length)
@@ -488,6 +534,51 @@ export function StudioTemplate({
     setCanceling(true)
     void runs.cancelAll().finally(() => setCanceling(false))
   }, [canceling, generating, runs])
+
+  const commands: Command[] = [
+    {
+      id: "home",
+      label: "Home",
+      hint: "Go to",
+      run: () => setView({ kind: "home" }),
+    },
+    {
+      id: "all",
+      label: "All generations",
+      hint: "Go to",
+      run: () => setView({ kind: "all" }),
+    },
+    ...projectsStore.projects.map((p) => ({
+      id: `project:${p.id}`,
+      label: p.name,
+      hint: "Project",
+      run: () => setView({ kind: "project", projectId: p.id }),
+    })),
+    ...surfaces.map((s) => ({
+      id: `surface:${s}`,
+      label: s === "video" ? "Video" : "Image",
+      hint: "Surface",
+      run: () => changeSurface(s),
+    })),
+    ...MODELS.map((m) => ({
+      id: `model:${m.id}`,
+      label: m.label,
+      hint: `Model · ${m.surface}`,
+      run: () => setActiveModel(m.id),
+    })),
+    {
+      id: "key",
+      label: "Manage API key",
+      hint: "Settings",
+      run: () => setKeyOpen(true),
+    },
+    {
+      id: "shortcuts",
+      label: "Keyboard shortcuts",
+      hint: "Help",
+      run: () => setShortcutsOpen(true),
+    },
+  ]
 
   const handleUseTemplate = (t: TemplateItem) => {
     setPrompt(t.prompt)
@@ -655,6 +746,21 @@ export function StudioTemplate({
             setUndo(null)
           }}
           onDismiss={() => setUndo(null)}
+        />
+      ) : null}
+      <CommandPalette
+        open={paletteOpen}
+        onOpenChange={setPaletteOpen}
+        commands={commands}
+      />
+      <ShortcutsDialog open={shortcutsOpen} onOpenChange={setShortcutsOpen} />
+      {tip && !undo ? (
+        <UndoToast
+          message={tip}
+          actionLabel="Got it"
+          ms={9000}
+          onUndo={() => setTip(null)}
+          onDismiss={() => setTip(null)}
         />
       ) : null}
       <KeyDialog
