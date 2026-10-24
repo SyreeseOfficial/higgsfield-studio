@@ -603,7 +603,7 @@ function ReferenceCard({
         </div>
       )}
       {caption ? (
-        <span className="mt-0.5 text-[10px] leading-none text-muted-foreground tabular-nums">
+        <span className="mt-0.5 text-xs leading-none text-muted-foreground tabular-nums">
           {caption}
         </span>
       ) : null}

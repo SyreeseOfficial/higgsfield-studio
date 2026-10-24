@@ -66,13 +66,17 @@ export function SettingsDialog({
           ) : (
             <div className="flex flex-col gap-1">
               {entries.map(([key, field]) => (
-                <SettingRow
-                  key={key}
-                  name={key}
-                  field={field}
-                  value={values[key]}
-                  onChange={(v) => onChange(key, v)}
-                />
+                <div key={key} className="pb-2">
+                  <SettingRow
+                    name={key}
+                    field={field}
+                    value={values[key]}
+                    onChange={(v) => onChange(key, v)}
+                  />
+                  <p className="px-1 text-q-caption-sm-regular text-q-text-secondary">
+                    {settingHelp(key, field)}
+                  </p>
+                </div>
               ))}
             </div>
           )}
@@ -88,6 +92,35 @@ export function settingLabel(key: string): string {
     .replace(/_/g, " ")
     .toLowerCase()
     .replace(/^\w/, (c) => c.toUpperCase())
+}
+
+/** One sentence under a setting. Known keys get a specific line; others fall back to what the control allows. */
+const SETTING_HELP: Record<string, string> = {
+  aspectRatio: "Shape of the result: wide for scenes, tall for phone screens.",
+  resolution: "Sharper output takes longer and may cost more.",
+  batchSize: "How many images each run makes.",
+  enhancePrompt: "Lets the model add detail to your prompt before generating.",
+  duration: "Length of the clip in seconds. Longer clips take longer to make.",
+  generateAudio: "Adds generated sound to the clip.",
+  sound: "Adds generated sound to the clip.",
+  bitrateMode: "High keeps more detail but makes a larger file.",
+  cfgScale:
+    "How closely to follow your prompt. Higher is stricter, lower is looser.",
+  multiShots: "Lets the clip cut between several shots.",
+  keepOriginalSound: "Keeps the audio from your reference video.",
+  characterOrientation:
+    "Whether the character faces the way it does in the video or in the image.",
+}
+
+export function settingHelp(key: string, field: SettingField): string {
+  return (
+    SETTING_HELP[key] ??
+    (field.type === "range"
+      ? `A number from ${field.min} to ${field.max}.`
+      : field.type === "enum"
+        ? `Choose one of ${field.values.length} options.`
+        : "Turn on or off.")
+  )
 }
 
 function SettingRow({

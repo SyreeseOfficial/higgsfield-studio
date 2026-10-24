@@ -160,15 +160,15 @@ Pictures, videos and audio you give the AI as input.
 - [x] 🟡 **Better drop zone** when dragging files over the window.
 - [x] ⚪ **Clearer failed tiles** with reason and Retry/Delete.
 - [x] ⚪ **Consistent model badges** per company.
-- [ ] ⚪ **Toast stack with Undo,** max 3 visible.
+- [x] ⚪ **Toast stack with Undo,** max 3 visible.
 - [x] ⚪ **Glow behind running tiles** by company color.
-- [ ] ⚪ **One icon style** across the app.
-- [ ] ⚪ **One set of text sizes.**
-- [ ] ⚪ **Fade in the first row only** on load.
+- [x] ⚪ **One icon style** across the app.
+- [x] ⚪ **One set of text sizes.**
+- [x] ⚪ **Fade in the first row only** on load.
 
 ## 16. First-time experience
 
-- [ ] 🟡 **Help text under each setting** in the dialog.
+- [x] 🟡 **Help text under each setting** in the dialog.
 - [ ] 🟡 **"Check key" button** in the key dialog.
 
 ## 18. Speed
@@ -588,7 +588,7 @@ Not doing these. Moved here from the sections above; kept in case you change you
 - [ ] ⚪ **"What's new" window.**
 - [ ] ⚪ **Tip:** "Videos take a few minutes; you can leave the tab."
 - [ ] ⚪ **"Replay tour"** in the command palette.
-- [ ] ⚪ **Help link** in the shortcuts window.
+- [x] ⚪ **Help link** in the shortcuts window.
 
 **17. Accessibility & languages**
 - [ ] 🔴 **Announce state changes to screen readers** ("Image ready", "Failed: content filter").

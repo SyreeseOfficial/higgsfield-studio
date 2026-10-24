@@ -60,7 +60,7 @@ function Timeline({ timeline }: { timeline: Usage["timeline"] }) {
                 />
               ))}
             </div>
-            <span className="text-[9px] text-muted-foreground">{d.day}</span>
+            <span className="text-xs text-muted-foreground">{d.day}</span>
           </div>
         ))}
       </div>
@@ -141,9 +141,7 @@ export function UsageDialog({
                       minHeight: d.runs ? 2 : 0,
                     }}
                   />
-                  <span className="text-[10px] text-muted-foreground">
-                    {d.day}
-                  </span>
+                  <span className="text-xs text-muted-foreground">{d.day}</span>
                 </div>
               ))}
             </div>

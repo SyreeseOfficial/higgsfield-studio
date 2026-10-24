@@ -9,7 +9,7 @@ import type {
   Ref,
 } from "react"
 import { useRender } from "@base-ui/react/use-render"
-import { AudioLines, Sparkle as SparklesGlyph } from "lucide-react"
+import { AudioLines, Plus, Sparkle as SparklesGlyph } from "lucide-react"
 import { cn as cx } from "@/lib/utils"
 
 /**
@@ -384,16 +384,7 @@ function Upload({
 
 /** The small "+" corner glyph rendered inside an empty Upload tile by default. */
 function PlusGlyph() {
-  return (
-    <svg viewBox="0 0 16 16" fill="none" aria-hidden width="16" height="16">
-      <path
-        d="M8 3.5v9M3.5 8h9"
-        stroke="currentColor"
-        strokeWidth="1.5"
-        strokeLinecap="round"
-      />
-    </svg>
-  )
+  return <Plus aria-hidden className="size-4" />
 }
 
 /* ── Generate (the special lime CTA) ───────────────────────────────────────── */

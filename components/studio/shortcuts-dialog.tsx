@@ -41,6 +41,17 @@ export function ShortcutsDialog({
               </div>
             ))}
           </dl>
+          <p className="pt-4 text-sm text-muted-foreground">
+            Need more help?{" "}
+            <a
+              href="https://open.higgsfield.ai"
+              target="_blank"
+              rel="noreferrer"
+              className="text-primary underline-offset-2 hover:underline focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none"
+            >
+              Higgsfield help and API docs
+            </a>
+          </p>
         </DialogBody>
       </DialogContent>
     </Dialog>

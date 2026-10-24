@@ -59,8 +59,7 @@ import {
   isDateSorted,
   type FeedView,
 } from "@/lib/studio/feed-view"
-import type { RunRecord } from "@/lib/studio/history"
-import { UndoToast } from "@/components/studio/undo-toast"
+import { ToastStack, useToasts } from "@/components/studio/toast-stack"
 import {
   requestNotificationPermission,
   useRunSignals,
@@ -410,10 +409,6 @@ export function StudioTemplate({
   const { configured: keyConfigured, setOpen: setKeyOpen } = key
   const [canceling, setCanceling] = useState(false)
   const [moving, setMoving] = useState<GalleryItem[] | null>(null)
-  const [undo, setUndo] = useState<{
-    message: string
-    records: RunRecord[]
-  } | null>(null)
   const [localError, setLocalError] = useState<string | null>(null)
   const [paletteOpen, setPaletteOpen] = useState(false)
   const [shortcutsOpen, setShortcutsOpen] = useState(false)
@@ -421,7 +416,7 @@ export function StudioTemplate({
   const [privacyOpen, setPrivacyOpen] = useState(false)
   const [settingsOpen, setSettingsOpen] = useState(false)
   const online = useOnline()
-  const [tip, setTip] = useState<string | null>(null)
+  const { toasts, push: pushToast, dismiss: dismissToast } = useToasts()
 
   const surface = useActive((s) => s.surface)
   const modelId = useActive((s) => s.model)
@@ -542,30 +537,34 @@ export function StudioTemplate({
   useEffect(() => {
     const timer = setTimeout(() => {
       if (claimTip("shortcuts"))
-        setTip(
-          "Tip: Ctrl/⌘+Enter generates, Ctrl/⌘+K opens the command palette, ? lists shortcuts."
-        )
+        pushToast({
+          message:
+            "Tip: Ctrl/⌘+Enter generates, Ctrl/⌘+K opens the command palette, ? lists shortcuts.",
+          ms: 9000,
+        })
     }, 2000)
     return () => clearTimeout(timer)
-  }, [])
+  }, [pushToast])
   const completed = runs.records.some((r) => r.status === "completed")
   useEffect(() => {
     if (completed && claimTip("paste"))
-      // eslint-disable-next-line react-hooks/set-state-in-effect -- one-shot, gated by localStorage
-      setTip(
-        "Tip: paste an image or drop a file on the prompt box to use it as a reference."
-      )
-  }, [completed])
+      pushToast({
+        message:
+          "Tip: paste an image or drop a file on the prompt box to use it as a reference.",
+        ms: 9000,
+      })
+  }, [completed, pushToast])
 
   const deleteRuns = (items: GalleryItem[]) => {
     const gone = runs.remove([...new Set(items.map((i) => i.runId))])
     if (gone.length)
-      setUndo({
+      pushToast({
         message:
           gone.length === 1
             ? "Generation deleted"
             : `${gone.length} generations deleted`,
-        records: gone,
+        actionLabel: "Undo",
+        onAction: () => runs.restore(gone),
       })
   }
 
@@ -690,7 +689,9 @@ export function StudioTemplate({
       source: "generation",
       createdAt: Date.now(),
     })
-    setTip("Saved to your library. Find it under Add references.")
+    pushToast({
+      message: "Saved to your library. Find it under Add references.",
+    })
   }
 
   const handleUseTemplate = (t: TemplateItem) => {
@@ -890,16 +891,6 @@ export function StudioTemplate({
           }}
         />
       ) : null}
-      {undo ? (
-        <UndoToast
-          message={undo.message}
-          onUndo={() => {
-            runs.restore(undo.records)
-            setUndo(null)
-          }}
-          onDismiss={() => setUndo(null)}
-        />
-      ) : null}
       {paletteOpen ? (
         <CommandPalette
           open
@@ -938,15 +929,7 @@ export function StudioTemplate({
       {shortcutsOpen ? (
         <ShortcutsDialog open onOpenChange={setShortcutsOpen} />
       ) : null}
-      {tip && !undo ? (
-        <UndoToast
-          message={tip}
-          actionLabel="Got it"
-          ms={9000}
-          onUndo={() => setTip(null)}
-          onDismiss={() => setTip(null)}
-        />
-      ) : null}
+      <ToastStack toasts={toasts} onDismiss={dismissToast} />
       <KeyDialog
         open={key.open}
         onOpenChange={key.setOpen}

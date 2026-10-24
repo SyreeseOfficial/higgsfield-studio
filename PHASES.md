@@ -18,7 +18,7 @@ Source of truth for details: [FINDINGS.md](FINDINGS.md). Do one phase at a time.
 | 6 | Tiles & status look | 10 | ☑ |
 | 7 | Prompt box & references | 9 | ☑ (HEIC ⛔) |
 | 8 | Gallery, cost & usage | 8 | ☑ (3 ⛔) |
-| 9 | First-run & visual polish | 7 | ☐ |
+| 9 | First-run & visual polish | 7 | ☑ (1 ⛔) |
 | 10 | Speed: rendering | 7 | ☐ |
 | 11 | Speed: loading & bundle | 7 | ☐ |
 | 12 | Tests: pure logic | 9 | ☐ |
@@ -116,12 +116,12 @@ Goal: one click = at most one paid job; one slow call never freezes the app.
 - [x] "Recent errors" panel in Settings (last 20, reason, support ID, retry)
 
 ## Phase 9 — First-run & visual polish
-- [ ] Help text under each setting
-- [ ] Help link in the shortcuts window
-- [ ] Toast stack with Undo, max 3
-- [ ] One icon style
-- [ ] One set of text sizes
-- [ ] Fade in the first row only
+- [x] Help text under each setting
+- [x] Help link in the shortcuts window
+- [x] Toast stack with Undo, max 3
+- [x] One icon style
+- [x] One set of text sizes
+- [x] Fade in the first row only
 - [ ] ⛔ "Check key" button → see Blocked (needs the API-key check answer)
 
 ## Phase 10 — Speed: rendering

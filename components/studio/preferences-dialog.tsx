@@ -228,7 +228,7 @@ export function PreferencesDialog({
                           {run.error ?? "Unknown reason"}
                         </p>
                         {run.requestId ? (
-                          <p className="font-mono text-[10px] text-muted-foreground select-all">
+                          <p className="font-mono text-xs text-muted-foreground select-all">
                             Support ID: {run.requestId}
                           </p>
                         ) : null}

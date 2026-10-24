@@ -53,6 +53,8 @@ export interface GalleryTileProps {
   onMeasured?: (item: GalleryItem, aspect: number) => void
   onUseAsReference?: (item: GalleryItem) => void
   onSaveAsReference?: (item: GalleryItem) => void
+  /** First row on load: fade in. */
+  enter?: boolean
 }
 
 const TILE_BUTTON =
@@ -295,6 +297,7 @@ function GalleryTileComponent({
   onMeasured,
   onUseAsReference,
   onSaveAsReference,
+  enter,
 }: GalleryTileProps) {
   const [hovered, setHovered] = useState(false)
   const style = rectStyle(rect, top)
@@ -314,7 +317,10 @@ function GalleryTileComponent({
 
   if (item.status === "generating") {
     return (
-      <div className="studio-tile group" style={style}>
+      <div
+        className={cn("studio-tile group", enter && "studio-enter")}
+        style={style}
+      >
         <GenerationTile
           state="generating"
           generatingKind={item.queued ? "queue" : item.stalled ? "warn" : "run"}
@@ -363,14 +369,17 @@ function GalleryTileComponent({
   }
   if (item.status === "failed") {
     return (
-      <div className="studio-tile group" style={style}>
+      <div
+        className={cn("studio-tile group", enter && "studio-enter")}
+        style={style}
+      >
         <GenerationTile
           state="failed"
           failureLabel={
             <>
               {item.failureLabel}
               {item.supportId ? (
-                <span className="mt-1 block font-mono text-[10px] opacity-60 select-all">
+                <span className="mt-1 block font-mono text-xs opacity-60 select-all">
                   Support ID: {item.supportId}
                 </span>
               ) : null}
@@ -506,7 +515,11 @@ function GalleryTileComponent({
 
   return (
     <div
-      className={cn("studio-tile", justFinished && "studio-finish")}
+      className={cn(
+        "studio-tile",
+        justFinished && "studio-finish",
+        enter && "studio-enter"
+      )}
       style={style}
       draggable
       onDragStart={(event) => {

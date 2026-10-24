@@ -31,6 +31,9 @@ Generate`). `StudioPromptBox` is the prop-driven composition on top; it caps
 - **`MyProjects`, `ProjectCreateModal`, `ProjectActions`** own project UI.
 - **`KeyDialog`** is the only place that collects the platform key.
 
+Text sizes: `text-xs` for captions and meta, `text-sm` for body, `text-lg`/
+`text-xl` for headings. No arbitrary pixel sizes (`text-[10px]`).
+
 Design invariants: dark only; lime `bg-primary` is reserved for the generation
 CTA and active states; ordinary actions use `ghost`/`outline` buttons; icons
 are `lucide-react`; every visible control works end to end.

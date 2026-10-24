@@ -1,6 +1,6 @@
 "use client"
 
-import { Fragment, useState, type ReactNode } from "react"
+import { Fragment, useEffect, useState, type ReactNode } from "react"
 import { Check, Download, FolderInput, Loader2, Trash2 } from "lucide-react"
 
 import { usePreferences } from "@/generation/stores/preferences"
@@ -76,6 +76,12 @@ export function JustifiedGallery({
     itemId: string
     runId: string
   } | null>(null)
+  // Only the first row fades in on load; later rows just appear as you scroll.
+  const [entering, setEntering] = useState(true)
+  useEffect(() => {
+    const timer = setTimeout(() => setEntering(false), 800)
+    return () => clearTimeout(timer)
+  }, [])
   const [selecting, setSelecting] = useState(false)
   const [selected, setSelected] = useState<ReadonlySet<string>>(new Set())
   const prefersReduced = useReducedMotion()
@@ -91,6 +97,7 @@ export function JustifiedGallery({
     ? (items.find((i) => i.id === viewing.itemId) ??
       items.find((i) => i.runId === viewing.runId))
     : undefined
+  const firstRowY = gallery.layout.rows.find((row) => row.type !== "header")?.y
   const viewBottom = gallery.scrollTop + gallery.viewportHeight
   // The heading of the day group scrolled to the top of the viewport.
   const passed = gallery.layout.rows
@@ -253,6 +260,7 @@ export function JustifiedGallery({
                     onMeasured={onMeasured}
                     onUseAsReference={onUseAsReference}
                     onSaveAsReference={onSaveAsReference}
+                    enter={entering && row.y === firstRowY}
                     onOpen={(i) => setViewing({ itemId: i.id, runId: i.runId })}
                     {...(onMove
                       ? { onMove: (i: GalleryItem) => onMove([i]) }

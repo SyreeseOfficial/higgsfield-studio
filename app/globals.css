@@ -92,9 +92,16 @@
       width 220ms ease,
       height 220ms ease;
   }
+  .studio-enter {
+    animation: studio-enter 450ms ease-out backwards;
+  }
   .studio-finish {
     animation: studio-finish 600ms ease-out;
   }
+}
+
+@keyframes studio-enter {
+  from { opacity: 0; }
 }
 
 @keyframes studio-finish {
@@ -110,7 +117,7 @@
 @media (prefers-reduced-motion: reduce) {
   .studio-glow { animation: none; opacity: 0.7; }
   .studio-tile { transition: none; }
-  .studio-finish { animation: none; }
+  .studio-finish, .studio-enter { animation: none; }
 }
 
 :root {

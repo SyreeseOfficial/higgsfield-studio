@@ -193,7 +193,7 @@ export function StudioSidebar({
           collapsed && "flex-col"
         )}
       >
-        <span className="relative flex size-6 shrink-0 items-center justify-center overflow-hidden rounded-md bg-primary text-[11px] font-bold text-primary-foreground">
+        <span className="relative flex size-6 shrink-0 items-center justify-center overflow-hidden rounded-md bg-primary text-xs font-bold text-primary-foreground">
           {logo ?? title.slice(0, 1).toUpperCase()}
         </span>
         {!collapsed ? (
@@ -272,7 +272,7 @@ export function StudioSidebar({
               }
               ariaLabel={project.name}
               start={
-                <span className="relative flex size-6 items-center justify-center rounded-md border border-white/10 bg-white/5 text-[11px] font-semibold text-muted-foreground">
+                <span className="relative flex size-6 items-center justify-center rounded-md border border-white/10 bg-white/5 text-xs font-semibold text-muted-foreground">
                   {project.cover ? (
                     <img
                       src={project.cover}
@@ -283,7 +283,7 @@ export function StudioSidebar({
                     project.name.slice(0, 1).toUpperCase()
                   )}
                   {collapsed && project.generationCount > 0 ? (
-                    <span className="absolute -top-1.5 -right-1.5 min-w-4 rounded-full bg-primary px-1 text-center text-[9px] leading-4 font-semibold text-primary-foreground tabular-nums">
+                    <span className="absolute -top-1.5 -right-1.5 min-w-4 rounded-full bg-primary px-1 text-center text-xs leading-4 font-semibold text-primary-foreground tabular-nums">
                       {project.generationCount > 99
                         ? "99+"
                         : project.generationCount}
