@@ -13,7 +13,7 @@ Source of truth for details: [FINDINGS.md](FINDINGS.md). Do one phase at a time.
 | 1 | Safe submits (no double charges, no freezes) | 8 | ☑ |
 | 2 | Run lifecycle & recovery | 10 | ☑ |
 | 3 | History & data safety | 9 | ☑ |
-| 4 | Security & downloads | 5 | ☐ |
+| 4 | Security & downloads | 5 | ☑ |
 | 5 | Result viewer | 9 | ☐ |
 | 6 | Tiles & status look | 10 | ☐ |
 | 7 | Prompt box & references | 9 | ☐ |
@@ -65,11 +65,11 @@ Goal: one click = at most one paid job; one slow call never freezes the app.
 - [x] Keep unsent prompts and attached files across reload
 
 ## Phase 4 — Security & downloads
-- [ ] Encrypt the API key in the cookie
-- [ ] Tighten CSP / browser security rules
-- [ ] Strip hidden data from WebP, GIF, MP4 before upload
-- [ ] Fix "Download all" (memory, double downloads)
-- [ ] Fix zip dates (1980) and warn before >4 GB zips
+- [x] Encrypt the API key in the cookie
+- [x] Tighten CSP / browser security rules
+- [x] Strip hidden data from WebP, GIF, MP4 before upload
+- [x] Fix "Download all" (memory, double downloads)
+- [x] Fix zip dates (1980) and warn before >4 GB zips
 
 ## Phase 5 — Result viewer
 - [ ] Update the detail window live when the run finishes

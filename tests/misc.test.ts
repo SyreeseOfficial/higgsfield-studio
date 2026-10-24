@@ -167,3 +167,30 @@ describe("usageStats", () => {
     expect(u.perDay).toHaveLength(7)
   })
 })
+
+describe("credential cookie encryption", () => {
+  it("round-trips with a secret and still reads plain cookies", async () => {
+    const { encodeCredentials, decodeCredentials } =
+      await import("@/generation/credentials")
+    process.env.HF_COOKIE_SECRET = "test-secret"
+    const sealed = encodeCredentials("abc123")
+    expect(sealed.startsWith("enc1.")).toBe(true)
+    expect(sealed).not.toContain("abc123")
+    expect(decodeCredentials(sealed)).toEqual({ apiKey: "abc123" })
+    expect(decodeCredentials(sealed.slice(0, -2) + "xx")).toBeNull()
+    expect(decodeCredentials('{"apiKey":"plain"}')).toEqual({ apiKey: "plain" })
+    delete process.env.HF_COOKIE_SECRET
+    expect(decodeCredentials(sealed)).toBeNull()
+  })
+})
+
+describe("zipFiles", () => {
+  it("writes real DOS dates and refuses oversize archives", async () => {
+    const { zipFiles, ZipTooLargeError } = await import("@/lib/studio/zip")
+    const zip = await zipFiles([{ name: "a.txt", blob: new Blob(["hi"]) }])
+    const view = new DataView(await zip.arrayBuffer())
+    expect(view.getUint16(12, true) >> 9).toBeGreaterThan(40) // year since 1980, not 0
+    const fake = { name: "x", blob: { size: 0xffffffff } as Blob }
+    await expect(zipFiles([fake])).rejects.toBeInstanceOf(ZipTooLargeError)
+  })
+})

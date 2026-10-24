@@ -33,7 +33,7 @@ The 8 most important items. Each one is also listed in its category below.
 3. [ ] **Don't lose starred items.** The app keeps only the newest 400 generations. Starred ones should never be dropped. ⏱ 15 min
 4. [ ] **Save results in case links expire.** Right now we only save links to the images/videos. If those links die, the gallery shows blank tiles. ⏱ 15 min
 5. [ ] **Show a friendly message when the app isn't set up right.** Today users see a raw technical error. ⏱ 15 min
-6. [ ] **Fix "Download all".** It can crash the browser and download files twice. ⏱ 15 min
+6. [x] **Fix "Download all".** It can crash the browser and download files twice. ⏱ 15 min
 7. [ ] **Protect the saved API key better.** It's stored in a readable form in the browser cookie. ⏱ 15 min
 8. [ ] **Tighten the browser security rules.** The current ones leave a gap that hackers could use. ⏱ 15 min
 
@@ -83,9 +83,9 @@ Keeping your work safe and getting it out of the app.
 
 - [x] 🔴 **Don't drop starred items** when history passes 400 runs. ⏱ 15 min
 - [x] 🔴 **Save copies of results** in case the original links expire. ⏱ 15 min
-- [ ] 🔴 **Fix "Download all".** It loads everything at once, can crash, and downloads files twice if one fails. ⏱ 15 min
+- [x] 🔴 **Fix "Download all".** It loads everything at once, can crash, and downloads files twice if one fails. ⏱ 15 min
 - [x] 🟡 **Fix a memory leak** in how the app opens browser storage. ⏱ 5 min
-- [ ] 🟡 **Fix the zip file dates** (show as 1980) and warn before creating zips over 4 GB that would silently corrupt. ⏱ 5 min
+- [x] 🟡 **Fix the zip file dates** (show as 1980) and warn before creating zips over 4 GB that would silently corrupt. ⏱ 5 min
 - [x] 🟡 **"Wipe everything" may miss some data.** Make sure it clears all of it. ⏱ 15 min
 - [x] 🟡 **Label the Usage numbers correctly.** "Total" really means "last 400 runs". ⏱ 15 min
 - [x] 🟡 **Give saved library items stable IDs** so the same image doesn't get duplicated or merged. ⏱ 15 min
@@ -99,9 +99,9 @@ Keeping your work safe and getting it out of the app.
 
 ## 4. Security & privacy
 
-- [ ] 🔴 **Encrypt the API key** stored in the browser cookie. Today it's readable if someone gets the cookie. ⏱ 15 min
-- [ ] 🔴 **Tighten browser security rules** (CSP). They're too loose and allow any website's content. ⏱ 15 min
-- [ ] 🟡 **Remove hidden data from WebP, GIF and MP4 files** before upload (location, camera info). Today only JPEG/PNG are cleaned. ⏱ 15 min
+- [x] 🔴 **Encrypt the API key** stored in the browser cookie. Today it's readable if someone gets the cookie. ⏱ 15 min
+- [x] 🔴 **Tighten browser security rules** (CSP). They're too loose and allow any website's content. ⏱ 15 min
+- [x] 🟡 **Remove hidden data from WebP, GIF and MP4 files** before upload (location, camera info). Today only JPEG/PNG are cleaned. ⏱ 15 min
 
 ## 5. Prompt box & typing
 

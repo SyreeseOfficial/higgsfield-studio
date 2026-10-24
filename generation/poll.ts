@@ -141,8 +141,6 @@ async function round(): Promise<void> {
     state.misses = 0 // ponytail: a failing group is retried each round until its deadline
     for (const result of results) deliver(result)
     sweep()
-    for (const result of results) deliver(result)
-    sweep()
   } catch (caught) {
     if (++state.misses < MAX_MISSES) return
     settleAll(caught instanceof Error ? caught : new Error(String(caught)))

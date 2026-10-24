@@ -54,23 +54,53 @@ export async function downloadMedia(
   }
 }
 
-/** One file downloads directly; several are zipped. Falls back to one download each when storage disallows fetch. */
+/** Fetches at most this many files at once. */
+const DOWNLOAD_CONCURRENCY = 4
+
+/** One file downloads directly; several are zipped. A file that cannot be fetched
+    (storage that disallows cross-origin reads) is saved on its own afterwards, and
+    each file is saved exactly once. */
 export async function downloadMany(urls: string[]): Promise<void> {
   if (urls.length < 2) return void (urls[0] && downloadMedia(urls[0]))
-  try {
-    const files = await Promise.all(
-      urls.map(async (url, i) => {
-        const response = await fetch(url)
-        if (!response.ok) throw new Error(String(response.status))
-        const blob = await response.blob()
-        return { name: `${i + 1}-${filenameFromUrl(url, blob.type)}`, blob }
-      })
-    )
-    const { zipFiles } = await import("./zip")
-    const objectUrl = URL.createObjectURL(await zipFiles(files))
-    clickDownload(objectUrl, "generations.zip")
-    window.setTimeout(() => URL.revokeObjectURL(objectUrl), 1000)
-  } catch {
-    for (const url of urls) await downloadMedia(url)
-  }
+  const fetched: { name: string; blob: Blob }[] = []
+  const direct: string[] = []
+  let next = 0
+  await Promise.all(
+    Array.from({ length: DOWNLOAD_CONCURRENCY }, async () => {
+      while (next < urls.length) {
+        const i = next++
+        const url = urls[i]!
+        try {
+          const response = await fetch(url)
+          if (!response.ok) throw new Error(String(response.status))
+          const blob = await response.blob()
+          fetched[i] = {
+            name: `${i + 1}-${filenameFromUrl(url, blob.type)}`,
+            blob,
+          }
+        } catch {
+          direct.push(url)
+        }
+      }
+    })
+  )
+  const files = fetched.filter(Boolean)
+  if (files.length > 1) {
+    try {
+      const { zipFiles } = await import("./zip")
+      const objectUrl = URL.createObjectURL(await zipFiles(files))
+      clickDownload(objectUrl, "generations.zip")
+      window.setTimeout(() => URL.revokeObjectURL(objectUrl), 1000)
+    } catch {
+      // Too big for one zip: save the files one by one instead.
+      for (const { name, blob } of files) saveBlob(blob, name)
+    }
+  } else for (const { name, blob } of files) saveBlob(blob, name)
+  for (const url of direct) await downloadMedia(url)
+}
+
+function saveBlob(blob: Blob, name: string) {
+  const objectUrl = URL.createObjectURL(blob)
+  clickDownload(objectUrl, name)
+  window.setTimeout(() => URL.revokeObjectURL(objectUrl), 1000)
 }

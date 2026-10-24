@@ -1,13 +1,26 @@
-/** Drops EXIF/XMP/IPTC (GPS, camera, timestamps) from JPEG and text/EXIF chunks from PNG before a
-    reference leaves the browser. Other types pass through untouched.
+/** Drops EXIF/XMP/IPTC (GPS, camera, timestamps) from JPEG, text/EXIF chunks from PNG, EXIF/XMP
+    from WebP, comments/XMP from GIF and udta/meta/uuid boxes from MP4 before a reference leaves the
+    browser. Other types (WAV) pass through untouched.
     A JPEG whose EXIF rotates it is re-encoded instead, so stripping cannot flip the picture. */
 export async function stripMetadata(file: File): Promise<File> {
-  if (file.type !== "image/jpeg" && file.type !== "image/png") return file
+  const strip = STRIPPERS[file.type]
+  if (!strip) return file
   const bytes = new Uint8Array(await file.arrayBuffer())
-  const clean = file.type === "image/png" ? stripPng(bytes) : stripJpeg(bytes)
+  const clean = strip(bytes)
   if (clean === "rotated") return reencode(file)
   if (!clean) return file
   return new File([clean], file.name, { type: file.type })
+}
+
+const STRIPPERS: Record<
+  string,
+  (bytes: Uint8Array<ArrayBuffer>) => Uint8Array<ArrayBuffer> | "rotated" | null
+> = {
+  "image/jpeg": stripJpeg,
+  "image/png": stripPng,
+  "image/webp": stripWebp,
+  "image/gif": stripGif,
+  "video/mp4": stripMp4,
 }
 
 const TEXT_CHUNKS = new Set(["eXIf", "tEXt", "iTXt", "zTXt"])
@@ -100,4 +113,116 @@ function concat(parts: Uint8Array<ArrayBuffer>[]): Uint8Array<ArrayBuffer> {
     offset += part.length
   }
   return out
+}
+
+const ascii = (bytes: Uint8Array, start: number, length: number) =>
+  String.fromCharCode(...bytes.subarray(start, start + length))
+
+/** RIFF/WebP: drops the EXIF and XMP chunks and clears their flags in VP8X. */
+export function stripWebp(
+  bytes: Uint8Array<ArrayBuffer>
+): Uint8Array<ArrayBuffer> | null {
+  if (
+    bytes.length < 12 ||
+    ascii(bytes, 0, 4) !== "RIFF" ||
+    ascii(bytes, 8, 4) !== "WEBP"
+  )
+    return null
+  const view = new DataView(bytes.buffer)
+  const kept: Uint8Array<ArrayBuffer>[] = [bytes.slice(0, 12)]
+  let pos = 12
+  while (pos + 8 <= bytes.length) {
+    const type = ascii(bytes, pos, 4)
+    const end =
+      pos +
+      8 +
+      view.getUint32(pos + 4, true) +
+      (view.getUint32(pos + 4, true) & 1)
+    if (end > bytes.length) return null
+    if (type === "VP8X") {
+      const chunk = bytes.slice(pos, end)
+      chunk[8]! &= ~(0x08 | 0x04) // EXIF and XMP present flags
+      kept.push(chunk)
+    } else if (type !== "EXIF" && type !== "XMP ")
+      kept.push(bytes.subarray(pos, end))
+    pos = end
+  }
+  const out = concat(kept)
+  new DataView(out.buffer).setUint32(4, out.length - 8, true)
+  return out
+}
+
+/** GIF: drops comment extensions and XMP application extensions; loop info stays. */
+export function stripGif(
+  bytes: Uint8Array<ArrayBuffer>
+): Uint8Array<ArrayBuffer> | null {
+  const head = ascii(bytes, 0, 6)
+  if (head !== "GIF87a" && head !== "GIF89a") return null
+  const skipBlocks = (from: number) => {
+    let p = from
+    while (p < bytes.length && bytes[p] !== 0) p += bytes[p]! + 1
+    return p + 1 // past the 0 terminator
+  }
+  let pos = 13
+  if (bytes[10]! & 0x80) pos += 3 * (2 << (bytes[10]! & 7))
+  const kept: Uint8Array<ArrayBuffer>[] = [bytes.subarray(0, pos)]
+  while (pos < bytes.length) {
+    const marker = bytes[pos]
+    if (marker === 0x3b) {
+      kept.push(bytes.subarray(pos, pos + 1))
+      return concat(kept)
+    }
+    let end: number
+    let drop = false
+    if (marker === 0x21) {
+      const label = bytes[pos + 1]
+      end = skipBlocks(pos + 2)
+      drop =
+        label === 0xfe ||
+        (label === 0xff && ascii(bytes, pos + 3, 11) === "XMP DataXMP")
+    } else if (marker === 0x2c) {
+      const packed = bytes[pos + 9]!
+      const table = packed & 0x80 ? 3 * (2 << (packed & 7)) : 0
+      end = skipBlocks(pos + 10 + table + 1)
+    } else return null
+    if (end > bytes.length) return null
+    if (!drop) kept.push(bytes.subarray(pos, end))
+    pos = end
+  }
+  return null
+}
+
+const MP4_CONTAINERS = new Set(["moov", "trak"])
+const MP4_METADATA = new Set(["udta", "meta", "uuid"])
+
+/** MP4: overwrites udta/meta/uuid boxes (GPS, device, XMP) with zeros and renames
+    them "free". Same size, so every sample offset stays valid. */
+export function stripMp4(
+  bytes: Uint8Array<ArrayBuffer>
+): Uint8Array<ArrayBuffer> | null {
+  if (bytes.length < 12 || ascii(bytes, 4, 4) !== "ftyp") return null
+  const out = bytes.slice()
+  const view = new DataView(out.buffer)
+  const walk = (from: number, to: number): boolean => {
+    let pos = from
+    while (pos + 8 <= to) {
+      let size = view.getUint32(pos)
+      let header = 8
+      if (size === 1) {
+        if (pos + 16 > to) return false
+        size = Number(view.getBigUint64(pos + 8))
+        header = 16
+      } else if (size === 0) size = to - pos
+      if (size < header || pos + size > to) return false
+      const type = ascii(out, pos + 4, 4)
+      if (MP4_METADATA.has(type)) {
+        out.fill(0, pos + header, pos + size)
+        out.set([0x66, 0x72, 0x65, 0x65], pos + 4) // "free"
+      } else if (MP4_CONTAINERS.has(type) && !walk(pos + header, pos + size))
+        return false
+      pos += size
+    }
+    return true
+  }
+  return walk(0, out.length) ? out : null
 }

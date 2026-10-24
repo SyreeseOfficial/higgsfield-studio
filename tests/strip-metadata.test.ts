@@ -1,6 +1,12 @@
 import { describe, expect, it } from "vitest"
 
-import { stripJpeg, stripPng } from "@/generation/strip-metadata"
+import {
+  stripGif,
+  stripJpeg,
+  stripMp4,
+  stripPng,
+  stripWebp,
+} from "@/generation/strip-metadata"
 
 const u8 = (...n: number[]) => new Uint8Array(n)
 const join = (...parts: Uint8Array<ArrayBuffer>[]) => {
@@ -99,5 +105,91 @@ describe("stripPng", () => {
       )
     )
     expect(out).toEqual(join(sig, chunk("IHDR", [1]), chunk("IDAT", [5])))
+  })
+})
+
+const text = (value: string) => Uint8Array.from(value, (c) => c.charCodeAt(0))
+const be32 = (n: number) => u8(n >>> 24, n >>> 16, n >>> 8, n)
+const le32 = (n: number) => u8(n, n >>> 8, n >>> 16, n >>> 24)
+
+describe("stripWebp", () => {
+  const chunk = (type: string, body: number[]) =>
+    join(
+      text(type),
+      le32(body.length),
+      u8(...body),
+      u8(...(body.length & 1 ? [0] : []))
+    )
+  it("drops EXIF/XMP chunks, clears VP8X flags and fixes the RIFF size", () => {
+    const body = join(
+      text("WEBP"),
+      chunk("VP8X", [0x0c, 0, 0, 0, 0, 0, 0, 0, 0, 0]),
+      chunk("EXIF", [1, 2, 3]),
+      chunk("XMP ", [4, 5]),
+      chunk("VP8 ", [9, 9])
+    )
+    const out = stripWebp(join(text("RIFF"), le32(body.length), body))!
+    const s = String.fromCharCode(...out)
+    expect(s).not.toContain("EXIF")
+    expect(s).not.toContain("XMP ")
+    expect(s).toContain("VP8 ")
+    expect(out[20]! & 0x0c).toBe(0)
+    expect(new DataView(out.buffer).getUint32(4, true)).toBe(out.length - 8)
+  })
+  it("returns null for broken input", () => {
+    expect(stripWebp(text("RIFF....WEBPEXIF\xff\xff\xff\x7f"))).toBeNull()
+  })
+})
+
+describe("stripGif", () => {
+  it("drops comments and XMP but keeps the loop extension and frames", () => {
+    const gif = join(
+      text("GIF89a"),
+      u8(1, 0, 1, 0, 0, 0, 0), // 1x1, no color table
+      u8(0x21, 0xfe, 3, 65, 66, 67, 0), // comment
+      u8(0x21, 0xff, 11, ...text("NETSCAPE2.0"), 3, 1, 0, 0, 0),
+      u8(0x21, 0xff, 11, ...text("XMP DataXMP"), 2, 1, 1, 0),
+      u8(0x2c, 0, 0, 0, 0, 1, 0, 1, 0, 0, 2, 1, 0x44, 0),
+      u8(0x3b)
+    )
+    const out = String.fromCharCode(...stripGif(gif)!)
+    expect(out).toContain("NETSCAPE2.0")
+    expect(out).not.toContain("ABC")
+    expect(out).not.toContain("XMP Data")
+    expect(out.endsWith(";")).toBe(true)
+  })
+  it("returns null for broken input", () => {
+    expect(
+      stripGif(join(text("GIF89a"), u8(1, 0, 1, 0, 0, 0, 0, 0x99)))
+    ).toBeNull()
+  })
+})
+
+describe("stripMp4", () => {
+  const box = (type: string, ...body: Uint8Array<ArrayBuffer>[]) => {
+    const inner = join(...body)
+    return join(be32(8 + inner.length), text(type), inner)
+  }
+  it("zeroes udta/meta boxes in place and keeps the size", () => {
+    const file = join(
+      box("ftyp", text("isom")),
+      box(
+        "moov",
+        box("udta", text("©xyz+12.3-045.6/")),
+        box("trak", box("tkhd", u8(1, 2)))
+      ),
+      box("mdat", u8(7, 7, 7))
+    )
+    const out = stripMp4(file)!
+    const s = String.fromCharCode(...out)
+    expect(out.length).toBe(file.length)
+    expect(s).not.toContain("xyz")
+    expect(s).toContain("free")
+    expect(s).toContain("tkhd")
+  })
+  it("returns null when a box overruns the file", () => {
+    expect(
+      stripMp4(join(box("ftyp", text("isom")), be32(999), text("moov")))
+    ).toBeNull()
   })
 })
