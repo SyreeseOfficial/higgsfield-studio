@@ -61,20 +61,20 @@ Jobs getting stuck, charged twice, or failing for no reason.
 - [x] 🔴 **Add a timeout to calls to Higgsfield.** One hung call freezes submit, cancel and status checks. ⏱ 15 min
 - [x] 🔴 **Make sure every generation has a unique ID**, even from older browsers, so a retry can't double-charge. ⏱ 15 min
 - [x] 🔴 **Show a clear "app isn't set up" screen** instead of raw errors on every generation when settings are missing. ⏱ 15 min
-- [ ] 🟡 **Dev-mode glitch:** checking on jobs can get dropped when the page reloads itself while developing. Fix it. ⏱ 15 min
+- [x] 🟡 **Dev-mode glitch:** checking on jobs can get dropped when the page reloads itself while developing. Fix it. ⏱ 15 min
 - [x] 🟡 **Don't throw away good results.** If one group of status checks fails, results from the groups that worked are lost. ⏱ 15 min
 - [x] 🟡 **Handle "too many jobs" gracefully** instead of failing the whole status check. ⏱ 15 min
 - [x] 🟡 **Treat "timeout" and "conflict" errors as "maybe it worked"**, not "it failed". Prevents double-charging. ⏱ 15 min
-- [ ] 🟡 **Fix "Canceling…" getting stuck** if the job was already running and can't be canceled. ⏱ 15 min
-- [ ] 🟡 **Wait a moment before declaring "no media produced".** Sometimes results are just a second late. ⏱ 15 min
-- [ ] 🟡 **Warn when a reference link has expired** instead of failing with a confusing error when using "More like this" later. ⏱ 15 min
-- [ ] 🟡 **Stop the tile from flickering** between "queued" and "running". ⏱ 15 min
+- [x] 🟡 **Fix "Canceling…" getting stuck** if the job was already running and can't be canceled. ⏱ 15 min
+- [x] 🟡 **Wait a moment before declaring "no media produced".** Sometimes results are just a second late. ⏱ 15 min
+- [x] 🟡 **Warn when a reference link has expired** instead of failing with a confusing error when using "More like this" later. ⏱ 15 min
+- [x] 🟡 **Stop the tile from flickering** between "queued" and "running". ⏱ 15 min
 - [x] 🟡 **Remember several pending retries**, not just one, so changing a prompt after a failure can't cause a duplicate paid job. ⏱ 15 min
 - [x] 🟡 **Limit running jobs across all browser tabs.** Two tabs currently allow double the limit. ⏱ 15 min
-- [ ] 🟡 **Show "Retrying…" and auto-retry once** on temporary server errors.
-- [ ] 🟡 **Pause the queue automatically** when Higgsfield says "slow down", with a visible countdown. ⏱ 15 min
-- [ ] 🟡 **Keep the queue after a page reload** instead of dropping it.
-- [ ] 🔴 **Show a notice after reload:** "Your runs were recovered."
+- [x] 🟡 **Show "Retrying…" and auto-retry once** on temporary server errors.
+- [x] 🟡 **Pause the queue automatically** when Higgsfield says "slow down", with a visible countdown. ⏱ 15 min
+- [x] 🟡 **Keep the queue after a page reload** instead of dropping it.
+- [x] 🔴 **Show a notice after reload:** "Your runs were recovered."
 - [ ] 🟡 **"Recent errors" panel** in Settings: last 20 failures, with reason, support ID and a one-click retry. ⏱ 15 min
 
 ## 2. Saving, history & downloads
@@ -94,7 +94,7 @@ Keeping your work safe and getting it out of the app.
 
 ## 3. Small bugs & glitches
 
-- [ ] 🟡 **Error messages guess wrong.** A prompt containing "credit card" gets treated as "not enough credits". Check the real error code first. ⏱ 5 min
+- [x] 🟡 **Error messages guess wrong.** A prompt containing "credit card" gets treated as "not enough credits". Check the real error code first. ⏱ 5 min
 - [ ] 🟡 **Video tiles are heavy.** Each one loads a full video player. Show a still frame until hover. ⏱ 15 min
 
 ## 4. Security & privacy

@@ -62,7 +62,7 @@ export type SubmitFailure = "auth" | "rejected" | "unknown"
 
 export type SubmitResult =
   | { ok: true; queued: QueuedGeneration }
-  | { ok: false; kind: SubmitFailure; error: string }
+  | { ok: false; kind: SubmitFailure; error: string; status?: number }
 
 export async function submitGeneration(
   plane: GenerationPlane,
@@ -95,6 +95,7 @@ export async function submitGeneration(
         ok: false,
         kind: maybeTaken ? "unknown" : "rejected",
         error,
+        status: caught.status,
       }
     }
     return { ok: false, kind: "rejected", error }

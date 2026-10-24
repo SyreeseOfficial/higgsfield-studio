@@ -34,11 +34,23 @@ type Waiter = {
   reject: (reason: Error) => void
 }
 
-const waiting = new Map<string, Waiter>()
-const inflight = new Map<string, Promise<GenerationStatus>>()
-let timer: ReturnType<typeof setTimeout> | null = null
-let polling = false
-let misses = 0
+/* Kept on globalThis so a hot reload of this file in dev does not orphan the
+   promises runs are already awaiting. */
+type PollState = {
+  waiting: Map<string, Waiter>
+  inflight: Map<string, Promise<GenerationStatus>>
+  timer: ReturnType<typeof setTimeout> | null
+  polling: boolean
+  misses: number
+}
+const state = ((globalThis as { __studioPoll?: PollState }).__studioPoll ??= {
+  waiting: new Map(),
+  inflight: new Map(),
+  timer: null,
+  polling: false,
+  misses: 0,
+})
+const { waiting, inflight } = state
 
 /** Resolves when the platform reports a terminal status for this request.
     Every request in flight is asked for together, in one server action per
@@ -75,16 +87,16 @@ export function watchRequest(
     nobody left to hand a result to. In-flight jobs stay in history and the
     next mount starts a fresh watch. */
 export function stopWatching(): void {
-  if (timer !== null) clearTimeout(timer)
-  timer = null
-  misses = 0
+  if (state.timer !== null) clearTimeout(state.timer)
+  state.timer = null
+  state.misses = 0
   waiting.clear()
   inflight.clear()
 }
 
 function schedule(): void {
-  if (timer !== null || polling || waiting.size === 0) return
-  timer = setTimeout(() => void round(), nextInterval())
+  if (state.timer !== null || state.polling || waiting.size === 0) return
+  state.timer = setTimeout(() => void round(), nextInterval())
 }
 
 /** Follows the newest watch: 4 s for its first minute, 8 s to five minutes, then 15 s.
@@ -103,14 +115,14 @@ function nextInterval(): number {
 
 if (typeof document !== "undefined")
   document.addEventListener("visibilitychange", () => {
-    if (document.hidden || waiting.size === 0 || polling) return
-    if (timer !== null) clearTimeout(timer)
-    timer = setTimeout(() => void round(), 0)
+    if (document.hidden || waiting.size === 0 || state.polling) return
+    if (state.timer !== null) clearTimeout(state.timer)
+    state.timer = setTimeout(() => void round(), 0)
   })
 
 async function round(): Promise<void> {
-  timer = null
-  polling = true
+  state.timer = null
+  state.polling = true
   try {
     const ids = [...waiting.keys()]
     const results: StatusResult[] = []
@@ -126,16 +138,16 @@ async function round(): Promise<void> {
         failure = caught // keep the answers the other groups gave
       }
     if (failure !== undefined && results.length === 0) throw failure
-    misses = 0 // ponytail: a failing group is retried each round until its deadline
+    state.misses = 0 // ponytail: a failing group is retried each round until its deadline
     for (const result of results) deliver(result)
     sweep()
     for (const result of results) deliver(result)
     sweep()
   } catch (caught) {
-    if (++misses < MAX_MISSES) return
+    if (++state.misses < MAX_MISSES) return
     settleAll(caught instanceof Error ? caught : new Error(String(caught)))
   } finally {
-    polling = false
+    state.polling = false
     schedule()
   }
 }
@@ -169,6 +181,6 @@ function sweep(): void {
 function settleAll(reason: Error): void {
   const waiters = [...waiting.values()]
   waiting.clear()
-  misses = 0
+  state.misses = 0
   for (const waiter of waiters) waiter.reject(reason)
 }

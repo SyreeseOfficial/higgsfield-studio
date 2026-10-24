@@ -22,6 +22,8 @@ import {
   VIDEO_DEADLINE_MS,
 } from "./limits"
 import { newId } from "./id"
+import { defaultKv } from "./kv"
+import { referenceReachable } from "./reference-check"
 import {
   aspectFromSettings,
   loadHistory,
@@ -32,6 +34,44 @@ import {
 
 const CHANNEL = "studio-history"
 const MAX_PENDING_KEYS = 20
+/** Pause after the platform says "slow down". */
+const RATE_PAUSE_MS = 60_000
+/** A cancel the platform quietly ignored (job already running) is given this long to show up. */
+const CANCEL_GRACE_MS = 20_000
+/** Polls that say "completed" with no media are re-asked this many times before it counts as failed. */
+const EMPTY_RETRIES = 3
+
+type QueueEntry = {
+  record: RunRecord
+  plane: GenerationPlane
+  projectId?: string
+}
+
+/** The queue is saved per tab (sessionStorage id), so a reload gets back its own
+    queue and a second tab can never resend it. */
+function queueKey(): string | null {
+  try {
+    let id = sessionStorage.getItem("studio-tab")
+    if (!id) sessionStorage.setItem("studio-tab", (id = newId()))
+    return `queue.v1.${id}`
+  } catch {
+    return null
+  }
+}
+
+function isQueueEntry(value: unknown): value is QueueEntry {
+  if (value === null || typeof value !== "object") return false
+  const { record, plane } = value as Partial<QueueEntry>
+  try {
+    return (
+      typeof record?.id === "string" &&
+      typeof plane?.model === "string" &&
+      !!getModel(plane.model)
+    )
+  } catch {
+    return false
+  }
+}
 
 /** Adds runs another tab created and takes its settled copy of any run still
     running here. Returns `current` untouched when nothing changed, so the
@@ -60,10 +100,11 @@ function mergeRecords(current: RunRecord[], stored: RunRecord[]): RunRecord[] {
  */
 export function useRuns({ onAuthError }: { onAuthError?: () => void } = {}) {
   const [records, setRecords] = useState<RunRecord[]>([])
-  // Planes waiting for a free slot; lost on reload (only sent runs are history).
-  const [queue, setQueue] = useState<
-    { record: RunRecord; plane: GenerationPlane; projectId?: string }[]
-  >([])
+  // Planes waiting for a free slot; saved per tab and restored on reload.
+  const [queue, setQueue] = useState<QueueEntry[]>([])
+  const [notice, setNotice] = useState<string | null>(null)
+  const [pausedUntil, setPausedUntil] = useState(0)
+  const [now, setNow] = useState(() => Date.now())
   const [pump, setPump] = useState(0)
   const [loaded, setLoaded] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -87,18 +128,31 @@ export function useRuns({ onAuthError }: { onAuthError?: () => void } = {}) {
     (record: RunRecord, from = record.createdAt) => {
       const limit =
         record.surface === "video" ? VIDEO_DEADLINE_MS : IMAGE_DEADLINE_MS
-      watchRequest(record.requestId, { deadline: from + limit })
-        .then((status) => update(record.id, settle(status)))
-        .catch((caught: unknown) => {
-          // Slow is not failed: the platform may still finish (and bill) it.
-          if (caught instanceof WatchTimeoutError)
-            return update(record.id, { stalled: true })
-          update(record.id, {
-            status: "failed",
-            canceling: false,
-            error: caught instanceof Error ? caught.message : String(caught),
+      const attempt = (emptyTries: number): void => {
+        watchRequest(record.requestId, { deadline: from + limit })
+          .then((status) => {
+            const patch = settle(status)
+            // Media can land a moment after "completed"; ask again before giving up.
+            if (
+              status.status === "completed" &&
+              patch.status === "failed" &&
+              emptyTries < EMPTY_RETRIES
+            )
+              return void setTimeout(() => attempt(emptyTries + 1), 3000)
+            update(record.id, patch)
           })
-        })
+          .catch((caught: unknown) => {
+            // Slow is not failed: the platform may still finish (and bill) it.
+            if (caught instanceof WatchTimeoutError)
+              return update(record.id, { stalled: true })
+            update(record.id, {
+              status: "failed",
+              canceling: false,
+              error: caught instanceof Error ? caught.message : String(caught),
+            })
+          })
+      }
+      attempt(0)
     },
     [update]
   )
@@ -112,9 +166,23 @@ export function useRuns({ onAuthError }: { onAuthError?: () => void } = {}) {
           `${skipped} saved ${skipped === 1 ? "run was" : "runs were"} unreadable and left out.`
         )
       setRecords(stored)
-      setLoaded(true)
-      for (const record of stored)
-        if (record.status === "running") watch(record)
+      const resumed = stored.filter((r) => r.status === "running")
+      for (const record of resumed) watch(record)
+      const key = queueKey()
+      void (key ? defaultKv().get<unknown>(key) : Promise.resolve(undefined))
+        .catch(() => undefined)
+        .then((saved) => {
+          if (!alive) return
+          const restored = Array.isArray(saved)
+            ? saved.filter(isQueueEntry)
+            : []
+          if (restored.length) setQueue(restored)
+          if (resumed.length || restored.length)
+            setNotice(
+              `Your runs were recovered: ${resumed.length} still generating, ${restored.length} waiting.`
+            )
+          setLoaded(true)
+        })
     })
     const bc = new BroadcastChannel(CHANNEL)
     channel.current = bc
@@ -143,6 +211,31 @@ export function useRuns({ onAuthError }: { onAuthError?: () => void } = {}) {
     return () => clearTimeout(timer)
   }, [loaded, records])
   useEffect(() => {
+    const key = queueKey()
+    if (loaded && key)
+      void defaultKv()
+        .set(key, queue)
+        .catch(() => undefined)
+  }, [loaded, queue])
+  useEffect(() => {
+    if (!notice) return
+    const timer = setTimeout(() => setNotice(null), 10_000)
+    return () => clearTimeout(timer)
+  }, [notice])
+  // Counts the rate-limit pause down once a second, then wakes the queue.
+  useEffect(() => {
+    if (pausedUntil <= Date.now()) return
+    const tick = setInterval(() => setNow(Date.now()), 1000)
+    const wake = setTimeout(
+      () => setPump((n) => n + 1),
+      pausedUntil - Date.now()
+    )
+    return () => {
+      clearInterval(tick)
+      clearTimeout(wake)
+    }
+  }, [pausedUntil])
+  useEffect(() => {
     const flush = () => {
       if (loaded) void saveHistory(latest.current)
     }
@@ -165,9 +258,25 @@ export function useRuns({ onAuthError }: { onAuthError?: () => void } = {}) {
       pending.current.set(fingerprint, key)
       if (pending.current.size > MAX_PENDING_KEYS)
         pending.current.delete(pending.current.keys().next().value!)
+      let created: RunRecord | undefined
+      let keepQueued = false
       try {
-        const result = await submitGeneration(plane, key)
+        let result = await submitGeneration(plane, key)
+        if (!result.ok && result.kind === "unknown") {
+          // Same idempotency key, so a second try cannot create a second job.
+          setNotice("Retrying…")
+          await new Promise((resolve) => setTimeout(resolve, 2000))
+          result = await submitGeneration(plane, key)
+          setNotice(null)
+        }
         if (!result.ok) {
+          if (result.status === 429) {
+            // Slow down: keep the plane waiting and resume after a pause.
+            keepQueued = true
+            setPausedUntil(Date.now() + RATE_PAUSE_MS)
+            setNow(Date.now())
+            return
+          }
           // Keep the key unless the platform definitely refused the job.
           if (result.kind !== "unknown") pending.current.delete(fingerprint)
           if (result.kind === "auth") onAuthErrorRef.current?.()
@@ -177,7 +286,8 @@ export function useRuns({ onAuthError }: { onAuthError?: () => void } = {}) {
         pending.current.delete(fingerprint)
         const { queued } = result
         const record: RunRecord = {
-          id: queued.requestId,
+          // Same id as the waiting placeholder, so the tile does not remount.
+          id: queuedId,
           requestId: queued.requestId,
           surface: model.surface,
           modelId: model.id,
@@ -194,18 +304,21 @@ export function useRuns({ onAuthError }: { onAuthError?: () => void } = {}) {
         }
         setRecords((current) => [record, ...current])
         watch(record)
-        // Saved now, not after the debounce, so another tab sees this slot taken.
-        await saveHistory(
-          mergeRecords([record, ...latest.current], await loadHistory())
-        ).catch(() => undefined)
+        created = record
       } catch (caught) {
         // The call itself dropped: the job may exist, so the key stays.
         setError(caught instanceof Error ? caught.message : String(caught))
       } finally {
         submitting.current = false
-        setQueue((current) => current.filter((q) => q.record.id !== queuedId))
+        if (!keepQueued)
+          setQueue((current) => current.filter((q) => q.record.id !== queuedId))
         setPump((n) => n + 1)
       }
+      // Saved now, not after the debounce, so another tab sees this slot taken.
+      if (created)
+        await saveHistory(
+          mergeRecords([created, ...latest.current], await loadHistory())
+        ).catch(() => undefined)
     },
     [watch]
   )
@@ -247,12 +360,13 @@ export function useRuns({ onAuthError }: { onAuthError?: () => void } = {}) {
   useEffect(() => {
     const next = queue[0]
     if (!loaded || !next || submitting.current) return
+    if (pausedUntil > Date.now()) return
     if (records.filter((r) => r.status === "running").length >= MAX_RUNNING)
       return
     // Claim the slot now, send on a microtask: start() sets state.
     submitting.current = true
     queueMicrotask(() => void start(next.plane, next.projectId, next.record.id))
-  }, [loaded, queue, records, pump, start])
+  }, [loaded, queue, records, pump, pausedUntil, start])
 
   /** Queues a plane; it goes to the platform as soon as fewer than MAX_RUNNING runs are active. */
   const submit = useCallback(
@@ -293,9 +407,18 @@ export function useRuns({ onAuthError }: { onAuthError?: () => void } = {}) {
 
   /** Resubmits a finished run's prompt, settings and references; the platform picks a new seed. */
   const variation = useCallback(
-    (id: string) => {
+    async (id: string) => {
       const record = records.find((r) => r.id === id)
       if (!record) return
+      const checks = await Promise.all(
+        (record.media ?? []).map((m) => referenceReachable(m))
+      )
+      if (checks.includes(false)) {
+        setError(
+          "A reference file from this run is no longer available (its link expired). Add it again to make a variation."
+        )
+        return
+      }
       void submit(
         {
           model: record.modelId,
@@ -328,7 +451,17 @@ export function useRuns({ onAuthError }: { onAuthError?: () => void } = {}) {
       if (!canceled) {
         update(id, { canceling: false })
         setError("Already running, can't cancel")
+        return
       }
+      // A running job accepts the request but never stops: don't stay on "Canceling…".
+      setTimeout(() => {
+        const current = latest.current.find((r) => r.id === id)
+        if (current?.status !== "running" || !current.canceling) return
+        update(id, { canceling: false })
+        setError(
+          "That run was already underway and can't be canceled. It will finish."
+        )
+      }, CANCEL_GRACE_MS)
     },
     [queue, records, update]
   )
@@ -404,6 +537,10 @@ export function useRuns({ onAuthError }: { onAuthError?: () => void } = {}) {
     cancelAll,
     loaded,
     error,
+    notice:
+      pausedUntil > now
+        ? `Rate limit reached. Queue paused, resuming in ${Math.ceil((pausedUntil - now) / 1000)}s.`
+        : notice,
     submit,
     cancel,
     recheck,

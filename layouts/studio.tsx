@@ -747,6 +747,7 @@ export function StudioTemplate({
     error:
       localError ??
       runs.error ??
+      runs.notice ??
       (online
         ? null
         : "You're offline. Generate is back when you reconnect.") ??

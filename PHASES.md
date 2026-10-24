@@ -11,7 +11,7 @@ Source of truth for details: [FINDINGS.md](FINDINGS.md). Do one phase at a time.
 | # | Phase | Items | Status |
 |---|---|---|---|
 | 1 | Safe submits (no double charges, no freezes) | 8 | ☑ |
-| 2 | Run lifecycle & recovery | 10 | ☐ |
+| 2 | Run lifecycle & recovery | 10 | ☑ |
 | 3 | History & data safety | 9 | ☐ |
 | 4 | Security & downloads | 5 | ☐ |
 | 5 | Result viewer | 9 | ☐ |
@@ -42,16 +42,16 @@ Goal: one click = at most one paid job; one slow call never freezes the app.
 - [x] Don't throw away good results when one status group fails
 
 ## Phase 2 — Run lifecycle & recovery
-- [ ] Dev-mode glitch: dropped status checks on hot reload
-- [ ] Fix "Canceling…" stuck
-- [ ] Wait a moment before "no media produced"
-- [ ] Warn when a reference link has expired
-- [ ] Stop queued/running tile flicker
-- [ ] "Retrying…" and auto-retry once on temporary errors
-- [ ] Pause queue automatically on "slow down", with countdown
-- [ ] Keep the queue after reload
-- [ ] "Your runs were recovered" notice
-- [ ] Error messages: check the real error code before keyword guessing
+- [x] Dev-mode glitch: dropped status checks on hot reload
+- [x] Fix "Canceling…" stuck
+- [x] Wait a moment before "no media produced"
+- [x] Warn when a reference link has expired
+- [x] Stop queued/running tile flicker
+- [x] "Retrying…" and auto-retry once on temporary errors
+- [x] Pause queue automatically on "slow down", with countdown
+- [x] Keep the queue after reload
+- [x] "Your runs were recovered" notice
+- [x] Error messages: check the real error code before keyword guessing
 
 ## Phase 3 — History & data safety
 - [ ] Never drop starred items past 400 runs
