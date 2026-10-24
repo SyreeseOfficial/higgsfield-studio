@@ -6,6 +6,7 @@ import {
   House,
   Images,
   KeyRound,
+  Settings,
   PanelLeftClose,
   PanelLeftOpen,
   Plus,
@@ -42,6 +43,7 @@ export interface StudioSidebarProps {
   onCollapsedChange: (collapsed: boolean) => void
   keyConfigured: boolean
   onOpenKey: () => void
+  onOpenSettings: () => void
 }
 
 function Row({
@@ -128,6 +130,7 @@ export function StudioSidebar({
   onCollapsedChange,
   keyConfigured,
   onOpenKey,
+  onOpenSettings,
 }: StudioSidebarProps) {
   return (
     <aside
@@ -252,7 +255,18 @@ export function StudioSidebar({
         </div>
       </nav>
 
-      <div className="pt-2">
+      <div className="flex flex-col gap-0.5 pt-2">
+        <Row
+          collapsed={collapsed}
+          onClick={onOpenSettings}
+          ariaLabel="Settings"
+          start={
+            <span className="flex size-6 items-center justify-center rounded-md border border-white/10 bg-white/5 text-muted-foreground">
+              <Settings className="size-3.5" />
+            </span>
+          }
+          title="Settings"
+        />
         <Row
           collapsed={collapsed}
           onClick={onOpenKey}

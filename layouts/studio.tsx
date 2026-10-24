@@ -38,6 +38,7 @@ import {
 } from "@/generation/catalog/media-inputs"
 import { toPlatform } from "@/generation/to-platform"
 import { useActive } from "@/generation/stores/active"
+import { usePreferences } from "@/generation/stores/preferences"
 import { useSettings } from "@/generation/stores/settings"
 import {
   runToGalleryItems,
@@ -97,6 +98,13 @@ const ShortcutsDialog = dynamic(
 )
 const UsageDialog = dynamic(
   () => import("@/components/studio/usage-dialog").then((m) => m.UsageDialog),
+  { ssr: false }
+)
+const PreferencesDialog = dynamic(
+  () =>
+    import("@/components/studio/preferences-dialog").then(
+      (m) => m.PreferencesDialog
+    ),
   { ssr: false }
 )
 const PrivacyDialog = dynamic(
@@ -407,6 +415,7 @@ export function StudioTemplate({
   const [shortcutsOpen, setShortcutsOpen] = useState(false)
   const [usageOpen, setUsageOpen] = useState(false)
   const [privacyOpen, setPrivacyOpen] = useState(false)
+  const [settingsOpen, setSettingsOpen] = useState(false)
   const online = useOnline()
   const [tip, setTip] = useState<string | null>(null)
 
@@ -557,14 +566,19 @@ export function StudioTemplate({
   const handleGenerate = useCallback(() => {
     if (!canGenerate || !prepared.plane) return
     setLocalError(null)
-    requestNotificationPermission()
+    if (usePreferences.getState().notify) requestNotificationPermission()
     if (!keyConfigured) {
       setKeyOpen(true)
       return
     }
     const projectId = view.kind === "project" ? view.projectId : undefined
     void runs.submit(prepared.plane, projectId).then((record) => {
-      if (record && view.kind === "home") setView({ kind: "all" })
+      if (
+        record &&
+        view.kind === "home" &&
+        usePreferences.getState().jumpToFeed
+      )
+        setView({ kind: "all" })
       if (record && projectId) projectsStore.touch(projectId)
     })
   }, [
@@ -614,6 +628,12 @@ export function StudioTemplate({
       hint: `Model · ${m.surface}`,
       run: () => setActiveModel(m.id),
     })),
+    {
+      id: "settings",
+      label: "Settings",
+      hint: "Settings",
+      run: () => setSettingsOpen(true),
+    },
     {
       id: "key",
       label: "Manage API key",
@@ -754,6 +774,7 @@ export function StudioTemplate({
         onCollapsedChange={setCollapsed}
         keyConfigured={key.configured}
         onOpenKey={() => key.setOpen(true)}
+        onOpenSettings={() => setSettingsOpen(true)}
       />
       <main className="relative flex min-w-0 flex-1 flex-col">
         {view.kind === "home" ? (
@@ -819,6 +840,17 @@ export function StudioTemplate({
           open
           onOpenChange={setPaletteOpen}
           commands={commands}
+        />
+      ) : null}
+      {settingsOpen ? (
+        <PreferencesDialog
+          open
+          onOpenChange={setSettingsOpen}
+          keyConfigured={key.configured}
+          onOpenKey={() => key.setOpen(true)}
+          onOpenUsage={() => setUsageOpen(true)}
+          onOpenShortcuts={() => setShortcutsOpen(true)}
+          onOpenPrivacy={() => setPrivacyOpen(true)}
         />
       ) : null}
       {privacyOpen ? (

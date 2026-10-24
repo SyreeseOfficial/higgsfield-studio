@@ -3,6 +3,7 @@
 import { Fragment, useState, type ReactNode } from "react"
 import { Check, Download, FolderInput, Loader2, Trash2 } from "lucide-react"
 
+import { usePreferences } from "@/generation/stores/preferences"
 import { downloadMany } from "@/lib/studio/download-media"
 
 import {
@@ -60,7 +61,9 @@ export function JustifiedGallery({
 }: JustifiedGalleryProps) {
   const [selecting, setSelecting] = useState(false)
   const [selected, setSelected] = useState<ReadonlySet<string>>(new Set())
-  const reducedMotion = useReducedMotion()
+  const prefersReduced = useReducedMotion()
+  const hoverPlay = usePreferences((s) => s.hoverPlay)
+  const reducedMotion = prefersReduced || !hoverPlay
   const { viewportRef, ...gallery } = useJustifiedGallery(items, grouped, {
     hasMore,
     loadingMore,
