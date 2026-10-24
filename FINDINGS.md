@@ -12,7 +12,11 @@ Reviewed 2026-10-13 against `17b2826` (Next.js 16, React 19, Tailwind 4, Base UI
 - **Skipped for now:** everything else. Kept for reference, not rejected.
 - Both split into **Verified findings** (checked by reading the code or grepping) and **Ideas** (brainstorm, not verified bugs; *(check)* marks behavior I did not confirm in code). Ideas respect `AGENTS.md` (server boundary, dark only, all models visible).
 
-## Start here (planned [H] items)
+## Progress (2026-10-23)
+
+Every **Planned** item is either done (`[x]`, with notes where it was partial) or logged under **Issues Needing Review** at the bottom. The **Skipped for now** section was not touched, since it is marked as deferred. Next: review the Issues section, then say whether to start on Skipped.
+
+## Start here (planned [H] items, all done)
 
 1. One transient status error permanently fails a running generation.
 2. Only one generation can run at a time.
