@@ -24,7 +24,6 @@ import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { MODELS, getModel, parseSettings } from "@/generation/catalog"
 import type {
   GenerationPlane,
-  MediaItem,
   MediaRole,
   Surface,
 } from "@/generation/catalog"
@@ -70,6 +69,7 @@ import {
   requestNotificationPermission,
   useRunSignals,
 } from "@/lib/studio/use-run-signals"
+import { useDraft } from "@/lib/studio/draft"
 import { useRuns } from "@/lib/studio/use-runs"
 
 /**
@@ -400,8 +400,7 @@ export function StudioTemplate({
 }: StudioTemplateProps) {
   const [view, setView] = useState<StudioView>({ kind: "home" })
   const [collapsed, setCollapsed] = useState(false)
-  const [prompt, setPrompt] = useState("")
-  const [media, setMedia] = useState<MediaItem[]>([])
+  const { prompt, setPrompt, media, setMedia } = useDraft()
   const key = useKeyStatus()
   const { configured: keyConfigured, setOpen: setKeyOpen } = key
   const [canceling, setCanceling] = useState(false)

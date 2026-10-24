@@ -57,7 +57,13 @@ export async function saveHistory(
   records: RunRecord[],
   kv: Kv = defaultKv()
 ): Promise<void> {
-  await kv.set(KEY, records.slice(0, HISTORY_MAX_RECORDS))
+  await kv.set(KEY, capHistory(records))
+}
+
+/** Newest-first records, trimmed to the cap; starred runs are never dropped. */
+export function capHistory(records: RunRecord[]): RunRecord[] {
+  let room = HISTORY_MAX_RECORDS
+  return records.filter((r) => r.starred || room-- > 0)
 }
 
 function isRunRecord(value: unknown): value is RunRecord {

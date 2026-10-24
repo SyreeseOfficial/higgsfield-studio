@@ -1,5 +1,14 @@
 import { type PersistStorage, type StorageValue } from "zustand/middleware"
 
+import { reportStorageFailure } from "@/lib/studio/storage-warning"
+
+/** Spread into a persist() config. Bump `version` and branch on it in `migrate`
+    when a store's saved shape changes, so old browsers upgrade instead of losing data. */
+export const persistVersion = {
+  version: 1,
+  migrate: (saved: unknown) => saved as never,
+}
+
 /** Per-call localStorage so persist still works after SSR, where the store
     module evaluates before a Storage exists. */
 export function browserStorage<T>(): PersistStorage<T> {
@@ -37,6 +46,6 @@ function write(name: string, value: string | null): void {
     if (value === null) localStorage.removeItem(name)
     else localStorage.setItem(name, value)
   } catch {
-    /* quota, private mode, or a denied store */
+    reportStorageFailure() // quota, private mode, or a denied store
   }
 }

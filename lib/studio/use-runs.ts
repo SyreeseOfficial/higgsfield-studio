@@ -22,6 +22,12 @@ import {
   VIDEO_DEADLINE_MS,
 } from "./limits"
 import { newId } from "./id"
+import { saveCopies } from "./media-cache"
+import {
+  STORAGE_FAILED_EVENT,
+  STORAGE_FAILED_MESSAGE,
+  reportStorageFailure,
+} from "./storage-warning"
 import { defaultKv } from "./kv"
 import { referenceReachable } from "./reference-check"
 import {
@@ -140,6 +146,8 @@ export function useRuns({ onAuthError }: { onAuthError?: () => void } = {}) {
             )
               return void setTimeout(() => attempt(emptyTries + 1), 3000)
             update(record.id, patch)
+            if (patch.status === "completed" && record.surface === "image")
+              void saveCopies(patch.urls ?? [])
           })
           .catch((caught: unknown) => {
             // Slow is not failed: the platform may still finish (and bill) it.
@@ -205,7 +213,9 @@ export function useRuns({ onAuthError }: { onAuthError?: () => void } = {}) {
     if (!loaded) return
     const timer = setTimeout(
       () =>
-        void saveHistory(records).then(() => channel.current?.postMessage(0)),
+        void saveHistory(records)
+          .then(() => channel.current?.postMessage(0))
+          .catch(reportStorageFailure),
       SAVE_DEBOUNCE_MS
     )
     return () => clearTimeout(timer)
@@ -217,6 +227,11 @@ export function useRuns({ onAuthError }: { onAuthError?: () => void } = {}) {
         .set(key, queue)
         .catch(() => undefined)
   }, [loaded, queue])
+  useEffect(() => {
+    const warn = () => setError(STORAGE_FAILED_MESSAGE)
+    window.addEventListener(STORAGE_FAILED_EVENT, warn)
+    return () => window.removeEventListener(STORAGE_FAILED_EVENT, warn)
+  }, [])
   useEffect(() => {
     if (!notice) return
     const timer = setTimeout(() => setNotice(null), 10_000)
@@ -318,7 +333,7 @@ export function useRuns({ onAuthError }: { onAuthError?: () => void } = {}) {
       if (created)
         await saveHistory(
           mergeRecords([created, ...latest.current], await loadHistory())
-        ).catch(() => undefined)
+        ).catch(reportStorageFailure)
     },
     [watch]
   )

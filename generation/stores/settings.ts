@@ -1,7 +1,7 @@
 import { create } from "zustand"
 import { persist } from "zustand/middleware"
 
-import { browserStorage } from "./browser-storage"
+import { browserStorage, persistVersion } from "./browser-storage"
 
 type SettingsState = {
   byModel: Record<string, Record<string, unknown>>
@@ -34,6 +34,7 @@ export const useSettings = create<SettingsState>()(
     {
       name: "hf.settings.v1",
       storage: browserStorage(),
+      ...persistVersion,
       partialize: (state) => ({ byModel: state.byModel }),
     }
   )

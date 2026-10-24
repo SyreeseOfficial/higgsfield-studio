@@ -1,7 +1,7 @@
 import { create } from "zustand"
 import { persist } from "zustand/middleware"
 
-import { browserStorage } from "./browser-storage"
+import { browserStorage, persistVersion } from "./browser-storage"
 
 type PreferencesState = {
   /** Desktop notification when a run finishes while the tab is hidden. */
@@ -38,6 +38,7 @@ export const usePreferences = create<PreferencesState>()(
     {
       name: "hf.preferences.v1",
       storage: browserStorage(),
+      ...persistVersion,
       partialize: ({ notify, tabTitle, hoverPlay, chime, jumpToFeed }) => ({
         notify,
         tabTitle,

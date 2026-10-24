@@ -1,6 +1,6 @@
-/* eslint-disable @next/next/no-img-element */
 "use client"
 
+import { CachedImg } from "./cached-img"
 import type {
   CSSProperties,
   FocusEventHandler,
@@ -78,7 +78,7 @@ export function GenerationCard({
         {state === "ready"
           ? (media ??
             (src ? (
-              <img
+              <CachedImg
                 src={src}
                 alt={alt}
                 className="absolute inset-0 size-full object-cover"

@@ -1,6 +1,7 @@
 /* eslint-disable @next/next/no-img-element */
 "use client"
 
+import { CachedImg } from "./cached-img"
 import { useState } from "react"
 import type { ReactElement, ReactNode } from "react"
 import { Dialog as DialogPrimitive } from "@base-ui/react/dialog"
@@ -124,7 +125,7 @@ export function GenerationDetailModal({
                 className="max-h-full max-w-full rounded-xl shadow-2xl"
               />
             ) : (
-              <img
+              <CachedImg
                 src={generation.src}
                 alt={generation.prompt ?? ""}
                 className="max-h-full max-w-full rounded-xl object-contain shadow-2xl"

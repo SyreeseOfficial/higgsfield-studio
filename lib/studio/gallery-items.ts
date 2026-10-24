@@ -69,8 +69,8 @@ export function runToGalleryItems(run: RunRecord): GalleryItem[] {
 
 export function runToLibraryItems(run: RunRecord): AssetLibraryItem[] {
   if (run.status !== "completed") return []
-  return run.urls.map((url) => ({
-    id: url,
+  return run.urls.map((url, index) => ({
+    id: `${run.id}:${index}`,
     src: url,
     kind: run.surface,
     name: run.prompt.slice(0, 60),

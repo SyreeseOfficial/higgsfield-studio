@@ -1,7 +1,10 @@
 import { create } from "zustand"
 import { persist } from "zustand/middleware"
 
-import { browserStorage } from "@/generation/stores/browser-storage"
+import {
+  browserStorage,
+  persistVersion,
+} from "@/generation/stores/browser-storage"
 
 import { newId } from "./id"
 
@@ -55,6 +58,6 @@ export const useProjects = create<ProjectsState>()(
           ),
         })),
     }),
-    { name: "hf.projects.v1", storage: browserStorage() }
+    { name: "hf.projects.v1", storage: browserStorage(), ...persistVersion }
   )
 )

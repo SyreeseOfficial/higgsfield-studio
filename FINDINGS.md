@@ -81,16 +81,16 @@ Jobs getting stuck, charged twice, or failing for no reason.
 
 Keeping your work safe and getting it out of the app.
 
-- [ ] 🔴 **Don't drop starred items** when history passes 400 runs. ⏱ 15 min
-- [ ] 🔴 **Save copies of results** in case the original links expire. ⏱ 15 min
+- [x] 🔴 **Don't drop starred items** when history passes 400 runs. ⏱ 15 min
+- [x] 🔴 **Save copies of results** in case the original links expire. ⏱ 15 min
 - [ ] 🔴 **Fix "Download all".** It loads everything at once, can crash, and downloads files twice if one fails. ⏱ 15 min
-- [ ] 🟡 **Fix a memory leak** in how the app opens browser storage. ⏱ 5 min
+- [x] 🟡 **Fix a memory leak** in how the app opens browser storage. ⏱ 5 min
 - [ ] 🟡 **Fix the zip file dates** (show as 1980) and warn before creating zips over 4 GB that would silently corrupt. ⏱ 5 min
-- [ ] 🟡 **"Wipe everything" may miss some data.** Make sure it clears all of it. ⏱ 15 min
-- [ ] 🟡 **Label the Usage numbers correctly.** "Total" really means "last 400 runs". ⏱ 15 min
-- [ ] 🟡 **Give saved library items stable IDs** so the same image doesn't get duplicated or merged. ⏱ 15 min
-- [ ] 🟡 **Prepare for future updates:** add a way to upgrade saved data without losing it. ⏱ 15 min
-- [ ] 🟡 **Warn when browser storage is full** instead of silently not saving. ⏱ 15 min
+- [x] 🟡 **"Wipe everything" may miss some data.** Make sure it clears all of it. ⏱ 15 min
+- [x] 🟡 **Label the Usage numbers correctly.** "Total" really means "last 400 runs". ⏱ 15 min
+- [x] 🟡 **Give saved library items stable IDs** so the same image doesn't get duplicated or merged. ⏱ 15 min
+- [x] 🟡 **Prepare for future updates:** add a way to upgrade saved data without losing it. ⏱ 15 min
+- [x] 🟡 **Warn when browser storage is full** instead of silently not saving. ⏱ 15 min
 
 ## 3. Small bugs & glitches
 
@@ -105,7 +105,7 @@ Keeping your work safe and getting it out of the app.
 
 ## 5. Prompt box & typing
 
-- [ ] 🔴 **Keep unsent prompts and attached files** when the page reloads.
+- [x] 🔴 **Keep unsent prompts and attached files** when the page reloads.
 
 ## 7. Models & settings
 

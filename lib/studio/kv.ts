@@ -2,21 +2,44 @@
 export type Kv = {
   get<T>(key: string): Promise<T | undefined>
   set(key: string, value: unknown): Promise<void>
+  del(key: string): Promise<void>
 }
 
 const DB_NAME = "studio"
 const STORE = "kv"
 
+/** One connection for the page's life; opening per call leaked a handle each time. */
+let connection: Promise<IDBDatabase> | undefined
+
 function open(): Promise<IDBDatabase> {
-  return new Promise((resolve, reject) => {
+  connection ??= new Promise((resolve, reject) => {
     const req = indexedDB.open(DB_NAME, 1)
     req.onupgradeneeded = () => {
       if (!req.result.objectStoreNames.contains(STORE))
         req.result.createObjectStore(STORE)
     }
-    req.onsuccess = () => resolve(req.result)
-    req.onerror = () => reject(req.error)
+    req.onsuccess = () => {
+      const db = req.result
+      // Another tab is deleting or upgrading the database: let go so it can.
+      db.onversionchange = db.onclose = () => {
+        db.close()
+        connection = undefined
+      }
+      resolve(db)
+    }
+    req.onerror = () => {
+      connection = undefined
+      reject(req.error)
+    }
   })
+  return connection
+}
+
+/** Releases the connection (needed before the database can be deleted). */
+export async function closeKv(): Promise<void> {
+  const open = connection
+  connection = undefined
+  if (open) (await open.catch(() => undefined))?.close()
 }
 
 function run<T>(
@@ -44,6 +67,9 @@ function memoryKv(): Kv {
     async set(key, value) {
       map.set(key, value)
     },
+    async del(key) {
+      map.delete(key)
+    },
   }
 }
 
@@ -56,6 +82,9 @@ export function defaultKv(): Kv {
       run("readonly", (s) => s.get(key)) as Promise<T | undefined>,
     set: async (key, value) => {
       await run("readwrite", (s) => s.put(value, key))
+    },
+    del: async (key) => {
+      await run("readwrite", (s) => s.delete(key))
     },
   }
   return browser

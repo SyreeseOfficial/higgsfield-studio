@@ -12,7 +12,7 @@ Source of truth for details: [FINDINGS.md](FINDINGS.md). Do one phase at a time.
 |---|---|---|---|
 | 1 | Safe submits (no double charges, no freezes) | 8 | ☑ |
 | 2 | Run lifecycle & recovery | 10 | ☑ |
-| 3 | History & data safety | 9 | ☐ |
+| 3 | History & data safety | 9 | ☑ |
 | 4 | Security & downloads | 5 | ☐ |
 | 5 | Result viewer | 9 | ☐ |
 | 6 | Tiles & status look | 10 | ☐ |
@@ -54,15 +54,15 @@ Goal: one click = at most one paid job; one slow call never freezes the app.
 - [x] Error messages: check the real error code before keyword guessing
 
 ## Phase 3 — History & data safety
-- [ ] Never drop starred items past 400 runs
-- [ ] Save copies of results in case links expire
-- [ ] Fix IndexedDB memory leak
-- [ ] "Wipe everything" clears all data
-- [ ] Stable IDs for library items
-- [ ] Versioned saved data, upgrade path
-- [ ] Warn when browser storage is full
-- [ ] Label Usage numbers ("last 400 runs")
-- [ ] Keep unsent prompts and attached files across reload
+- [x] Never drop starred items past 400 runs
+- [x] Save copies of results in case links expire
+- [x] Fix IndexedDB memory leak
+- [x] "Wipe everything" clears all data
+- [x] Stable IDs for library items
+- [x] Versioned saved data, upgrade path
+- [x] Warn when browser storage is full
+- [x] Label Usage numbers ("last 400 runs")
+- [x] Keep unsent prompts and attached files across reload
 
 ## Phase 4 — Security & downloads
 - [ ] Encrypt the API key in the cookie

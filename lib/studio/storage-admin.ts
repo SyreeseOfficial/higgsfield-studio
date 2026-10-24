@@ -1,6 +1,7 @@
 import { clearPlatformCredentials } from "@/generation/actions"
 
 import { loadHistory } from "./history"
+import { closeKv } from "./kv"
 
 /** Bytes used and available for this origin, when the browser says. */
 export async function storageEstimate(): Promise<{
@@ -33,11 +34,13 @@ export async function exportHistory(): Promise<void> {
 /** Removes the API key cookie, history, projects, uploads and settings, then reloads. */
 export async function wipeEverything(): Promise<void> {
   await clearPlatformCredentials()
+  await closeKv()
   await new Promise<void>((resolve) => {
     const request = indexedDB.deleteDatabase("studio")
     request.onsuccess = request.onerror = request.onblocked = () => resolve()
   })
   for (const key of Object.keys(localStorage))
     if (key.startsWith("hf.")) localStorage.removeItem(key)
+  sessionStorage.clear()
   location.reload()
 }

@@ -1,5 +1,6 @@
 "use client"
 
+import { HISTORY_MAX_RECORDS } from "@/lib/studio/limits"
 import {
   Dialog,
   DialogBody,
@@ -33,9 +34,14 @@ export function UsageDialog({
         </DialogHeader>
         <DialogBody>
           <div className="flex flex-col gap-5 text-sm">
+            <p className="text-xs text-muted-foreground">
+              Based on the runs saved in this browser: the latest{" "}
+              {HISTORY_MAX_RECORDS}, plus any you starred. Older runs are not
+              counted.
+            </p>
             <dl className="grid grid-cols-3 gap-3">
               {[
-                ["Runs", String(usage.total)],
+                ["Runs saved", String(usage.total)],
                 [
                   "Success rate",
                   usage.successRate == null

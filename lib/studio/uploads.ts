@@ -1,7 +1,11 @@
 import { create } from "zustand"
 import { persist } from "zustand/middleware"
 
-import { browserStorage } from "@/generation/stores/browser-storage"
+import { newId } from "./id"
+import {
+  browserStorage,
+  persistVersion,
+} from "@/generation/stores/browser-storage"
 import { stripMetadata } from "@/generation/strip-metadata"
 import { uploadMedia, type UploadOptions } from "@/generation/upload"
 import {
@@ -48,7 +52,7 @@ export const useUploads = create<UploadsState>()(
       remove: (id) =>
         set((s) => ({ items: s.items.filter((i) => i.id !== id) })),
     }),
-    { name: "hf.uploads.v1", storage: browserStorage() }
+    { name: "hf.uploads.v1", storage: browserStorage(), ...persistVersion }
   )
 )
 
@@ -90,7 +94,7 @@ export async function uploadAsset(
   if (known) return known
   const { url } = await uploadMedia(file, options)
   const item: AssetLibraryItem = {
-    id: url,
+    id: newId(),
     src: url,
     kind: kindOf(file),
     name: original.name,

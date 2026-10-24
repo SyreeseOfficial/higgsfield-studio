@@ -3,7 +3,7 @@ import { persist } from "zustand/middleware"
 
 import { defaultModel, getModel } from "../catalog"
 import type { Surface } from "../catalog/types"
-import { browserStorage } from "./browser-storage"
+import { browserStorage, persistVersion } from "./browser-storage"
 
 /** Results one press of Generate produces. Models that do not carry a count of
     their own are submitted once per result — every unit is a real platform
@@ -41,6 +41,7 @@ export const useActive = create<ActiveState>()(
     {
       name: "hf.active.v2",
       storage: browserStorage(),
+      ...persistVersion,
       partialize: (state) => ({
         surface: state.surface,
         model: state.model,
