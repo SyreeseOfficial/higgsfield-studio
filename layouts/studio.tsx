@@ -49,6 +49,14 @@ import {
   useUploads,
   type AssetSelection,
 } from "@/lib/studio/uploads"
+import { FeedControls } from "@/components/studio/feed-controls"
+import {
+  DEFAULT_FEED_VIEW,
+  applyFeedView,
+  emptyFeedMessage,
+  isDateSorted,
+  type FeedView,
+} from "@/lib/studio/feed-view"
 import type { RunRecord } from "@/lib/studio/history"
 import { MoveToProjectDialog } from "@/components/studio/move-dialog"
 import { UndoToast } from "@/components/studio/undo-toast"
@@ -210,6 +218,7 @@ function FeedState({
   onMove,
   onDeleteMany,
   onVariation,
+  onStar,
 }: {
   items: GalleryItem[]
   previewItems: GalleryItem[]
@@ -221,7 +230,18 @@ function FeedState({
   onMove: (items: GalleryItem[]) => void
   onDeleteMany: (items: GalleryItem[]) => void
   onVariation: (item: GalleryItem) => void
+  onStar: (item: GalleryItem) => void
 }) {
+  const [feedView, setFeedView] = useState<FeedView>(DEFAULT_FEED_VIEW)
+  const shownItems = useMemo(
+    () => applyFeedView(items, feedView),
+    [items, feedView]
+  )
+  const feedModels = useMemo(
+    () => [...new Set(items.map((i) => i.modelLabel))].sort(),
+    [items]
+  )
+  const filtered = items.length > 0 && shownItems.length === 0
   const images = useMemo(() => heroImages(previewItems), [previewItems])
   const dockRef = useRef<HTMLDivElement>(null)
   const [dockHeight, setDockHeight] = useState(180)
@@ -241,8 +261,19 @@ function FeedState({
         style={{ paddingBottom: dockHeight + 24 }}
       >
         <UserGenerations
-          items={items}
+          items={shownItems}
           title={title}
+          grouped={isDateSorted(feedView.sort)}
+          toolbar={
+            items.length > 0 ? (
+              <FeedControls
+                view={feedView}
+                models={feedModels}
+                onChange={setFeedView}
+              />
+            ) : undefined
+          }
+          onStar={onStar}
           onDelete={onDelete}
           onCancel={onCancel}
           onRecheck={onRecheck}
@@ -251,12 +282,14 @@ function FeedState({
           onVariation={onVariation}
           emptyState={{
             images,
-            title:
-              title === "All Generations"
+            title: filtered
+              ? "Nothing here"
+              : title === "All Generations"
                 ? "No generations yet"
                 : `No generations in ${title}`,
-            description:
-              "Describe an idea below, then generate the first result.",
+            description: filtered
+              ? emptyFeedMessage(feedView)
+              : "Describe an idea below, then generate the first result.",
           }}
         />
       </div>
@@ -594,6 +627,7 @@ export function StudioTemplate({
             onDelete={(item) => deleteRuns([item])}
             onDeleteMany={deleteRuns}
             onVariation={(item) => runs.variation(item.runId)}
+            onStar={(item) => runs.toggleStar(item.runId)}
             onMove={(items) => setMoving(items)}
             onCancel={(item) => void runs.cancel(item.runId)}
             onRecheck={(item) => runs.recheck(item.runId)}

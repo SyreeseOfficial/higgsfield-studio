@@ -36,6 +36,9 @@ export interface JustifiedGalleryProps {
   onMove?: (items: GalleryItem[]) => void
   onDeleteMany?: (items: GalleryItem[]) => void
   onVariation?: (item: GalleryItem) => void
+  onStar?: (item: GalleryItem) => void
+  /** Filter and sort controls, shown beside the title. */
+  toolbar?: ReactNode
 }
 
 export function JustifiedGallery({
@@ -52,6 +55,8 @@ export function JustifiedGallery({
   onMove,
   onDeleteMany,
   onVariation,
+  onStar,
+  toolbar,
 }: JustifiedGalleryProps) {
   const [selecting, setSelecting] = useState(false)
   const [selected, setSelected] = useState<ReadonlySet<string>>(new Set())
@@ -62,6 +67,14 @@ export function JustifiedGallery({
     onLoadMore,
   })
   const viewBottom = gallery.scrollTop + gallery.viewportHeight
+  // The heading of the day group scrolled to the top of the viewport.
+  const passed = gallery.layout.rows
+    .filter((row) => row.type === "header" && row.y < gallery.scrollTop)
+    .at(-1)
+  const stickyLabel =
+    passed && passed.y + passed.height <= gallery.scrollTop
+      ? passed.label
+      : undefined
   const chosen = items.filter((item) => selected.has(item.id))
   const bulk = onMove || onDeleteMany
   const stopSelecting = () => {
@@ -86,6 +99,7 @@ export function JustifiedGallery({
               {title}
             </h1>
           ) : null}
+          {toolbar}
           {gallery.loadingMore ? (
             <span className="flex items-center gap-1.5 text-xs text-muted-foreground">
               <Loader2 className="size-3 animate-spin" /> Loading
@@ -174,6 +188,13 @@ export function JustifiedGallery({
             className="relative w-full"
             style={{ height: gallery.layout.totalHeight }}
           >
+            {grouped && stickyLabel ? (
+              <div className="sticky top-0 z-[4] h-0">
+                <span className="inline-block rounded-full bg-background/80 px-3 py-1 text-xs font-medium backdrop-blur-md">
+                  {stickyLabel}
+                </span>
+              </div>
+            ) : null}
             {gallery.visibleRows.map((row) => {
               if (row.type === "header") {
                 return (
@@ -203,6 +224,7 @@ export function JustifiedGallery({
                     onCancel={onCancel}
                     onRecheck={onRecheck}
                     onVariation={onVariation}
+                    onStar={onStar}
                     {...(onMove
                       ? { onMove: (i: GalleryItem) => onMove([i]) }
                       : {})}

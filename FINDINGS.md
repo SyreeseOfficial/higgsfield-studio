@@ -84,12 +84,12 @@ Reviewed 2026-10-13 against `17b2826` (Next.js 16, React 19, Tailwind 4, Base UI
 - [x] **[L]** EXIF-free guarantee note: strip metadata from uploaded references (privacy). *(Done for JPEG and PNG; WebP, GIF, MP4 and WAV are uploaded as they are. A JPEG rotated by EXIF is re-encoded so it keeps its orientation.)*
 
 ### Gallery and organization
-- [ ] **[H]** Favorites/stars with a "Starred" filter, stored in the run record.
-- [ ] **[M]** Filter chips: image / video / failed / by model / by project.
-- [ ] **[M]** Sort options: newest, oldest, model, favorites first.
-- [ ] **[M]** Group-by-day headings with sticky date labels in the feed.
-- [ ] **[M]** Empty-state per filter ("No failed runs" vs "No history yet") with a relevant action.
-- [ ] **[L]** Detail modal shows all settings used, seed, model, duration, and timing, with "Copy as JSON".
+- [x] **[H]** Favorites/stars with a "Starred" filter, stored in the run record.
+- [x] **[M]** Filter chips: image / video / failed / by model / by project. *(Done: All/Images/Videos/Starred/Failed chips plus a model select. By-project is the sidebar's project view.)*
+- [x] **[M]** Sort options: newest, oldest, model, favorites first.
+- [x] **[M]** Group-by-day headings with sticky date labels in the feed. *(Day headings show in date order; they are off when sorting by model or starred.)*
+- [x] **[M]** Empty-state per filter *(Done: filtered-out feeds say what is missing. The empty-state art is still the scaffold's; see Issues Needing Review.)* ("No failed runs" vs "No history yet") with a relevant action.
+- [x] **[L]** Detail modal shows all settings used, seed, model, duration, and timing, with "Copy as JSON". *(Done except seed: the catalog has no seed setting. "Took" is shown for runs finished after this change.)*
 
 ### Onboarding and first run
 - [ ] **[H]** Key dialog explains where to get a key and links there; show "connected" state with masked key tail.

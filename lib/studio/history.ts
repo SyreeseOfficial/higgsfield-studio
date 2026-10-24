@@ -27,6 +27,8 @@ export interface RunRecord {
   inputMode?: string
   /** 1-based place in the local queue; set only on waiting placeholders, never persisted. */
   queued?: number
+  starred?: boolean
+  completedAt?: number
   /** Deadline passed but the platform never said it failed: offer "Check again". */
   stalled?: boolean
   /** Cancel requested; the next poll decides the final state. */

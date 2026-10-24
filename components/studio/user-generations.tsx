@@ -25,6 +25,9 @@ export interface UserGenerationsProps {
   onMove?: (items: GalleryItem[]) => void
   onDeleteMany?: (items: GalleryItem[]) => void
   onVariation?: (item: GalleryItem) => void
+  onStar?: (item: GalleryItem) => void
+  toolbar?: ReactNode
+  grouped?: boolean
 }
 
 export function UserGenerations(props: UserGenerationsProps) {

@@ -3,6 +3,26 @@ import type { AssetLibraryItem } from "@/lib/studio/uploads"
 
 import type { RunRecord } from "./history"
 
+/** Day bucket for the feed's date headings. */
+function dayGroup(createdAt: number) {
+  const day = new Date(createdAt)
+  day.setHours(0, 0, 0, 0)
+  const days = Math.round((new Date().setHours(0, 0, 0, 0) - +day) / 86_400_000)
+  return {
+    groupId: String(+day),
+    groupLabel:
+      days <= 0
+        ? "Today"
+        : days === 1
+          ? "Yesterday"
+          : day.toLocaleDateString(undefined, {
+              weekday: "short",
+              month: "short",
+              day: "numeric",
+            }),
+  }
+}
+
 /** One feed tile per result URL; a running or failed run is a single placeholder tile. */
 export function runToGalleryItems(run: RunRecord): GalleryItem[] {
   const base = {
@@ -15,8 +35,9 @@ export function runToGalleryItems(run: RunRecord): GalleryItem[] {
     alt: run.prompt || run.modelLabel,
     modelLabel: run.modelLabel,
     settings: run.settings,
-    groupId: "all",
-    groupLabel: "",
+    ...dayGroup(run.createdAt),
+    ...(run.starred ? { starred: true } : {}),
+    ...(run.completedAt ? { completedAt: run.completedAt } : {}),
   }
   if (run.status !== "completed") {
     return [

@@ -9,6 +9,7 @@ import {
   FolderInput,
   Share2,
   Shuffle,
+  Star,
   Trash2,
 } from "lucide-react"
 
@@ -36,6 +37,7 @@ export interface GalleryTileProps {
   onRecheck?: (item: GalleryItem) => void
   onMove?: (item: GalleryItem) => void
   onVariation?: (item: GalleryItem) => void
+  onStar?: (item: GalleryItem) => void
 }
 
 function rectStyle(rect: TileRect, top: number): CSSProperties {
@@ -137,6 +139,7 @@ function GalleryTileComponent({
   onRecheck,
   onMove,
   onVariation,
+  onStar,
 }: GalleryTileProps) {
   const [hovered, setHovered] = useState(false)
   const style = rectStyle(rect, top)
@@ -236,6 +239,16 @@ function GalleryTileComponent({
         else void copyText(`${item.prompt}\n${url}`)
       },
     },
+    ...(onStar
+      ? [
+          {
+            id: "star",
+            label: item.starred ? "Unstar" : "Star",
+            icon: Star,
+            onSelect: () => onStar(item),
+          },
+        ]
+      : []),
     ...(onVariation
       ? [
           {
@@ -284,6 +297,7 @@ function GalleryTileComponent({
           model: item.modelLabel,
           createdAt: item.createdAt,
           settings: item.settings,
+          ...(item.completedAt ? { completedAt: item.completedAt } : {}),
         }}
         openLabel={`Open generation: ${item.prompt}`}
         onMouseEnter={isVideo ? () => setHovered(true) : undefined}
@@ -291,6 +305,12 @@ function GalleryTileComponent({
         onFocus={isVideo ? () => setHovered(true) : undefined}
         onBlur={isVideo ? () => setHovered(false) : undefined}
       />
+      {item.starred ? (
+        <Star
+          aria-label="Starred"
+          className="pointer-events-none absolute top-2 left-2 z-[2] size-4 fill-yellow-300 text-yellow-300 drop-shadow"
+        />
+      ) : null}
     </div>
   )
 }

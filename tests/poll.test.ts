@@ -2,7 +2,8 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest"
 
 import type { StatusResult } from "@/generation/platform"
 
-const getGenerationStatuses = vi.fn<(data: unknown) => Promise<StatusResult[]>>()
+const getGenerationStatuses =
+  vi.fn<(data: unknown) => Promise<StatusResult[]>>()
 vi.mock("@/generation/actions", () => ({
   getGenerationStatuses: (data: unknown) => getGenerationStatuses(data),
 }))

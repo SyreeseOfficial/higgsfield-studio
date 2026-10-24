@@ -4,7 +4,7 @@
 import { useState } from "react"
 import type { ReactElement, ReactNode } from "react"
 import { Dialog as DialogPrimitive } from "@base-ui/react/dialog"
-import { Copy, Download, Share2, X } from "lucide-react"
+import { Braces, Copy, Download, Share2, X } from "lucide-react"
 
 import { Button } from "@/components/ui/button"
 import { downloadMedia } from "@/lib/studio/download-media"
@@ -24,6 +24,7 @@ export interface GenerationDetail {
   prompt?: string
   model?: string
   createdAt?: number
+  completedAt?: number
   settings?: Record<string, unknown>
 }
 
@@ -45,6 +46,13 @@ async function copyText(text: string) {
   await navigator.clipboard?.writeText(text)
 }
 
+function formatDuration(ms: number): string {
+  const seconds = Math.max(1, Math.round(ms / 1000))
+  return seconds < 60
+    ? `${seconds} s`
+    : `${Math.floor(seconds / 60)} min ${seconds % 60} s`
+}
+
 function defaultRows(g: GenerationDetail): GenerationDetailRow[] {
   const rows: GenerationDetailRow[] = []
   if (g.model) rows.push({ id: "model", label: "Model", value: g.model })
@@ -58,6 +66,12 @@ function defaultRows(g: GenerationDetail): GenerationDetailRow[] {
       id: "created",
       label: "Created",
       value: new Date(g.createdAt).toLocaleString(),
+    })
+  if (g.createdAt && g.completedAt)
+    rows.push({
+      id: "took",
+      label: "Took",
+      value: formatDuration(g.completedAt - g.createdAt),
     })
   for (const [key, value] of Object.entries(g.settings ?? {})) {
     if (value === undefined || value === null) continue
@@ -177,6 +191,32 @@ export function GenerationDetailModal({
                       <Copy />
                     </Button>
                   ) : null}
+                  <Button
+                    variant="outline"
+                    size="icon"
+                    aria-label="Copy as JSON"
+                    title="Copy as JSON"
+                    onClick={() =>
+                      void copyText(
+                        JSON.stringify(
+                          {
+                            model: generation.model,
+                            type: generation.mediaType,
+                            prompt: generation.prompt,
+                            settings: generation.settings,
+                            createdAt: generation.createdAt
+                              ? new Date(generation.createdAt).toISOString()
+                              : undefined,
+                            result: generation.src,
+                          },
+                          null,
+                          2
+                        )
+                      )
+                    }
+                  >
+                    <Braces />
+                  </Button>
                   <Button
                     variant="outline"
                     size="icon"

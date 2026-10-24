@@ -2,6 +2,11 @@ import { describe, expect, it } from "vitest"
 
 import { parseUploadTicket } from "@/generation/upload-contract"
 import { aspectFromSettings } from "@/lib/studio/history"
+import {
+  DEFAULT_FEED_VIEW,
+  applyFeedView,
+  type FeedView,
+} from "@/lib/studio/feed-view"
 import { JustifiedLayoutEngine } from "@/components/studio/gallery/justified-engine"
 import type { GalleryItem } from "@/components/studio/gallery/gallery-types"
 
@@ -29,13 +34,19 @@ describe("parseUploadTicket", () => {
   it("rejects credential headers and mismatched types", () => {
     expect(() =>
       parseUploadTicket(
-        { ...ticket, upload_headers: { ...ticket.upload_headers, Authorization: "x" } },
+        {
+          ...ticket,
+          upload_headers: { ...ticket.upload_headers, Authorization: "x" },
+        },
         "image/png"
       )
     ).toThrow()
     expect(() => parseUploadTicket(ticket, "image/jpeg")).toThrow()
     expect(() =>
-      parseUploadTicket({ ...ticket, upload_url: "http://insecure" }, "image/png")
+      parseUploadTicket(
+        { ...ticket, upload_url: "http://insecure" },
+        "image/png"
+      )
     ).toThrow()
   })
 })
@@ -60,11 +71,63 @@ describe("JustifiedLayoutEngine", () => {
 
   it("justifies a full row to the container width", () => {
     const engine = new JustifiedLayoutEngine()
-    engine.setConfig({ containerWidth: 1000, targetRowHeight: 200, gap: 6, grouped: false })
-    engine.setItems([item("a", 1), item("b", 1.5), item("c", 2), item("d", 1), item("e", 1)])
+    engine.setConfig({
+      containerWidth: 1000,
+      targetRowHeight: 200,
+      gap: 6,
+      grouped: false,
+    })
+    engine.setItems([
+      item("a", 1),
+      item("b", 1.5),
+      item("c", 2),
+      item("d", 1),
+      item("e", 1),
+    ])
     const [row] = engine.compute().rows
     const tiles = row!.tiles!
     const used = tiles.reduce((n, t) => n + t.width, 0) + 6 * (tiles.length - 1)
     expect(used).toBeCloseTo(1000, 0)
+  })
+})
+
+describe("applyFeedView", () => {
+  const mk = (id: string, patch: Partial<GalleryItem>): GalleryItem => ({
+    id,
+    runId: id,
+    createdAt: Number(id),
+    kind: "image",
+    status: "ready",
+    src: "",
+    width: 1,
+    height: 1,
+    prompt: "",
+    alt: "",
+    modelLabel: "A",
+    settings: {},
+    groupId: "",
+    groupLabel: "",
+    ...patch,
+  })
+  const items = [
+    mk("3", { kind: "video", modelLabel: "B", starred: true }),
+    mk("2", { status: "failed" }),
+    mk("1", {}),
+  ]
+  const ids = (view: Partial<FeedView>) =>
+    applyFeedView(items, { ...DEFAULT_FEED_VIEW, ...view }).map((i) => i.id)
+
+  it("filters by kind, failure, star and model", () => {
+    expect(ids({ kind: "video" })).toEqual(["3"])
+    expect(ids({ kind: "image" })).toEqual(["1"])
+    expect(ids({ kind: "failed" })).toEqual(["2"])
+    expect(ids({ kind: "starred" })).toEqual(["3"])
+    expect(ids({ model: "A" })).toEqual(["2", "1"])
+  })
+
+  it("sorts", () => {
+    expect(ids({ sort: "oldest" })).toEqual(["1", "2", "3"])
+    expect(ids({ sort: "model" })).toEqual(["2", "1", "3"])
+    expect(ids({ sort: "starred" })).toEqual(["3", "2", "1"])
   })
 })

@@ -305,6 +305,12 @@ export function useRuns({ onAuthError }: { onAuthError?: () => void } = {}) {
     )
   }, [])
 
+  const toggleStar = useCallback((id: string) => {
+    setRecords((current) =>
+      current.map((r) => (r.id === id ? { ...r, starred: !r.starred } : r))
+    )
+  }, [])
+
   /** Files runs under a project, or out of any project when `projectId` is undefined. */
   const move = useCallback((ids: string[], projectId?: string) => {
     setRecords((current) =>
@@ -338,6 +344,7 @@ export function useRuns({ onAuthError }: { onAuthError?: () => void } = {}) {
     remove,
     restore,
     move,
+    toggleStar,
     setError,
   }
 }
@@ -348,7 +355,13 @@ function settle(status: GenerationStatus): Partial<RunRecord> {
     ...(status.video ? [status.video.url] : []),
   ]
   if (status.status === "completed" && urls.length > 0)
-    return { status: "completed", urls, stalled: false, canceling: false }
+    return {
+      status: "completed",
+      urls,
+      stalled: false,
+      canceling: false,
+      completedAt: Date.now(),
+    }
   const reason =
     status.status === "nsfw"
       ? "Blocked by the content filter"
