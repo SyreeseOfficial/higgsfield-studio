@@ -49,6 +49,13 @@ import {
   useUploads,
   type AssetSelection,
 } from "@/lib/studio/uploads"
+import type { RunRecord } from "@/lib/studio/history"
+import { MoveToProjectDialog } from "@/components/studio/move-dialog"
+import { UndoToast } from "@/components/studio/undo-toast"
+import {
+  requestNotificationPermission,
+  useRunSignals,
+} from "@/lib/studio/use-run-signals"
 import { MAX_RUNNING, useRuns } from "@/lib/studio/use-runs"
 
 /**
@@ -200,6 +207,8 @@ function FeedState({
   onDelete,
   onCancel,
   onRecheck,
+  onMove,
+  onDeleteMany,
 }: {
   items: GalleryItem[]
   previewItems: GalleryItem[]
@@ -208,6 +217,8 @@ function FeedState({
   onDelete: (item: GalleryItem) => void
   onCancel: (item: GalleryItem) => void
   onRecheck: (item: GalleryItem) => void
+  onMove: (items: GalleryItem[]) => void
+  onDeleteMany: (items: GalleryItem[]) => void
 }) {
   const images = useMemo(() => heroImages(previewItems), [previewItems])
   const dockRef = useRef<HTMLDivElement>(null)
@@ -233,6 +244,8 @@ function FeedState({
           onDelete={onDelete}
           onCancel={onCancel}
           onRecheck={onRecheck}
+          onMove={onMove}
+          onDeleteMany={onDeleteMany}
           emptyState={{
             images,
             title:
@@ -281,6 +294,11 @@ export function StudioTemplate({
   const [keyOpen, setKeyOpen] = useState(false)
   const [keyConfigured, setKeyConfigured] = useState(false)
   const [canceling, setCanceling] = useState(false)
+  const [moving, setMoving] = useState<GalleryItem[] | null>(null)
+  const [undo, setUndo] = useState<{
+    message: string
+    records: RunRecord[]
+  } | null>(null)
   const [localError, setLocalError] = useState<string | null>(null)
 
   const surface = useActive((s) => s.surface)
@@ -399,9 +417,24 @@ export function StudioTemplate({
     ) ||
     (model.requirePrompt && !prompt.trim())
 
+  useRunSignals(runs.records)
+
+  const deleteRuns = (items: GalleryItem[]) => {
+    const gone = runs.remove([...new Set(items.map((i) => i.runId))])
+    if (gone.length)
+      setUndo({
+        message:
+          gone.length === 1
+            ? "Generation deleted"
+            : `${gone.length} generations deleted`,
+        records: gone,
+      })
+  }
+
   const handleGenerate = useCallback(() => {
     if (!canGenerate || generating || !prepared.plane) return
     setLocalError(null)
+    requestNotificationPermission()
     if (!keyConfigured) {
       setKeyOpen(true)
       return
@@ -474,7 +507,11 @@ export function StudioTemplate({
           : mergeMedia(
               media,
               role,
-              selected.map((item) => ({ ...item, id: `${role}:${item.id}`, role })),
+              selected.map((item) => ({
+                ...item,
+                id: `${role}:${item.id}`,
+                role,
+              })),
               roles[role] ?? 0
             )
       setLocalError(null)
@@ -505,6 +542,10 @@ export function StudioTemplate({
     canceling,
     generateDisabled: !canGenerate,
     disabledReason: prepared.error ?? undefined,
+    etaHint:
+      model.surface === "video"
+        ? "Video usually takes a few minutes"
+        : "Images usually take under a minute",
     error:
       localError ??
       runs.error ??
@@ -556,12 +597,37 @@ export function StudioTemplate({
             previewItems={galleryItems}
             title={selectedProject?.name ?? "All Generations"}
             dock={dock}
-            onDelete={(item) => runs.remove(item.runId)}
+            onDelete={(item) => deleteRuns([item])}
+            onDeleteMany={deleteRuns}
+            onMove={(items) => setMoving(items)}
             onCancel={(item) => void runs.cancel(item.runId)}
             onRecheck={(item) => runs.recheck(item.runId)}
           />
         )}
       </main>
+      <MoveToProjectDialog
+        open={moving !== null}
+        count={new Set(moving?.map((i) => i.runId)).size}
+        projects={projectsStore.projects}
+        onOpenChange={(open) => {
+          if (!open) setMoving(null)
+        }}
+        onPick={(projectId) => {
+          runs.move([...new Set(moving?.map((i) => i.runId))], projectId)
+          if (projectId) projectsStore.touch(projectId)
+          setMoving(null)
+        }}
+      />
+      {undo ? (
+        <UndoToast
+          message={undo.message}
+          onUndo={() => {
+            runs.restore(undo.records)
+            setUndo(null)
+          }}
+          onDismiss={() => setUndo(null)}
+        />
+      ) : null}
       <KeyDialog
         open={keyOpen}
         onOpenChange={setKeyOpen}

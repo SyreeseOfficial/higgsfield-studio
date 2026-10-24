@@ -113,7 +113,8 @@ export function useRuns({ onAuthError }: { onAuthError?: () => void } = {}) {
   }, [watch])
 
   useEffect(() => {
-    if (loaded) void saveHistory(records).then(() => channel.current?.postMessage(0))
+    if (loaded)
+      void saveHistory(records).then(() => channel.current?.postMessage(0))
   }, [loaded, records])
 
   const submit = useCallback(
@@ -197,8 +198,36 @@ export function useRuns({ onAuthError }: { onAuthError?: () => void } = {}) {
     [records, update, watch]
   )
 
-  const remove = useCallback((id: string) => {
-    setRecords((current) => current.filter((r) => r.id !== id))
+  /** Removes runs and returns them, so the caller can offer Undo. */
+  const remove = useCallback(
+    (ids: string[]): RunRecord[] => {
+      const gone = records.filter((r) => ids.includes(r.id))
+      setRecords((current) => current.filter((r) => !ids.includes(r.id)))
+      return gone
+    },
+    [records]
+  )
+
+  const restore = useCallback((restored: RunRecord[]) => {
+    setRecords((current) =>
+      [
+        ...restored,
+        ...current.filter((r) => !restored.some((x) => x.id === r.id)),
+      ].sort((a, b) => b.createdAt - a.createdAt)
+    )
+  }, [])
+
+  /** Files runs under a project, or out of any project when `projectId` is undefined. */
+  const move = useCallback((ids: string[], projectId?: string) => {
+    setRecords((current) =>
+      current.map((r) => {
+        if (!ids.includes(r.id)) return r
+        const moved: RunRecord = { ...r }
+        if (projectId) moved.projectId = projectId
+        else delete moved.projectId
+        return moved
+      })
+    )
   }, [])
 
   const running = records.filter((r) => r.status === "running")
@@ -212,6 +241,8 @@ export function useRuns({ onAuthError }: { onAuthError?: () => void } = {}) {
     cancel,
     recheck,
     remove,
+    restore,
+    move,
     setError,
   }
 }

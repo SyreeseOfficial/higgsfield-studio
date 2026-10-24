@@ -3,7 +3,10 @@ import { persist } from "zustand/middleware"
 
 import { browserStorage } from "@/generation/stores/browser-storage"
 import { uploadMedia } from "@/generation/upload"
-import { mediaKindFromMime } from "@/generation/upload-contract"
+import {
+  mediaKindFromMime,
+  unsupportedFileMessage,
+} from "@/generation/upload-contract"
 import type { MediaKind } from "@/generation/catalog/types"
 
 export type AssetKind = MediaKind
@@ -47,7 +50,11 @@ export const useUploads = create<UploadsState>()(
 )
 
 export function kindOf(file: File): AssetKind {
-  return mediaKindFromMime(file.type)
+  try {
+    return mediaKindFromMime(file.type)
+  } catch {
+    throw new Error(unsupportedFileMessage(file))
+  }
 }
 
 /** Record a reference only after the Higgsfield storage upload succeeds. */

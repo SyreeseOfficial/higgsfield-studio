@@ -27,6 +27,18 @@ export function requireUploadContentType(value: unknown): string {
   return value
 }
 
+/** Why a file the platform can't take was refused, in terms of what to do instead. */
+export function unsupportedFileMessage(file: { type: string; name: string }) {
+  const ext = file.name.split(".").pop()?.toLowerCase()
+  if (/hei[cf]/.test(file.type) || ext === "heic" || ext === "heif")
+    return "HEIC photos aren't supported. Export the photo as JPEG or PNG first."
+  if (file.type === "video/quicktime" || ext === "mov")
+    return "MOV videos aren't supported. Export the clip as MP4 first."
+  if (file.type.startsWith("audio/") || ext === "mp3" || ext === "m4a")
+    return "Only WAV audio is supported. Convert the file to WAV first."
+  return "Unsupported file type. Use JPEG, PNG, WebP, GIF, MP4, or WAV."
+}
+
 export function mediaKindFromMime(contentType: string): MediaKind {
   requireUploadContentType(contentType)
   if (contentType.startsWith("audio/")) return "audio"

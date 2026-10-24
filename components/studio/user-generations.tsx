@@ -22,6 +22,8 @@ export interface UserGenerationsProps {
   onDelete?: (item: GalleryItem) => void
   onCancel?: (item: GalleryItem) => void
   onRecheck?: (item: GalleryItem) => void
+  onMove?: (items: GalleryItem[]) => void
+  onDeleteMany?: (items: GalleryItem[]) => void
 }
 
 export function UserGenerations(props: UserGenerationsProps) {

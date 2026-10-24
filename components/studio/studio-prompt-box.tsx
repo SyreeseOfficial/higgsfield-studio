@@ -1,6 +1,13 @@
 "use client"
 
-import { useRef, useState, type ChangeEvent, type ReactNode } from "react"
+import {
+  useRef,
+  useState,
+  type ChangeEvent,
+  type ClipboardEvent,
+  type DragEvent,
+  type ReactNode,
+} from "react"
 import {
   AudioLines,
   Check,
@@ -47,6 +54,7 @@ import {
   ROLE_KIND,
   ROLE_LABEL,
 } from "@/generation/catalog/media-inputs"
+import { kindOf } from "@/lib/studio/uploads"
 import type { AssetLibraryItem, AssetSelection } from "@/lib/studio/uploads"
 
 import { AssetLibraryModal } from "./asset-library"
@@ -85,6 +93,8 @@ export interface StudioPromptBoxProps {
   canceling?: boolean
   generateDisabled?: boolean
   disabledReason?: string
+  /** Tooltip on Generate while it is enabled: roughly how long a run takes. */
+  etaHint?: string
   error?: ReactNode
   skin?: PromptBoxSurface
   className?: string
@@ -264,26 +274,10 @@ function ReferencePicker({
   StudioPromptBoxProps,
   "model" | "inputMode" | "media" | "onMediaAdd" | "library"
 >) {
-  const limits = inputRoles(model, inputMode)
-  const slots = mediaSlots(model, inputMode)
-  const kinds = (Object.keys(REFERENCE_ROLE) as MediaKind[]).filter(
-    (kind) =>
-      !slots.includes(REFERENCE_ROLE[kind]) &&
-      (limits[REFERENCE_ROLE[kind]] ?? 0) > 0
-  )
-  const kindLimits = Object.fromEntries(
-    kinds.map((kind) => [
-      kind,
-      Math.max(
-        0,
-        (limits[REFERENCE_ROLE[kind]] ?? 0) -
-          media.filter((item) => item.role === REFERENCE_ROLE[kind]).length
-      ),
-    ])
-  )
-  const remaining = Object.values(kindLimits).reduce(
-    (total, count) => total + count,
-    0
+  const { kinds, kindLimits, remaining } = referenceRoom(
+    model,
+    inputMode,
+    media
   )
   if (!kinds.length) return null
   return (
@@ -307,6 +301,104 @@ function ReferencePicker({
       }
     />
   )
+}
+
+/** Which kinds of reference the dock can still take, and how many of each. */
+function referenceRoom(
+  model: ModelEntry,
+  inputMode: string | undefined,
+  media: MediaItem[]
+) {
+  const limits = inputRoles(model, inputMode)
+  const slots = mediaSlots(model, inputMode)
+  const kinds = (Object.keys(REFERENCE_ROLE) as MediaKind[]).filter(
+    (kind) =>
+      !slots.includes(REFERENCE_ROLE[kind]) &&
+      (limits[REFERENCE_ROLE[kind]] ?? 0) > 0
+  )
+  const kindLimits = Object.fromEntries(
+    kinds.map((kind) => [
+      kind,
+      Math.max(
+        0,
+        (limits[REFERENCE_ROLE[kind]] ?? 0) -
+          media.filter((item) => item.role === REFERENCE_ROLE[kind]).length
+      ),
+    ])
+  ) as Partial<Record<MediaKind, number>>
+  const remaining = Object.values(kindLimits).reduce(
+    (total, count) => total + count,
+    0
+  )
+  return { kinds, kindLimits, remaining }
+}
+
+/** Pasted images and files dropped on the dock become references, like the library's upload tile. */
+function useReferenceIntake({
+  model,
+  inputMode,
+  media,
+  onMediaAdd,
+  library,
+}: Pick<
+  StudioPromptBoxProps,
+  "model" | "inputMode" | "media" | "onMediaAdd" | "library"
+>) {
+  const [status, setStatus] = useState<{ text: string; error: boolean } | null>(
+    null
+  )
+  const busy = useRef(false)
+
+  const take = async (files: File[]) => {
+    if (!files.length || busy.current) return
+    busy.current = true
+    try {
+      const { kinds, kindLimits } = referenceRoom(model, inputMode, media)
+      if (!kinds.length)
+        throw new Error(`${model.label} doesn't take reference files.`)
+      const used: Partial<Record<MediaKind, number>> = {}
+      for (const file of files) {
+        const kind = kindOf(file)
+        if (!kinds.includes(kind))
+          throw new Error(`${model.label} doesn't take ${kind} references.`)
+        used[kind] = (used[kind] ?? 0) + 1
+        if (used[kind]! > (kindLimits[kind] ?? 0))
+          throw new Error(
+            `You can add ${kindLimits[kind] ?? 0} more ${kind} files.`
+          )
+      }
+      setStatus({ text: "Uploading reference…", error: false })
+      const uploaded: AssetSelection[] = []
+      for (const file of files) uploaded.push(await library.onUpload(file))
+      onMediaAdd("auto", uploaded)
+      setStatus(null)
+    } catch (caught) {
+      setStatus({
+        text: caught instanceof Error ? caught.message : "Upload failed.",
+        error: true,
+      })
+    } finally {
+      busy.current = false
+    }
+  }
+
+  return {
+    status,
+    onPaste: (event: ClipboardEvent) => {
+      const files = Array.from(event.clipboardData.files)
+      if (!files.length) return
+      event.preventDefault()
+      void take(files)
+    },
+    onDragOver: (event: DragEvent) => {
+      if (event.dataTransfer.types.includes("Files")) event.preventDefault()
+    },
+    onDrop: (event: DragEvent) => {
+      if (!event.dataTransfer.files.length) return
+      event.preventDefault()
+      void take(Array.from(event.dataTransfer.files))
+    },
+  }
 }
 
 function MediaInputs({
@@ -519,28 +611,129 @@ export function StudioPromptBox({
   canceling = false,
   generateDisabled = false,
   disabledReason,
+  etaHint,
   error,
   skin,
   className = "w-[830px] max-w-full",
 }: StudioPromptBoxProps) {
   const headline = headlineSetting(model)
   const headlineField = headline ? model.settings[headline] : undefined
+  const intake = useReferenceIntake({
+    model,
+    inputMode,
+    media,
+    onMediaAdd,
+    library,
+  })
   return (
-    <PromptBox.Root surface={skin} className={className}>
-      <PromptBox.ModeRail hidden={surfaces.length < 2}>
-        {surfaces.map((value) => (
-          <PromptBox.Mode
-            key={value}
-            active={surface === value}
-            onClick={() => onSurfaceChange(value)}
-            start={value === "video" ? <Clapperboard /> : <ImageIcon />}
-          >
-            {value === "video" ? "Video" : "Image"}
-          </PromptBox.Mode>
-        ))}
-      </PromptBox.ModeRail>
-      <PromptBox.Body>
+    <div
+      className="contents"
+      onPaste={intake.onPaste}
+      onDragOver={intake.onDragOver}
+      onDrop={intake.onDrop}
+    >
+      <PromptBox.Root surface={skin} className={className}>
+        <PromptBox.ModeRail hidden={surfaces.length < 2}>
+          {surfaces.map((value) => (
+            <PromptBox.Mode
+              key={value}
+              active={surface === value}
+              onClick={() => onSurfaceChange(value)}
+              start={value === "video" ? <Clapperboard /> : <ImageIcon />}
+            >
+              {value === "video" ? "Video" : "Image"}
+            </PromptBox.Mode>
+          ))}
+        </PromptBox.ModeRail>
+        <PromptBox.Body>
+          <MediaInputs
+            {...{
+              model,
+              inputMode,
+              media,
+              onMediaAdd,
+              onMediaRemove,
+              onMediaRoleChange,
+              library,
+            }}
+          />
+          <PromptBox.Field
+            placeholder={placeholder}
+            aria-label={placeholder}
+            value={prompt}
+            onChange={(event: ChangeEvent<HTMLTextAreaElement>) =>
+              onPromptChange(event.target.value)
+            }
+            onKeyDown={(event) => {
+              if (
+                event.key === "Enter" &&
+                (event.metaKey || event.ctrlKey) &&
+                !generating &&
+                !generateDisabled
+              ) {
+                event.preventDefault()
+                onGenerate()
+              }
+            }}
+          />
+          {error != null || intake.status ? (
+            <p
+              className={
+                "px-1 pb-1 text-q-caption-sm-medium " +
+                (error == null && intake.status && !intake.status.error
+                  ? "text-muted-foreground"
+                  : "text-q-state-error-fg")
+              }
+              role="alert"
+            >
+              {error ?? intake.status?.text}
+            </p>
+          ) : null}
+          <PromptBox.Actions className="flex-wrap">
+            <ReferencePicker
+              {...{ model, inputMode, media, onMediaAdd, library }}
+            />
+            <PillSelect
+              label="Model"
+              value={model.id}
+              onValueChange={onModelChange}
+              options={models.map((entry) => ({
+                value: entry.id,
+                label: entry.label,
+                icon: modelIcon(entry),
+              }))}
+            />
+            {headline && headlineField?.type === "enum" ? (
+              <PillSelect
+                label={settingLabel(headline)}
+                value={
+                  typeof settings[headline] === "string"
+                    ? (settings[headline] as string)
+                    : headlineField.default
+                }
+                onValueChange={(value) => onSettingChange(headline, value)}
+                options={headlineField.values.map((value) => ({
+                  value,
+                  label: value,
+                }))}
+              />
+            ) : null}
+            <SettingsDialog
+              model={model}
+              values={settings}
+              onChange={onSettingChange}
+              trigger={
+                <PromptBox.Pill
+                  iconOnly
+                  aria-label="All settings"
+                  start={<SlidersHorizontal />}
+                />
+              }
+            />
+          </PromptBox.Actions>
+        </PromptBox.Body>
         <MediaInputs
+          tilesOnly
           {...{
             model,
             inputMode,
@@ -551,96 +744,15 @@ export function StudioPromptBox({
             library,
           }}
         />
-        <PromptBox.Field
-          placeholder={placeholder}
-          aria-label={placeholder}
-          value={prompt}
-          onChange={(event: ChangeEvent<HTMLTextAreaElement>) =>
-            onPromptChange(event.target.value)
-          }
-          onKeyDown={(event) => {
-            if (
-              event.key === "Enter" &&
-              (event.metaKey || event.ctrlKey) &&
-              !generating &&
-              !generateDisabled
-            ) {
-              event.preventDefault()
-              onGenerate()
-            }
-          }}
-        />
-        {error != null ? (
-          <p
-            className="px-1 pb-1 text-q-caption-sm-medium text-q-state-error-fg"
-            role="alert"
-          >
-            {error}
-          </p>
-        ) : null}
-        <PromptBox.Actions className="flex-wrap">
-          <ReferencePicker
-            {...{ model, inputMode, media, onMediaAdd, library }}
-          />
-          <PillSelect
-            label="Model"
-            value={model.id}
-            onValueChange={onModelChange}
-            options={models.map((entry) => ({
-              value: entry.id,
-              label: entry.label,
-              icon: modelIcon(entry),
-            }))}
-          />
-          {headline && headlineField?.type === "enum" ? (
-            <PillSelect
-              label={settingLabel(headline)}
-              value={
-                typeof settings[headline] === "string"
-                  ? (settings[headline] as string)
-                  : headlineField.default
-              }
-              onValueChange={(value) => onSettingChange(headline, value)}
-              options={headlineField.values.map((value) => ({
-                value,
-                label: value,
-              }))}
-            />
-          ) : null}
-          <SettingsDialog
-            model={model}
-            values={settings}
-            onChange={onSettingChange}
-            trigger={
-              <PromptBox.Pill
-                iconOnly
-                aria-label="All settings"
-                start={<SlidersHorizontal />}
-              />
-            }
-          />
-        </PromptBox.Actions>
-      </PromptBox.Body>
-      <MediaInputs
-        tilesOnly
-        {...{
-          model,
-          inputMode,
-          media,
-          onMediaAdd,
-          onMediaRemove,
-          onMediaRoleChange,
-          library,
-        }}
-      />
-      <PromptBox.Generate
-        cost={generating ? undefined : cost}
-        onClick={generating ? onCancel : onGenerate}
-        disabled={canceling || (!generating && generateDisabled)}
-        title={!generating && generateDisabled ? disabledReason : undefined}
-      >
-        {canceling ? "Cancelling…" : generating ? "Cancel all" : "Generate"}
-      </PromptBox.Generate>
-    </PromptBox.Root>
+        <PromptBox.Generate
+          cost={generating ? undefined : cost}
+          onClick={generating ? onCancel : onGenerate}
+          disabled={canceling || (!generating && generateDisabled)}
+          title={!generating && generateDisabled ? disabledReason : etaHint}
+        >
+          {canceling ? "Cancelling…" : generating ? "Cancel all" : "Generate"}
+        </PromptBox.Generate>
+      </PromptBox.Root>
+    </div>
   )
 }

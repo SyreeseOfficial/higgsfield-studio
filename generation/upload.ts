@@ -1,7 +1,16 @@
-import { parseUploadTicket, requireUploadContentType } from "./upload-contract"
+import {
+  parseUploadTicket,
+  requireUploadContentType,
+  unsupportedFileMessage,
+} from "./upload-contract"
 
 export async function uploadMedia(file: File): Promise<{ url: string }> {
-  const contentType = requireUploadContentType(file.type)
+  let contentType: string
+  try {
+    contentType = requireUploadContentType(file.type)
+  } catch {
+    throw new Error(unsupportedFileMessage(file))
+  }
   const res = await fetch("/api/upload", {
     method: "POST",
     headers: { "Content-Type": "application/json" },

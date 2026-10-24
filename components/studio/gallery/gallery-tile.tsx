@@ -3,7 +3,7 @@
 
 import { memo, useEffect, useRef, useState } from "react"
 import type { CSSProperties } from "react"
-import { Copy, Download, Share2, Trash2 } from "lucide-react"
+import { Copy, Download, FolderInput, Share2, Trash2 } from "lucide-react"
 
 import {
   GenerationTile,
@@ -27,6 +27,7 @@ export interface GalleryTileProps {
   onDelete?: (item: GalleryItem) => void
   onCancel?: (item: GalleryItem) => void
   onRecheck?: (item: GalleryItem) => void
+  onMove?: (item: GalleryItem) => void
 }
 
 function rectStyle(rect: TileRect, top: number): CSSProperties {
@@ -126,6 +127,7 @@ function GalleryTileComponent({
   onDelete,
   onCancel,
   onRecheck,
+  onMove,
 }: GalleryTileProps) {
   const [hovered, setHovered] = useState(false)
   const style = rectStyle(rect, top)
@@ -223,6 +225,16 @@ function GalleryTileComponent({
         else void copyText(`${item.prompt}\n${url}`)
       },
     },
+    ...(onMove
+      ? [
+          {
+            id: "move",
+            label: "Move to project",
+            icon: FolderInput,
+            onSelect: () => onMove(item),
+          },
+        ]
+      : []),
     ...(onDelete
       ? [
           {

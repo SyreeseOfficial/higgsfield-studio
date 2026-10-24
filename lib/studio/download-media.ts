@@ -53,3 +53,24 @@ export async function downloadMedia(
     clickDownload(url, filename ?? filenameFromUrl(url), true)
   }
 }
+
+/** One file downloads directly; several are zipped. Falls back to one download each when storage disallows fetch. */
+export async function downloadMany(urls: string[]): Promise<void> {
+  if (urls.length < 2) return void (urls[0] && downloadMedia(urls[0]))
+  try {
+    const files = await Promise.all(
+      urls.map(async (url, i) => {
+        const response = await fetch(url)
+        if (!response.ok) throw new Error(String(response.status))
+        const blob = await response.blob()
+        return { name: `${i + 1}-${filenameFromUrl(url, blob.type)}`, blob }
+      })
+    )
+    const { zipFiles } = await import("./zip")
+    const objectUrl = URL.createObjectURL(await zipFiles(files))
+    clickDownload(objectUrl, "generations.zip")
+    window.setTimeout(() => URL.revokeObjectURL(objectUrl), 1000)
+  } catch {
+    for (const url of urls) await downloadMedia(url)
+  }
+}
