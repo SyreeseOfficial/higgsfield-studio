@@ -71,7 +71,11 @@ export async function submitGeneration(
     if (caught instanceof PlatformError) {
       if (caught.status === 401 || caught.status === 403)
         return { ok: false, kind: "auth", error }
-      return { ok: false, kind: caught.status < 500 ? "rejected" : "unknown", error }
+      return {
+        ok: false,
+        kind: caught.status < 500 ? "rejected" : "unknown",
+        error,
+      }
     }
     return { ok: false, kind: "rejected", error }
   }
@@ -85,14 +89,16 @@ export async function getGenerationStatuses(
   data: unknown
 ): Promise<StatusResult[]> {
   const requestIds = [...new Set(parseRequestIds(data))]
-  if (requestIds.length > MAX_STATUS_IDS) throw new Error("Too many request ids")
+  if (requestIds.length > MAX_STATUS_IDS)
+    throw new Error("Too many request ids")
   const client = createPlatformClient(await readCredentials())
   const results: StatusResult[] = []
   for (let i = 0; i < requestIds.length; i += STATUS_CONCURRENCY) {
     results.push(
       ...(await Promise.all(
-        requestIds.slice(i, i + STATUS_CONCURRENCY).map(
-          async (requestId): Promise<StatusResult> => {
+        requestIds
+          .slice(i, i + STATUS_CONCURRENCY)
+          .map(async (requestId): Promise<StatusResult> => {
             try {
               return { requestId, status: await client.status(requestId) }
             } catch (caught) {
@@ -109,8 +115,7 @@ export async function getGenerationStatuses(
                   caught.status !== 429,
               }
             }
-          }
-        )
+          })
       ))
     )
   }

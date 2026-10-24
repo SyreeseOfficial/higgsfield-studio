@@ -55,6 +55,7 @@ import {
   ROLE_KIND,
   ROLE_LABEL,
 } from "@/generation/catalog/media-inputs"
+import type { UploadOptions } from "@/generation/upload"
 import { modelSummary } from "@/lib/studio/model-info"
 import { kindOf } from "@/lib/studio/uploads"
 import type { AssetLibraryItem, AssetSelection } from "@/lib/studio/uploads"
@@ -83,7 +84,7 @@ export interface StudioPromptBoxProps {
   onMediaRoleChange: (id: string, role: ImageRole) => void
   library: {
     items: AssetLibraryItem[]
-    onUpload: (file: File) => Promise<AssetSelection>
+    onUpload: (file: File, options?: UploadOptions) => Promise<AssetSelection>
   }
   placeholder?: string
   prompt: string
@@ -367,6 +368,7 @@ function useReferenceIntake({
     null
   )
   const busy = useRef(false)
+  const abort = useRef<AbortController | null>(null)
 
   const take = async (files: File[]) => {
     if (!files.length || busy.current) return
@@ -386,16 +388,30 @@ function useReferenceIntake({
             `You can add ${kindLimits[kind] ?? 0} more ${kind} files.`
           )
       }
+      abort.current = new AbortController()
       setStatus({ text: "Uploading reference…", error: false })
       const uploaded: AssetSelection[] = []
-      for (const file of files) uploaded.push(await library.onUpload(file))
+      for (const file of files)
+        uploaded.push(
+          await library.onUpload(file, {
+            signal: abort.current.signal,
+            onProgress: (fraction) =>
+              setStatus({
+                text: `Uploading reference… ${Math.round(fraction * 100)}%`,
+                error: false,
+              }),
+          })
+        )
       onMediaAdd("auto", uploaded)
       setStatus(null)
     } catch (caught) {
-      setStatus({
-        text: caught instanceof Error ? caught.message : "Upload failed.",
-        error: true,
-      })
+      if (caught instanceof DOMException && caught.name === "AbortError")
+        setStatus(null)
+      else
+        setStatus({
+          text: caught instanceof Error ? caught.message : "Upload failed.",
+          error: true,
+        })
     } finally {
       busy.current = false
     }
@@ -403,6 +419,7 @@ function useReferenceIntake({
 
   return {
     status,
+    cancel: () => abort.current?.abort(),
     onPaste: (event: ClipboardEvent) => {
       const files = Array.from(event.clipboardData.files)
       if (!files.length) return
@@ -708,6 +725,15 @@ export function StudioPromptBox({
               role="alert"
             >
               {error ?? intake.status?.text}
+              {error == null && intake.status && !intake.status.error ? (
+                <button
+                  type="button"
+                  className="ml-2 underline hover:text-foreground"
+                  onClick={intake.cancel}
+                >
+                  Cancel
+                </button>
+              ) : null}
             </p>
           ) : null}
           <PromptBox.Actions className="flex-wrap">

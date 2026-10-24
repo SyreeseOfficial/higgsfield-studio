@@ -1,5 +1,6 @@
 "use client"
 
+import type { UploadOptions } from "@/generation/upload"
 import { useMemo, useRef, useState } from "react"
 import type { DragEvent, ReactElement } from "react"
 import {
@@ -61,7 +62,7 @@ const TABS: { value: Tab; label: string }[] = [
 export type AssetLibraryModalProps = {
   trigger: ReactElement
   items: AssetLibraryItem[]
-  onUpload: (file: File) => Promise<AssetSelection>
+  onUpload: (file: File, options?: UploadOptions) => Promise<AssetSelection>
   maxSelections?: number
   kindLimits?: Partial<Record<AssetKind, number>>
   excludeIds?: string[]
@@ -89,6 +90,8 @@ export function AssetLibraryModal({
   const [tab, setTab] = useState<Tab>("uploads")
   const [query, setQuery] = useState("")
   const [uploading, setUploading] = useState(false)
+  const [progress, setProgress] = useState<number | null>(null)
+  const abort = useRef<AbortController | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [dragging, setDragging] = useState(false)
   const [selected, setSelected] = useState<AssetSelection[]>([])
@@ -176,7 +179,12 @@ export function AssetLibraryModal({
       }
       setUploading(true)
       for (const file of files) {
-        const uploaded = await onUpload(file)
+        abort.current = new AbortController()
+        setProgress(0)
+        const uploaded = await onUpload(file, {
+          onProgress: setProgress,
+          signal: abort.current.signal,
+        })
         if (multiple)
           setSelected((current) =>
             current.some((item) => item.src === uploaded.src)
@@ -186,12 +194,15 @@ export function AssetLibraryModal({
         else commit([uploaded])
       }
     } catch (caught) {
-      setError(
-        caught instanceof Error
-          ? caught.message
-          : "Upload failed — check your connection and try again."
-      )
+      if (!(caught instanceof DOMException && caught.name === "AbortError"))
+        setError(
+          caught instanceof Error
+            ? caught.message
+            : "Upload failed — check your connection and try again."
+        )
     } finally {
+      abort.current = null
+      setProgress(null)
       setUploading(false)
     }
   }
@@ -292,6 +303,8 @@ export function AssetLibraryModal({
                   {canUploadHere ? (
                     <UploadCard
                       uploading={uploading}
+                      progress={progress}
+                      onCancel={() => abort.current?.abort()}
                       onClick={() => inputRef.current?.click()}
                     />
                   ) : null}
@@ -371,33 +384,52 @@ export function AssetLibraryModal({
 
 function UploadCard({
   uploading,
+  progress,
+  onCancel,
   onClick,
 }: {
   uploading: boolean
+  progress: number | null
+  onCancel: () => void
   onClick: () => void
 }) {
   return (
-    <button
-      type="button"
-      disabled={uploading}
-      onClick={onClick}
-      className="flex h-[148px] w-full flex-col items-center gap-1.5 rounded-q-400 p-1 text-left disabled:opacity-60"
-    >
-      <div className="flex h-24 w-full items-center justify-center rounded-q-300 border border-q-border-subtle bg-q-transparent-light-05">
-        <span className="flex size-10 items-center justify-center rounded-q-full bg-q-transparent-light-05 shadow-q-raised-sm">
-          {uploading ? (
-            <Loader2 className="size-5 animate-spin text-q-icon-secondary" />
-          ) : (
-            <Plus className="size-5 text-q-icon-primary" />
-          )}
-        </span>
-      </div>
-      <div className="px-1 py-0.5">
-        <span className="text-q-caption-sm-semi-bold text-q-text-primary">
-          {uploading ? "Uploading…" : "Upload"}
-        </span>
-      </div>
-    </button>
+    <div className="relative">
+      {uploading ? (
+        <button
+          type="button"
+          onClick={onCancel}
+          className="absolute top-1 right-1 z-[1] rounded-full bg-black/50 px-2 py-0.5 text-xs text-white hover:bg-black/70 focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none"
+        >
+          Cancel
+        </button>
+      ) : null}
+      <button
+        type="button"
+        disabled={uploading}
+        onClick={onClick}
+        className="flex h-[148px] w-full flex-col items-center gap-1.5 rounded-q-400 p-1 text-left disabled:opacity-60"
+      >
+        <div className="flex h-24 w-full items-center justify-center rounded-q-300 border border-q-border-subtle bg-q-transparent-light-05">
+          <span className="flex size-10 items-center justify-center rounded-q-full bg-q-transparent-light-05 shadow-q-raised-sm">
+            {uploading ? (
+              <Loader2 className="size-5 animate-spin text-q-icon-secondary" />
+            ) : (
+              <Plus className="size-5 text-q-icon-primary" />
+            )}
+          </span>
+        </div>
+        <div className="px-1 py-0.5">
+          <span className="text-q-caption-sm-semi-bold text-q-text-primary">
+            {uploading
+              ? progress != null && progress > 0
+                ? `Uploading ${Math.round(progress * 100)}%`
+                : "Uploading…"
+              : "Upload"}
+          </span>
+        </div>
+      </button>
+    </div>
   )
 }
 

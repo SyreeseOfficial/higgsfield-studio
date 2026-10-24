@@ -77,11 +77,11 @@ Reviewed 2026-10-13 against `17b2826` (Next.js 16, React 19, Tailwind 4, Base UI
 - [x] **[L]** "Reset to defaults" button in the settings dialog.
 
 ### Assets and references
-- [ ] **[M]** Dedupe uploads by content hash so re-attaching the same file reuses the URL.
-- [ ] **[M]** Upload progress bar and cancel for large videos (XHR or `fetch` with stream; currently a spinner *(check)*).
+- [x] **[M]** Dedupe uploads by content hash so re-attaching the same file reuses the URL. *(Done: SHA-256 stored on the upload record. A reused URL is assumed to still be valid; the platform's URL lifetime is unknown.)*
+- [x] **[M]** Upload progress bar and cancel for large videos *(Done with XHR: percent in the library card and the dock, with Cancel.)* (XHR or `fetch` with stream; currently a spinner *(check)*).
 - [ ] **[L]** Auto-convert HEIC to JPEG in the browser before upload instead of refusing.
 - [ ] **[L]** Auto-downscale oversized images to the model's max input size before upload.
-- [ ] **[L]** EXIF-free guarantee note: strip metadata from uploaded references (privacy).
+- [x] **[L]** EXIF-free guarantee note: strip metadata from uploaded references (privacy). *(Done for JPEG and PNG; WebP, GIF, MP4 and WAV are uploaded as they are. A JPEG rotated by EXIF is re-encoded so it keeps its orientation.)*
 
 ### Gallery and organization
 - [ ] **[H]** Favorites/stars with a "Starred" filter, stored in the run record.
@@ -344,3 +344,6 @@ Reviewed 2026-10-13 against `17b2826` (Next.js 16, React 19, Tailwind 4, Base UI
 - **Replace scaffold placeholders with real media** (Planned > Docs, tests, repo, [L]). Not done. `public/presets/studio-1..4.svg`, the starter `TEMPLATES` in `components/studio/template-picker.tsx` and `HERO_FALLBACKS` in `layouts/studio.tsx` are still the scaffold's. Replacing them needs real, on-brand outputs: generating them spends Higgsfield credits and needs your brand direction. Decision needed: (a) tell me the product/brand and approve spending credits on example media, (b) supply the media, or (c) remove the Explore tab and hero fallbacks until there is content.
 
 - **Disable settings combinations a model rejects** (Planned > Models and settings, [M]). Not done. Catalog entries only describe each setting on its own (`enum`/`range`/`boolean`); nothing says which combinations the platform refuses (for example resolution with duration), so there is nothing to grey out. Decision needed: list the known-invalid combinations per model (or point me at the platform docs) and I will add a `constraints` field to `ModelEntry` and disable options in the picker and dialog.
+
+- **Auto-convert HEIC to JPEG before upload** (Planned > Assets and references, [L]). Not done. Browsers other than Safari cannot decode HEIC, so this needs a WASM decoder dependency (for example `heic2any`/`libheif-js`, roughly 1 MB+). Decision needed: approve adding that dependency (lazy-loaded), or keep the current clear refusal message ("Export the photo as JPEG or PNG first").
+- **Auto-downscale oversized images to the model's max input size** (Planned > Assets and references, [L]). Not done. No catalog entry declares a maximum input resolution or file size, so there is no target to downscale to. Decision needed: the per-model (or global) max edge/size, and whether to add an `inputMaxEdge` field to `ModelEntry`.
