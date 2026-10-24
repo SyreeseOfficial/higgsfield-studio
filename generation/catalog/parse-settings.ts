@@ -15,7 +15,7 @@ export function parseSettings(
     }
     if (field.type === "range") {
       const picked = typeof value === "number" ? value : field.default
-      if (picked < field.min || picked > field.max)
+      if (!Number.isFinite(picked) || picked < field.min || picked > field.max)
         throw new Error(`Invalid ${key}`)
       out[key] = picked
       continue

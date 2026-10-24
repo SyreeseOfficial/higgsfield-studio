@@ -79,6 +79,18 @@ function exifOrientation(
   start: number,
   end: number
 ): number {
+  try {
+    return readOrientation(bytes, start, end)
+  } catch {
+    return 1 // a truncated or damaged EXIF block: nothing to honour
+  }
+}
+
+function readOrientation(
+  bytes: Uint8Array,
+  start: number,
+  end: number
+): number {
   if (String.fromCharCode(...bytes.subarray(start, start + 4)) !== "Exif")
     return 1
   const tiff = start + 6

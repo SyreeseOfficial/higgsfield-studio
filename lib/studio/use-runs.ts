@@ -22,6 +22,7 @@ import {
   VIDEO_DEADLINE_MS,
 } from "./limits"
 import { newId } from "./id"
+import { PendingKeys } from "./pending-keys"
 import { saveCopies } from "./media-cache"
 import {
   STORAGE_FAILED_EVENT,
@@ -33,6 +34,7 @@ import { referenceReachable } from "./reference-check"
 import {
   aspectFromSettings,
   loadHistory,
+  mergeRecords,
   readHistory,
   saveHistory,
   type RunRecord,
@@ -79,26 +81,6 @@ function isQueueEntry(value: unknown): value is QueueEntry {
   }
 }
 
-/** Adds runs another tab created and takes its settled copy of any run still
-    running here. Returns `current` untouched when nothing changed, so the
-    save → broadcast → merge loop between tabs ends.
-    ponytail: deletes in one tab are not propagated; add tombstones if needed. */
-function mergeRecords(current: RunRecord[], stored: RunRecord[]): RunRecord[] {
-  const byId = new Map(current.map((r) => [r.id, r]))
-  let changed = false
-  const merged = current.map((r) => {
-    const other = stored.find((s) => s.id === r.id)
-    if (r.status === "running" && other && other.status !== "running") {
-      changed = true
-      return other
-    }
-    return r
-  })
-  const added = stored.filter((s) => !byId.has(s.id))
-  if (added.length === 0 && !changed) return current
-  return [...merged, ...added].sort((a, b) => b.createdAt - a.createdAt)
-}
-
 /**
  * The studio's generation controller: submits planes to the platform through
  * the server action, keeps every run in IndexedDB-backed history, and resumes
@@ -117,7 +99,7 @@ export function useRuns({ onAuthError }: { onAuthError?: () => void } = {}) {
   // Blocks a second submit while the first is still awaiting the platform.
   const submitting = useRef(false)
   // Keys of attempts whose outcome is unknown, reused if the same plane is retried.
-  const pending = useRef(new Map<string, string>())
+  const [pending] = useState(() => new PendingKeys(MAX_PENDING_KEYS))
   const channel = useRef<BroadcastChannel | null>(null)
   const onAuthErrorRef = useRef(onAuthError)
   useEffect(() => {
@@ -268,11 +250,7 @@ export function useRuns({ onAuthError }: { onAuthError?: () => void } = {}) {
       setError(null)
       const model = getModel(plane.model)
       const fingerprint = JSON.stringify([plane, projectId])
-      const key = pending.current.get(fingerprint) ?? newId()
-      pending.current.delete(fingerprint) // re-insert last: Map order = recency
-      pending.current.set(fingerprint, key)
-      if (pending.current.size > MAX_PENDING_KEYS)
-        pending.current.delete(pending.current.keys().next().value!)
+      const key = pending.keyFor(fingerprint, newId)
       let created: RunRecord | undefined
       let keepQueued = false
       try {
@@ -293,12 +271,12 @@ export function useRuns({ onAuthError }: { onAuthError?: () => void } = {}) {
             return
           }
           // Keep the key unless the platform definitely refused the job.
-          if (result.kind !== "unknown") pending.current.delete(fingerprint)
+          if (result.kind !== "unknown") pending.settle(fingerprint)
           if (result.kind === "auth") onAuthErrorRef.current?.()
           setError(result.error)
           return
         }
-        pending.current.delete(fingerprint)
+        pending.settle(fingerprint)
         const { queued } = result
         const record: RunRecord = {
           // Same id as the waiting placeholder, so the tile does not remount.
@@ -335,7 +313,7 @@ export function useRuns({ onAuthError }: { onAuthError?: () => void } = {}) {
           mergeRecords([created, ...latest.current], await loadHistory())
         ).catch(reportStorageFailure)
     },
-    [watch]
+    [watch, pending]
   )
 
   /** Sends one plane under a cross-tab lock, so two tabs cannot both take the last slot. */

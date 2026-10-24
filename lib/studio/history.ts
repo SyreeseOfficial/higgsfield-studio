@@ -37,6 +37,29 @@ export interface RunRecord {
   createdAt: number
 }
 
+/** Adds runs another tab created and takes its settled copy of any run still
+    running here. Returns `current` untouched when nothing changed, so the
+    save → broadcast → merge loop between tabs ends.
+    ponytail: deletes in one tab are not propagated; add tombstones if needed. */
+export function mergeRecords(
+  current: RunRecord[],
+  stored: RunRecord[]
+): RunRecord[] {
+  const byId = new Map(current.map((r) => [r.id, r]))
+  let changed = false
+  const merged = current.map((r) => {
+    const other = stored.find((s) => s.id === r.id)
+    if (r.status === "running" && other && other.status !== "running") {
+      changed = true
+      return other
+    }
+    return r
+  })
+  const added = stored.filter((s) => !byId.has(s.id))
+  if (added.length === 0 && !changed) return current
+  return [...merged, ...added].sort((a, b) => b.createdAt - a.createdAt)
+}
+
 const KEY = "history.v1"
 
 export async function loadHistory(kv: Kv = defaultKv()): Promise<RunRecord[]> {

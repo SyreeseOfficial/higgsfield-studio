@@ -121,7 +121,7 @@ describe("applyFeedView", () => {
 
   it("filters by kind, failure, star and model", () => {
     expect(ids({ kind: "video" })).toEqual(["3"])
-    expect(ids({ kind: "image" })).toEqual(["1"])
+    expect(ids({ kind: "image" })).toEqual(["2", "1"]) // the failed one stays
     expect(ids({ kind: "failed" })).toEqual(["2"])
     expect(ids({ kind: "starred" })).toEqual(["3"])
     expect(ids({ model: "A" })).toEqual(["2", "1"])

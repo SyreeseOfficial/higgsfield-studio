@@ -26,7 +26,8 @@ export function applyFeedView(
     switch (view.kind) {
       case "image":
       case "video":
-        return item.kind === view.kind && item.status !== "failed"
+        // A run that failed stays where the user watched it generate.
+        return item.kind === view.kind
       case "failed":
         return item.status === "failed"
       case "starred":

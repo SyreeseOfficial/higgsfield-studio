@@ -21,7 +21,7 @@ Source of truth for details: [FINDINGS.md](FINDINGS.md). Do one phase at a time.
 | 9 | First-run & visual polish | 7 | ☑ (1 ⛔) |
 | 10 | Speed: rendering | 7 | ☑ |
 | 11 | Speed: loading & bundle | 7 | ☑ |
-| 12 | Tests: pure logic | 9 | ☐ |
+| 12 | Tests: pure logic | 9 | ☑ |
 | 13 | Tests: infrastructure & fake server | 7 | ☐ |
 | 14 | Code quality & lint | 10 | ☐ |
 | 15 | Cleanup & small ops | 14 | ☐ |
@@ -143,15 +143,15 @@ Goal: one click = at most one paid job; one slow call never freezes the app.
 - [x] Split the two biggest files (886 and 816 lines)
 
 ## Phase 12 — Tests: pure logic (free)
-- [ ] Test the error messages against recorded real responses
-- [ ] Stress-test error messages with real samples
-- [ ] Random-input tests for settings parsing
-- [ ] Test merging of history and skipping bad rows
-- [ ] Test history loading (bad row, order, cap)
-- [ ] Test "failed runs stay visible"
-- [ ] Test idempotency key reuse
-- [ ] Test metadata stripping with broken files
-- [ ] Tests for model files (icons, unique order, roles)
+- [x] Test the error messages against recorded real responses
+- [x] Stress-test error messages with real samples
+- [x] Random-input tests for settings parsing
+- [x] Test merging of history and skipping bad rows
+- [x] Test history loading (bad row, order, cap)
+- [x] Test "failed runs stay visible"
+- [x] Test idempotency key reuse
+- [x] Test metadata stripping with broken files
+- [x] Tests for model files (icons, unique order, roles)
 
 ## Phase 13 — Tests: infrastructure & fake server (free)
 - [ ] Fake Higgsfield server for tests and demos without a key

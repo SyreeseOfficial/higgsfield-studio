@@ -194,20 +194,20 @@ Pictures, videos and audio you give the AI as input.
 Work that users don't see but keeps the app healthy.
 
 **Tests**
-- [ ] 🔴 **Test the error messages** against real Higgsfield responses.
+- [x] 🔴 **Test the error messages** against real Higgsfield responses. *(Done against representative samples in `tests/fixtures/platform-errors.ts`; add real captures when a live failure shows new wording.)*
 - [ ] 🟡 **Tests for screens** (prompt box, key dialog, gallery tile). ⏱ 15 min
-- [ ] 🟡 **Tests with random inputs** for settings parsing. ⏱ 15 min
+- [x] 🟡 **Tests with random inputs** for settings parsing. ⏱ 15 min
 - [ ] 🟡 **Recorded-response tests** for the Higgsfield connection. ⏱ 15 min
 - [ ] 🟡 **Stress-test** the polling and run logic. ⏱ 15 min
 - [ ] 🟡 **Test the run controller** (queue, retry, cancel, two tabs). ⏱ 15 min
-- [ ] 🟡 **Test merging of history** and skipping bad rows. ⏱ 15 min
-- [ ] 🟡 **Stress-test error messages** with real samples. ⏱ 15 min
-- [ ] 🟡 **Test metadata stripping** with broken files. ⏱ 15 min
+- [x] 🟡 **Test merging of history** and skipping bad rows. ⏱ 15 min
+- [x] 🟡 **Stress-test error messages** with real samples. ⏱ 15 min
+- [x] 🟡 **Test metadata stripping** with broken files. ⏱ 15 min
 - [ ] 🟡 **Browser test of the main scenarios** (missing key, cancel, empty history). *(see Decisions)*
-- [ ] 🟡 **Test history loading** (bad row skipped, order, cap).
-- [ ] 🟡 **Test "failed runs stay visible."**
-- [ ] 🟡 **Test idempotency key reuse.**
-- [ ] 🟡 **Tests for model files** (icons, unique order, roles). ⏱ 15 min
+- [x] 🟡 **Test history loading** (bad row skipped, order, cap).
+- [x] 🟡 **Test "failed runs stay visible."**
+- [x] 🟡 **Test idempotency key reuse.**
+- [x] 🟡 **Tests for model files** (icons, unique order, roles). ⏱ 15 min
 - [ ] 🟡 **Single `pnpm check` command** for all checks.
 - [ ] 🟡 **Fake Higgsfield server** for tests and demos without a key.
 - [ ] ⚪ **Automatic accessibility/speed run** in CI. *(see Decisions)*

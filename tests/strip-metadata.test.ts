@@ -193,3 +193,71 @@ describe("stripMp4", () => {
     ).toBeNull()
   })
 })
+
+describe("stripping never throws on broken files", () => {
+  // One small valid file per format, then every truncation and random corruption of it.
+  const valid: Record<string, Uint8Array<ArrayBuffer>> = {
+    jpeg: join(
+      u8(0xff, 0xd8),
+      u8(0xff, 0xe1, 0, 8, 69, 120, 105, 102, 0, 0),
+      u8(0xff, 0xda, 0, 4, 1, 2, 9, 9)
+    ),
+    png: join(
+      u8(0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a),
+      be32(2),
+      text("tEXt"),
+      u8(1, 2),
+      be32(0),
+      be32(0),
+      text("IDAT"),
+      be32(0)
+    ),
+    webp: join(
+      text("RIFF"),
+      le32(22),
+      text("WEBP"),
+      text("VP8X"),
+      le32(10),
+      u8(0x0c, 0, 0, 0, 0, 0, 0, 0, 0, 0)
+    ),
+    gif: join(
+      text("GIF89a"),
+      u8(1, 0, 1, 0, 0, 0, 0),
+      u8(0x21, 0xfe, 1, 65, 0),
+      u8(0x2c, 0, 0, 0, 0, 1, 0, 1, 0, 0, 2, 1, 0x44, 0),
+      u8(0x3b)
+    ),
+    mp4: join(
+      be32(12),
+      text("ftyp"),
+      text("isom"),
+      be32(16),
+      text("moov"),
+      be32(8),
+      text("udta")
+    ),
+  }
+  const fns = {
+    jpeg: stripJpeg,
+    png: stripPng,
+    webp: stripWebp,
+    gif: stripGif,
+    mp4: stripMp4,
+  }
+  let seed = 99
+  const rand = () => (seed = (seed * 1664525 + 1013904223) >>> 0) / 2 ** 32
+
+  it.each(Object.keys(valid))("%s: truncations and bit flips", (name) => {
+    const fn = fns[name as keyof typeof fns]
+    const bytes = valid[name]!
+    for (let cut = 0; cut <= bytes.length; cut++)
+      expect(() => fn(bytes.slice(0, cut))).not.toThrow()
+    for (let i = 0; i < 300; i++) {
+      const copy = bytes.slice()
+      for (let k = 0; k < 3; k++)
+        copy[Math.floor(rand() * copy.length)] = Math.floor(rand() * 256)
+      expect(() => fn(copy)).not.toThrow()
+    }
+    expect(fn(bytes)).not.toBeNull() // the untouched sample is accepted
+  })
+})
