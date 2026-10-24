@@ -122,8 +122,8 @@ Reviewed 2026-10-13 against `17b2826` (Next.js 16, React 19, Tailwind 4, Base UI
 - [ ] **[L]** Turn on `reactCompiler` in Next 16 and measure re-renders in the gallery.
 
 ### Visual design polish
-- [ ] **[M]** Progress feel for running tiles: elapsed timer plus per-model typical time ("~2 min").
-- [ ] **[L]** Custom scrollbars matching the dark tokens.
+- [x] **[M]** Progress feel for running tiles: elapsed timer plus per-model typical time ("~2 min"). *(Typical time is per surface (~30 s image, ~3 min video), not per model.)*
+- [x] **[L]** Custom scrollbars matching the dark tokens.
 
 ### Code quality, testing and dev experience
 - [ ] **[M]** Split `layouts/studio.tsx` (it owns prompt, media, generate, cancel, key state); extract hooks (`useDock`, `useKeyStatus`) to make it testable.

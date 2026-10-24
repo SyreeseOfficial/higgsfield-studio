@@ -60,6 +60,10 @@
     }
   html {
     @apply font-sans;
+    /* Thin scrollbars tinted from the foreground token. */
+    scrollbar-width: thin;
+    scrollbar-color: color-mix(in oklch, var(--foreground) 22%, transparent)
+      transparent;
     }
 }
 

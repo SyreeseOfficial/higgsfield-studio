@@ -48,6 +48,23 @@ async function copyText(text: string) {
   await navigator.clipboard?.writeText(text)
 }
 
+/** "Generating 0:42 · usually ~3 min": elapsed time ticks once a second. */
+function Elapsed({ since, usually }: { since: number; usually: string }) {
+  const [now, setNow] = useState(() => Date.now())
+  useEffect(() => {
+    const timer = setInterval(() => setNow(Date.now()), 1000)
+    return () => clearInterval(timer)
+  }, [])
+  const seconds = Math.max(0, Math.floor((now - since) / 1000))
+  return (
+    <>
+      Generating {Math.floor(seconds / 60)}:
+      {String(seconds % 60).padStart(2, "0")}
+      <span className="font-normal opacity-70"> · usually {usually}</span>
+    </>
+  )
+}
+
 function Placeholder() {
   return <span className="absolute inset-0 bg-card" aria-hidden="true" />
 }
@@ -158,13 +175,18 @@ function GalleryTileComponent({
         <GenerationTile
           state="generating"
           generatingLabel={
-            item.queued
-              ? `Queued · ${item.queued}`
-              : item.canceling
-                ? "Canceling…"
-                : item.stalled
-                  ? "Still working"
-                  : "Generating"
+            item.queued ? (
+              `Queued · ${item.queued}`
+            ) : item.canceling ? (
+              "Canceling…"
+            ) : item.stalled ? (
+              "Still working"
+            ) : (
+              <Elapsed
+                since={item.createdAt}
+                usually={item.kind === "video" ? "~3 min" : "~30 s"}
+              />
+            )
           }
           className="size-full"
         />
