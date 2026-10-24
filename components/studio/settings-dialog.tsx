@@ -46,6 +46,17 @@ export function SettingsDialog({
         <DialogHeader>
           <DialogTitle>{model.label} settings</DialogTitle>
           <DialogDescription>Applied to the next generation.</DialogDescription>
+          {entries.length > 0 ? (
+            <button
+              type="button"
+              className="text-q-caption-sm-medium text-q-text-secondary hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none"
+              onClick={() => {
+                for (const [key, field] of entries) onChange(key, field.default)
+              }}
+            >
+              Reset to defaults
+            </button>
+          ) : null}
         </DialogHeader>
         <DialogBody>
           {entries.length === 0 ? (

@@ -71,10 +71,10 @@ Reviewed 2026-10-13 against `17b2826` (Next.js 16, React 19, Tailwind 4, Base UI
 - [x] **[L]** Spellcheck toggle and language hint. *(Spellcheck toggle done; the language hint was left out, the field follows the page language.)*
 
 ### Models and settings
-- [ ] **[M]** Model info popover: what it is best at, max duration, supported inputs, relative speed.
+- [x] **[M]** Model info popover: what it is best at, max duration, supported inputs, relative speed. *(Done as a one-line description under each model in the picker: inputs, longest clip, rough speed, all derived from the catalog. "Best at" is not in the catalog, so it is omitted.)*
 - [ ] **[M]** Disable (grey out with reason) settings combos a model rejects, instead of failing at the platform.
-- [ ] **[L]** Aspect ratio picker with visual frames and a "match reference" option.
-- [ ] **[L]** "Reset to defaults" button in the settings dialog.
+- [x] **[L]** Aspect ratio picker with visual frames and a "match reference" option. *(Frames done; "match reference" left out, since no model declares such a value.)*
+- [x] **[L]** "Reset to defaults" button in the settings dialog.
 
 ### Assets and references
 - [ ] **[M]** Dedupe uploads by content hash so re-attaching the same file reuses the URL.
@@ -342,3 +342,5 @@ Reviewed 2026-10-13 against `17b2826` (Next.js 16, React 19, Tailwind 4, Base UI
 - **API key verification on save** (Planned > Generation reliability, [L]). Not done. The plan probes `GET /requests/<random uuid>/status` and treats 401/403 as "bad key", but I can't confirm the platform answers an unknown request id with 404 rather than 403 (no key or `HF_API_BASE_URL` here). If it returns 403 for unknown ids, the check would block every valid key from being saved. Decision needed: confirm the platform's behavior (or name a cheap authenticated endpoint) and I'll wire it into `savePlatformCredentials`.
 
 - **Replace scaffold placeholders with real media** (Planned > Docs, tests, repo, [L]). Not done. `public/presets/studio-1..4.svg`, the starter `TEMPLATES` in `components/studio/template-picker.tsx` and `HERO_FALLBACKS` in `layouts/studio.tsx` are still the scaffold's. Replacing them needs real, on-brand outputs: generating them spends Higgsfield credits and needs your brand direction. Decision needed: (a) tell me the product/brand and approve spending credits on example media, (b) supply the media, or (c) remove the Explore tab and hero fallbacks until there is content.
+
+- **Disable settings combinations a model rejects** (Planned > Models and settings, [M]). Not done. Catalog entries only describe each setting on its own (`enum`/`range`/`boolean`); nothing says which combinations the platform refuses (for example resolution with duration), so there is nothing to grey out. Decision needed: list the known-invalid combinations per model (or point me at the platform docs) and I will add a `constraints` field to `ModelEntry` and disable options in the picker and dialog.

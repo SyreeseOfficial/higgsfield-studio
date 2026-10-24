@@ -55,6 +55,7 @@ import {
   ROLE_KIND,
   ROLE_LABEL,
 } from "@/generation/catalog/media-inputs"
+import { modelSummary } from "@/lib/studio/model-info"
 import { kindOf } from "@/lib/studio/uploads"
 import type { AssetLibraryItem, AssetSelection } from "@/lib/studio/uploads"
 
@@ -186,6 +187,23 @@ function PillSelect({
         ))}
       </SelectContent>
     </Select>
+  )
+}
+
+/** A small outline in the shape of an aspect-ratio value like "16:9"; nothing for other values. */
+function aspectFrame(value: string): ReactNode {
+  const [w, h] = value.split(":").map(Number)
+  if (!w || !h) return undefined
+  const long = 14
+  return (
+    <span
+      aria-hidden="true"
+      className="rounded-[3px] border border-current"
+      style={{
+        width: w >= h ? long : (long * w) / h,
+        height: h >= w ? long : (long * h) / w,
+      }}
+    />
   )
 }
 
@@ -703,6 +721,7 @@ export function StudioPromptBox({
               options={models.map((entry) => ({
                 value: entry.id,
                 label: entry.label,
+                description: modelSummary(entry),
                 icon: modelIcon(entry),
               }))}
             />
@@ -718,6 +737,7 @@ export function StudioPromptBox({
                 options={headlineField.values.map((value) => ({
                   value,
                   label: value,
+                  icon: aspectFrame(value),
                 }))}
               />
             ) : null}
