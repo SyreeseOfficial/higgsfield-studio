@@ -26,7 +26,7 @@ Source of truth for details: [FINDINGS.md](FINDINGS.md). Do one phase at a time.
 | 14 | Code quality & lint | 10 | ☑ |
 | 15 | Cleanup & small ops | 14 | ☑ |
 | 16 | Docs | 8 | ☑ |
-| ⛔ | Blocked on you | 8 | see bottom |
+| ⛔ | Blocked on you | 12 | see bottom |
 
 ---
 
