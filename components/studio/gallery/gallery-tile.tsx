@@ -68,6 +68,9 @@ function StillMedia({ item, tier }: { item: GalleryItem; tier: LoadTier }) {
 }
 
 /** Poster by default; plays muted on hover/focus; honours reduced motion. */
+/** At most one tile video plays at a time; starting one stops the last. */
+let playingVideo: HTMLVideoElement | null = null
+
 function HoverVideo({
   item,
   tier,
@@ -81,6 +84,9 @@ function HoverVideo({
 }) {
   const ref = useRef<HTMLVideoElement | null>(null)
   const [loaded, setLoaded] = useState(false)
+  // Download starts once the tile has been in the viewport, and is never undone.
+  const [armed, setArmed] = useState(tier === "full")
+  if (tier === "full" && !armed) setArmed(true)
   const active = playing && !reducedMotion
   const hasPoster = item.src.length > 0
   // Without a poster the first frame is the still, so keep the video visible.
@@ -89,8 +95,11 @@ function HoverVideo({
   useEffect(() => {
     const v = ref.current
     if (!v) return
-    if (active) void v.play()?.catch(() => undefined)
-    else {
+    if (active) {
+      if (playingVideo && playingVideo !== v) playingVideo.pause()
+      playingVideo = v
+      void v.play()?.catch(() => undefined)
+    } else {
       v.pause()
       try {
         v.currentTime = 0
@@ -117,13 +126,12 @@ function HoverVideo({
         muted
         loop
         playsInline
+        src={armed ? item.videoSrc : undefined}
         preload={hasPoster ? "none" : "metadata"}
         poster={hasPoster ? item.src : undefined}
         onLoadedData={() => setLoaded(true)}
         style={{ opacity: showVideo ? 1 : 0 }}
-      >
-        <source src={item.videoSrc} />
-      </video>
+      />
     </>
   )
 }

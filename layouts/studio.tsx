@@ -1,5 +1,6 @@
 "use client"
 
+import dynamic from "next/dynamic"
 import { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import type { ComponentProps } from "react"
 import { Compass, Folder } from "lucide-react"
@@ -49,14 +50,8 @@ import {
   useUploads,
   type AssetSelection,
 } from "@/lib/studio/uploads"
-import {
-  CommandPalette,
-  type Command,
-} from "@/components/studio/command-palette"
-import { ShortcutsDialog } from "@/components/studio/shortcuts-dialog"
-import { UsageDialog } from "@/components/studio/usage-dialog"
+import type { Command } from "@/components/studio/command-palette"
 import { ErrorBoundary } from "@/components/studio/error-boundary"
-import { PrivacyDialog } from "@/components/studio/privacy-dialog"
 import { useOnline } from "@/lib/studio/use-online"
 import { claimTip } from "@/lib/studio/tips"
 import { FeedControls } from "@/components/studio/feed-controls"
@@ -68,7 +63,6 @@ import {
   type FeedView,
 } from "@/lib/studio/feed-view"
 import type { RunRecord } from "@/lib/studio/history"
-import { MoveToProjectDialog } from "@/components/studio/move-dialog"
 import { UndoToast } from "@/components/studio/undo-toast"
 import {
   requestNotificationPermission,
@@ -86,6 +80,36 @@ import { useRuns } from "@/lib/studio/use-runs"
  * glow + dot-field atmosphere, HeroComposition, StudioPromptBox, the
  * Explore / My Projects section, and the UserGenerations feed.
  */
+
+// Occasional dialogs load on first use, not with the studio.
+const CommandPalette = dynamic(
+  () =>
+    import("@/components/studio/command-palette").then((m) => m.CommandPalette),
+  { ssr: false }
+)
+const ShortcutsDialog = dynamic(
+  () =>
+    import("@/components/studio/shortcuts-dialog").then(
+      (m) => m.ShortcutsDialog
+    ),
+  { ssr: false }
+)
+const UsageDialog = dynamic(
+  () => import("@/components/studio/usage-dialog").then((m) => m.UsageDialog),
+  { ssr: false }
+)
+const PrivacyDialog = dynamic(
+  () =>
+    import("@/components/studio/privacy-dialog").then((m) => m.PrivacyDialog),
+  { ssr: false }
+)
+const MoveToProjectDialog = dynamic(
+  () =>
+    import("@/components/studio/move-dialog").then(
+      (m) => m.MoveToProjectDialog
+    ),
+  { ssr: false }
+)
 
 // Shown until the user has three finished outputs of their own.
 const HERO_FALLBACKS = [
@@ -229,7 +253,9 @@ function FeedState({
   onDeleteMany,
   onVariation,
   onStar,
+  loading,
 }: {
+  loading: boolean
   items: GalleryItem[]
   previewItems: GalleryItem[]
   title: string
@@ -270,53 +296,68 @@ function FeedState({
         className="flex min-h-0 flex-1 flex-col px-4 pt-4"
         style={{ paddingBottom: dockHeight + 24 }}
       >
-        <ErrorBoundary
-          fallback={(reset) => (
-            <div className="flex flex-1 flex-col items-center justify-center gap-3 text-center text-sm">
-              <p>Something went wrong showing your generations.</p>
-              <button
-                type="button"
-                className="rounded-full bg-white/8 px-4 py-2 font-medium hover:bg-white/14"
-                onClick={reset}
-              >
-                Reload feed
-              </button>
-            </div>
-          )}
-        >
-          <UserGenerations
-            items={shownItems}
-            title={title}
-            grouped={isDateSorted(feedView.sort)}
-            toolbar={
-              items.length > 0 ? (
-                <FeedControls
-                  view={feedView}
-                  models={feedModels}
-                  onChange={setFeedView}
-                />
-              ) : undefined
-            }
-            onStar={onStar}
-            onDelete={onDelete}
-            onCancel={onCancel}
-            onRecheck={onRecheck}
-            onMove={onMove}
-            onDeleteMany={onDeleteMany}
-            onVariation={onVariation}
-            emptyState={{
-              images,
-              title: filtered
-                ? "Nothing here"
-                : title === "All Generations"
-                  ? "No generations yet"
-                  : `No generations in ${title}`,
-              description: filtered
-                ? emptyFeedMessage(feedView)
-                : "Describe an idea below, then generate the first result.",
-            }}
-          />
-        </ErrorBoundary>
+        {loading ? (
+          <div
+            className="grid flex-1 grid-cols-2 content-start gap-1.5 overflow-hidden md:grid-cols-4"
+            aria-busy="true"
+            aria-label="Loading your generations"
+          >
+            {Array.from({ length: 8 }, (_, i) => (
+              <div
+                key={i}
+                className="aspect-[4/3] animate-pulse rounded-xl bg-card motion-reduce:animate-none"
+              />
+            ))}
+          </div>
+        ) : (
+          <ErrorBoundary
+            fallback={(reset) => (
+              <div className="flex flex-1 flex-col items-center justify-center gap-3 text-center text-sm">
+                <p>Something went wrong showing your generations.</p>
+                <button
+                  type="button"
+                  className="rounded-full bg-white/8 px-4 py-2 font-medium hover:bg-white/14"
+                  onClick={reset}
+                >
+                  Reload feed
+                </button>
+              </div>
+            )}
+          >
+            <UserGenerations
+              items={shownItems}
+              title={title}
+              grouped={isDateSorted(feedView.sort)}
+              toolbar={
+                items.length > 0 ? (
+                  <FeedControls
+                    view={feedView}
+                    models={feedModels}
+                    onChange={setFeedView}
+                  />
+                ) : undefined
+              }
+              onStar={onStar}
+              onDelete={onDelete}
+              onCancel={onCancel}
+              onRecheck={onRecheck}
+              onMove={onMove}
+              onDeleteMany={onDeleteMany}
+              onVariation={onVariation}
+              emptyState={{
+                images,
+                title: filtered
+                  ? "Nothing here"
+                  : title === "All Generations"
+                    ? "No generations yet"
+                    : `No generations in ${title}`,
+                description: filtered
+                  ? emptyFeedMessage(feedView)
+                  : "Describe an idea below, then generate the first result.",
+              }}
+            />
+          </ErrorBoundary>
+        )}
       </div>
       <div
         className="pointer-events-none absolute inset-x-0 bottom-0 flex justify-center px-4 pt-24 pb-4"
@@ -748,6 +789,7 @@ export function StudioTemplate({
           />
         ) : (
           <FeedState
+            loading={!runs.loaded}
             items={visibleItems}
             previewItems={galleryItems}
             title={selectedProject?.name ?? "All Generations"}
@@ -762,19 +804,21 @@ export function StudioTemplate({
           />
         )}
       </main>
-      <MoveToProjectDialog
-        open={moving !== null}
-        count={new Set(moving?.map((i) => i.runId)).size}
-        projects={projectsStore.projects}
-        onOpenChange={(open) => {
-          if (!open) setMoving(null)
-        }}
-        onPick={(projectId) => {
-          runs.move([...new Set(moving?.map((i) => i.runId))], projectId)
-          if (projectId) projectsStore.touch(projectId)
-          setMoving(null)
-        }}
-      />
+      {moving !== null ? (
+        <MoveToProjectDialog
+          open
+          count={new Set(moving?.map((i) => i.runId)).size}
+          projects={projectsStore.projects}
+          onOpenChange={(open) => {
+            if (!open) setMoving(null)
+          }}
+          onPick={(projectId) => {
+            runs.move([...new Set(moving?.map((i) => i.runId))], projectId)
+            if (projectId) projectsStore.touch(projectId)
+            setMoving(null)
+          }}
+        />
+      ) : null}
       {undo ? (
         <UndoToast
           message={undo.message}
@@ -785,18 +829,26 @@ export function StudioTemplate({
           onDismiss={() => setUndo(null)}
         />
       ) : null}
-      <CommandPalette
-        open={paletteOpen}
-        onOpenChange={setPaletteOpen}
-        commands={commands}
-      />
-      <PrivacyDialog open={privacyOpen} onOpenChange={setPrivacyOpen} />
-      <UsageDialog
-        open={usageOpen}
-        onOpenChange={setUsageOpen}
-        records={runs.records.filter((r) => !r.queued)}
-      />
-      <ShortcutsDialog open={shortcutsOpen} onOpenChange={setShortcutsOpen} />
+      {paletteOpen ? (
+        <CommandPalette
+          open
+          onOpenChange={setPaletteOpen}
+          commands={commands}
+        />
+      ) : null}
+      {privacyOpen ? (
+        <PrivacyDialog open onOpenChange={setPrivacyOpen} />
+      ) : null}
+      {usageOpen ? (
+        <UsageDialog
+          open
+          onOpenChange={setUsageOpen}
+          records={runs.records.filter((r) => !r.queued)}
+        />
+      ) : null}
+      {shortcutsOpen ? (
+        <ShortcutsDialog open onOpenChange={setShortcutsOpen} />
+      ) : null}
       {tip && !undo ? (
         <UndoToast
           message={tip}

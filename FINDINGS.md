@@ -111,14 +111,14 @@ Reviewed 2026-10-13 against `17b2826` (Next.js 16, React 19, Tailwind 4, Base UI
 - [x] **[L]** "Sign out" in the Key dialog that clears the cookie server side (confirm it exists and works). *(Confirmed: "Remove API key" calls `clearPlatformCredentials`.)*
 
 ### Performance
-- [ ] **[M]** Use `loading="lazy"` plus a low-res poster/thumbnail for videos; only attach `src` when near the viewport (keeps AGENTS.md rule: never unmount *loaded* media).
-- [ ] **[M]** Cap simultaneously playing videos (pause others on hover-play) to save CPU/battery.
+- [x] **[M]** Use `loading="lazy"` plus a low-res poster/thumbnail for videos *(Done for the lazy part: a video tile downloads only after it has been near the viewport, and never unloads. No low-res poster: result URLs are cross-origin, so frames cannot be read.)*; only attach `src` when near the viewport (keeps AGENTS.md rule: never unmount *loaded* media).
+- [x] **[M]** Cap simultaneously playing videos (pause others on hover-play) to save CPU/battery.
 - [ ] **[M]** Generate and cache thumbnails in IndexedDB so reopening is instant offline.
-- [ ] **[M]** Back off polling: 4 s for the first minute, then 8-15 s for long video jobs; pause when the tab is hidden and resume on `visibilitychange`.
-- [ ] **[L]** Debounce history writes (batch within 250 ms) instead of rewriting the whole array each tick.
-- [ ] **[L]** Move IndexedDB reads off first paint with `Suspense` skeletons to avoid layout shift.
-- [ ] **[L]** Analyze the bundle (`@next/bundle-analyzer`) once; lazy-load the settings dialog, detail modal, asset library.
-- [ ] **[L]** Prefetch the next page of history on idle.
+- [x] **[M]** Back off polling: 4 s for the first minute *(Done: 4 s, then 8 s, then 15 s by age of the newest watch; a hidden tab polls every 30 s instead of pausing, so completion notifications still work.)*, then 8-15 s for long video jobs; pause when the tab is hidden and resume on `visibilitychange`.
+- [x] **[L]** Debounce history writes (batch within 250 ms) *(Flushed on `pagehide`.)* instead of rewriting the whole array each tick.
+- [x] **[L]** Move IndexedDB reads off first paint with `Suspense` skeletons *(Done as a loading skeleton in the feed, not `Suspense`; it also stops the "No generations yet" flash.)* to avoid layout shift.
+- [ ] **[L]** Analyze the bundle (`@next/bundle-analyzer`) once; lazy-load the settings dialog, detail modal, asset library. *(Partly: the command palette, shortcuts, usage, privacy and move dialogs now load on first use. The analyzer was not run, and the settings dialog, detail modal and asset library stay eager because they are opened by their own trigger buttons.)*
+- [ ] **[L]** Prefetch the next page of history on idle. *(Not applicable: IndexedDB history is read in one go, capped at 400 runs.)*
 - [ ] **[L]** Turn on `reactCompiler` in Next 16 and measure re-renders in the gallery.
 
 ### Visual design polish
@@ -347,3 +347,6 @@ Reviewed 2026-10-13 against `17b2826` (Next.js 16, React 19, Tailwind 4, Base UI
 
 - **Auto-convert HEIC to JPEG before upload** (Planned > Assets and references, [L]). Not done. Browsers other than Safari cannot decode HEIC, so this needs a WASM decoder dependency (for example `heic2any`/`libheif-js`, roughly 1 MB+). Decision needed: approve adding that dependency (lazy-loaded), or keep the current clear refusal message ("Export the photo as JPEG or PNG first").
 - **Auto-downscale oversized images to the model's max input size** (Planned > Assets and references, [L]). Not done. No catalog entry declares a maximum input resolution or file size, so there is no target to downscale to. Decision needed: the per-model (or global) max edge/size, and whether to add an `inputMaxEdge` field to `ModelEntry`.
+
+- **Cache thumbnails in IndexedDB** (Planned > Performance, [M]). Not done. Result media is served cross-origin from the platform CDN, so the browser cannot draw video frames to a canvas (tainted canvas) and a `fetch` of the bytes depends on the CDN sending CORS headers, which I can't verify without a key. Decision needed: confirm the CDN sends `Access-Control-Allow-Origin` (then I will cache image thumbnails), or accept no offline thumbnails.
+- **Turn on `reactCompiler` and measure re-renders** (Planned > Performance, [L]). Not done. It needs `babel-plugin-react-compiler` as a new dependency and a profiling session in a browser against real data, which I can't do here. Decision needed: approve the dependency and run the React profiler on the gallery before/after, or drop the item.

@@ -5,6 +5,10 @@ import type { GenerationStatus, StatusResult } from "./platform"
 const TERMINAL = new Set(["completed", "failed", "nsfw", "canceled"])
 
 export const POLL_INTERVAL_MS = 4000
+/** Slower rhythm for jobs that have run a while, and for a hidden tab. */
+const SLOW_INTERVAL_MS = 8000
+const SLOWER_INTERVAL_MS = 15_000
+const HIDDEN_INTERVAL_MS = 30_000
 export const POLL_DEADLINE_MS = 10 * 60_000
 /** Rounds allowed to fail back to back before the watches are given up on. One
     dropped round must not end every generation in flight. */
@@ -23,6 +27,7 @@ export class WatchTimeoutError extends Error {
 }
 
 type Waiter = {
+  startedAt: number
   deadline: number
   errors: number
   resolve: (status: GenerationStatus) => void
@@ -48,6 +53,7 @@ export function watchRequest(
   if (existing) return existing
   const promise = new Promise<GenerationStatus>((resolve, reject) => {
     waiting.set(requestId, {
+      startedAt: Date.now(),
       deadline: opts?.deadline ?? Date.now() + POLL_DEADLINE_MS,
       errors: 0,
       resolve: (status) => {
@@ -78,8 +84,29 @@ export function stopWatching(): void {
 
 function schedule(): void {
   if (timer !== null || polling || waiting.size === 0) return
-  timer = setTimeout(() => void round(), POLL_INTERVAL_MS)
+  timer = setTimeout(() => void round(), nextInterval())
 }
+
+/** Follows the newest watch: 4 s for its first minute, 8 s to five minutes, then 15 s.
+    A hidden tab polls every 30 s; the visibility listener wakes it on return. */
+function nextInterval(): number {
+  if (typeof document !== "undefined" && document.hidden)
+    return HIDDEN_INTERVAL_MS
+  const newest = Math.max(...[...waiting.values()].map((w) => w.startedAt))
+  const age = Date.now() - newest
+  return age < 60_000
+    ? POLL_INTERVAL_MS
+    : age < 5 * 60_000
+      ? SLOW_INTERVAL_MS
+      : SLOWER_INTERVAL_MS
+}
+
+if (typeof document !== "undefined")
+  document.addEventListener("visibilitychange", () => {
+    if (document.hidden || waiting.size === 0 || polling) return
+    if (timer !== null) clearTimeout(timer)
+    timer = setTimeout(() => void round(), 0)
+  })
 
 async function round(): Promise<void> {
   timer = null

@@ -125,10 +125,25 @@ export function useRuns({ onAuthError }: { onAuthError?: () => void } = {}) {
     }
   }, [watch])
 
+  // Writes are batched for 250 ms, and flushed if the tab goes away first.
+  const latest = useRef(records)
   useEffect(() => {
-    if (loaded)
-      void saveHistory(records).then(() => channel.current?.postMessage(0))
+    latest.current = records
+    if (!loaded) return
+    const timer = setTimeout(
+      () =>
+        void saveHistory(records).then(() => channel.current?.postMessage(0)),
+      250
+    )
+    return () => clearTimeout(timer)
   }, [loaded, records])
+  useEffect(() => {
+    const flush = () => {
+      if (loaded) void saveHistory(latest.current)
+    }
+    window.addEventListener("pagehide", flush)
+    return () => window.removeEventListener("pagehide", flush)
+  }, [loaded])
 
   const start = useCallback(
     async (
