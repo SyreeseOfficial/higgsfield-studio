@@ -4,6 +4,7 @@ import { useCallback, useEffect, useRef, useState } from "react"
 
 import { cancelGeneration, submitGeneration } from "@/generation/actions"
 import { getModel } from "@/generation/catalog"
+import { friendlyError } from "@/generation/errors"
 import { groupMedia } from "@/generation/catalog/media-inputs"
 import type { GenerationPlane } from "@/generation/catalog"
 import type { GenerationStatus } from "@/generation/platform"
@@ -16,6 +17,7 @@ import {
 import {
   aspectFromSettings,
   loadHistory,
+  readHistory,
   saveHistory,
   type RunRecord,
 } from "./history"
@@ -98,8 +100,12 @@ export function useRuns({ onAuthError }: { onAuthError?: () => void } = {}) {
 
   useEffect(() => {
     let alive = true
-    void loadHistory().then((stored) => {
+    void readHistory().then(({ records: stored, skipped }) => {
       if (!alive) return
+      if (skipped)
+        setError(
+          `${skipped} saved ${skipped === 1 ? "run was" : "runs were"} unreadable and left out.`
+        )
       setRecords(stored)
       setLoaded(true)
       for (const record of stored)
@@ -367,8 +373,10 @@ function settle(status: GenerationStatus): Partial<RunRecord> {
       ? "Blocked by the content filter"
       : status.status === "canceled"
         ? "Canceled"
-        : (describeError(status.error) ??
-          "The generation did not produce media")
+        : friendlyError(
+            describeError(status.error) ??
+              "The generation did not produce media"
+          )
   return { status: "failed", error: reason, stalled: false, canceling: false }
 }
 

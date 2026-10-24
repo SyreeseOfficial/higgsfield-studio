@@ -12,6 +12,7 @@ import {
   encodeCredentials,
   parseCredentialInput,
 } from "./credentials"
+import { friendlyError } from "./errors"
 import { PlatformError, createPlatformClient } from "./platform"
 import type { QueuedGeneration, StatusResult } from "./platform"
 import { toPlatform } from "./to-platform"
@@ -71,7 +72,11 @@ export async function submitGeneration(
     const client = createPlatformClient(await readCredentials())
     return { ok: true, queued: await client.submit(path, body, idempotencyKey) }
   } catch (caught) {
-    const error = caught instanceof Error ? caught.message : String(caught)
+    const raw = caught instanceof Error ? caught.message : String(caught)
+    const error = friendlyError(
+      raw,
+      caught instanceof PlatformError ? caught.status : undefined
+    )
     if (caught instanceof MissingCredentialsError)
       return { ok: false, kind: "auth", error }
     if (caught instanceof PlatformError) {

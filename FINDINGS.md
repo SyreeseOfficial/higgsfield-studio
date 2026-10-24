@@ -101,13 +101,13 @@ Reviewed 2026-10-13 against `17b2826` (Next.js 16, React 19, Tailwind 4, Base UI
 - [x] **[L]** Usage dashboard: runs per model/day, success rate, median time-to-complete (local data). *(Done as a Usage dialog in the command palette; median time only counts runs finished after completion times were recorded.)*
 
 ### Resilience, safety and privacy
-- [ ] **[H]** Error boundary around the gallery and detail modal so one bad record doesn't blank the app.
-- [ ] **[M]** Validate/migrate IndexedDB records on load (schema version + zod); skip and report corrupt rows rather than crash. Use one `readJson(schema)` helper for every IndexedDB/localStorage read.
-- [ ] **[M]** Offline banner: disable Generate and say "You're offline" instead of failing with a fetch error.
-- [ ] **[M]** Map platform error codes to friendly messages (content filter, insufficient credits, rate limit, model unavailable) with a next step each. Centralize in `generation/errors.ts`.
-- [ ] **[M]** Storage quota warning (`navigator.storage.estimate`) with "Clear cache" and Export.
-- [ ] **[M]** Privacy panel: states exactly what is stored where (cookie, IndexedDB, localStorage) with a "Wipe everything" button.
-- [ ] **[M]** "Wipe everything" also clears the httpOnly cookie via a server action.
+- [x] **[H]** Error boundary around the gallery and detail modal so one bad record doesn't blank the app.
+- [x] **[M]** Validate/migrate IndexedDB records on load *(Done with hand-written checks instead of zod, and a notice for skipped rows; unreadable rows are dropped on the next save. There is no schema version yet, and the shared `readJson` helper was not added: localStorage goes through zustand persist.)* (schema version + zod); skip and report corrupt rows rather than crash. Use one `readJson(schema)` helper for every IndexedDB/localStorage read.
+- [x] **[M]** Offline banner: disable Generate and say "You're offline" instead of failing with a fetch error.
+- [x] **[M]** Map platform error codes to friendly messages *(Done in `generation/errors.ts`, applied to submit errors and failed-run reasons.)* (content filter, insufficient credits, rate limit, model unavailable) with a next step each. Centralize in `generation/errors.ts`.
+- [x] **[M]** Storage quota warning (`navigator.storage.estimate`) with "Clear cache" and Export. *(Done inside the Privacy and storage dialog (command palette), not as a proactive banner; "Clear cache" is the full wipe.)*
+- [x] **[M]** Privacy panel: states exactly what is stored where (cookie, IndexedDB, localStorage) with a "Wipe everything" button.
+- [x] **[M]** "Wipe everything" also clears the httpOnly cookie via a server action.
 - [x] **[L]** "Sign out" in the Key dialog that clears the cookie server side (confirm it exists and works). *(Confirmed: "Remove API key" calls `clearPlatformCredentials`.)*
 
 ### Performance

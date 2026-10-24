@@ -40,9 +40,17 @@ const KEY = "history.v1"
 const MAX_RECORDS = 400
 
 export async function loadHistory(kv: Kv = defaultKv()): Promise<RunRecord[]> {
+  return (await readHistory(kv)).records
+}
+
+/** Valid runs, plus how many stored rows were unreadable and left out. */
+export async function readHistory(
+  kv: Kv = defaultKv()
+): Promise<{ records: RunRecord[]; skipped: number }> {
   const stored = await kv.get<unknown>(KEY)
-  if (!Array.isArray(stored)) return []
-  return stored.filter(isRunRecord)
+  if (!Array.isArray(stored)) return { records: [], skipped: 0 }
+  const records = stored.filter(isRunRecord)
+  return { records, skipped: stored.length - records.length }
 }
 
 export async function saveHistory(
@@ -61,7 +69,16 @@ function isRunRecord(value: unknown): value is RunRecord {
     typeof r.modelId === "string" &&
     typeof r.prompt === "string" &&
     typeof r.createdAt === "number" &&
-    Array.isArray(r.urls)
+    (r.status === "running" ||
+      r.status === "completed" ||
+      r.status === "failed") &&
+    typeof r.aspect === "number" &&
+    typeof r.modelLabel === "string" &&
+    (r.surface === "image" || r.surface === "video") &&
+    r.settings !== null &&
+    typeof r.settings === "object" &&
+    Array.isArray(r.urls) &&
+    r.urls.every((url) => typeof url === "string")
   )
 }
 

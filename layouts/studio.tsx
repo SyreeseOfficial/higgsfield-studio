@@ -55,6 +55,9 @@ import {
 } from "@/components/studio/command-palette"
 import { ShortcutsDialog } from "@/components/studio/shortcuts-dialog"
 import { UsageDialog } from "@/components/studio/usage-dialog"
+import { ErrorBoundary } from "@/components/studio/error-boundary"
+import { PrivacyDialog } from "@/components/studio/privacy-dialog"
+import { useOnline } from "@/lib/studio/use-online"
 import { claimTip } from "@/lib/studio/tips"
 import { FeedControls } from "@/components/studio/feed-controls"
 import {
@@ -267,38 +270,53 @@ function FeedState({
         className="flex min-h-0 flex-1 flex-col px-4 pt-4"
         style={{ paddingBottom: dockHeight + 24 }}
       >
-        <UserGenerations
-          items={shownItems}
-          title={title}
-          grouped={isDateSorted(feedView.sort)}
-          toolbar={
-            items.length > 0 ? (
-              <FeedControls
-                view={feedView}
-                models={feedModels}
-                onChange={setFeedView}
-              />
-            ) : undefined
-          }
-          onStar={onStar}
-          onDelete={onDelete}
-          onCancel={onCancel}
-          onRecheck={onRecheck}
-          onMove={onMove}
-          onDeleteMany={onDeleteMany}
-          onVariation={onVariation}
-          emptyState={{
-            images,
-            title: filtered
-              ? "Nothing here"
-              : title === "All Generations"
-                ? "No generations yet"
-                : `No generations in ${title}`,
-            description: filtered
-              ? emptyFeedMessage(feedView)
-              : "Describe an idea below, then generate the first result.",
-          }}
-        />
+        <ErrorBoundary
+          fallback={(reset) => (
+            <div className="flex flex-1 flex-col items-center justify-center gap-3 text-center text-sm">
+              <p>Something went wrong showing your generations.</p>
+              <button
+                type="button"
+                className="rounded-full bg-white/8 px-4 py-2 font-medium hover:bg-white/14"
+                onClick={reset}
+              >
+                Reload feed
+              </button>
+            </div>
+          )}
+        >
+          <UserGenerations
+            items={shownItems}
+            title={title}
+            grouped={isDateSorted(feedView.sort)}
+            toolbar={
+              items.length > 0 ? (
+                <FeedControls
+                  view={feedView}
+                  models={feedModels}
+                  onChange={setFeedView}
+                />
+              ) : undefined
+            }
+            onStar={onStar}
+            onDelete={onDelete}
+            onCancel={onCancel}
+            onRecheck={onRecheck}
+            onMove={onMove}
+            onDeleteMany={onDeleteMany}
+            onVariation={onVariation}
+            emptyState={{
+              images,
+              title: filtered
+                ? "Nothing here"
+                : title === "All Generations"
+                  ? "No generations yet"
+                  : `No generations in ${title}`,
+              description: filtered
+                ? emptyFeedMessage(feedView)
+                : "Describe an idea below, then generate the first result.",
+            }}
+          />
+        </ErrorBoundary>
       </div>
       <div
         className="pointer-events-none absolute inset-x-0 bottom-0 flex justify-center px-4 pt-24 pb-4"
@@ -346,6 +364,8 @@ export function StudioTemplate({
   const [paletteOpen, setPaletteOpen] = useState(false)
   const [shortcutsOpen, setShortcutsOpen] = useState(false)
   const [usageOpen, setUsageOpen] = useState(false)
+  const [privacyOpen, setPrivacyOpen] = useState(false)
+  const online = useOnline()
   const [tip, setTip] = useState<string | null>(null)
 
   const surface = useActive((s) => s.surface)
@@ -575,6 +595,12 @@ export function StudioTemplate({
       run: () => setKeyOpen(true),
     },
     {
+      id: "privacy",
+      label: "Privacy and storage",
+      hint: "Settings",
+      run: () => setPrivacyOpen(true),
+    },
+    {
       id: "usage",
       label: "Usage",
       hint: "Stats",
@@ -666,8 +692,8 @@ export function StudioTemplate({
     onCancel: handleCancel,
     generating,
     canceling,
-    generateDisabled: !canGenerate,
-    disabledReason: prepared.error ?? undefined,
+    generateDisabled: !canGenerate || !online,
+    disabledReason: online ? (prepared.error ?? undefined) : "You're offline",
     etaHint:
       model.surface === "video"
         ? "Video usually takes a few minutes"
@@ -675,6 +701,9 @@ export function StudioTemplate({
     error:
       localError ??
       runs.error ??
+      (online
+        ? null
+        : "You're offline. Generate is back when you reconnect.") ??
       (!missingRequiredInput && media.length > 0 ? prepared.error : null) ??
       undefined,
   }
@@ -761,6 +790,7 @@ export function StudioTemplate({
         onOpenChange={setPaletteOpen}
         commands={commands}
       />
+      <PrivacyDialog open={privacyOpen} onOpenChange={setPrivacyOpen} />
       <UsageDialog
         open={usageOpen}
         onOpenChange={setUsageOpen}

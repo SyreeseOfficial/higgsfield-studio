@@ -19,6 +19,7 @@ import {
 import { downloadMedia } from "@/lib/studio/download-media"
 import { cn } from "@/lib/utils"
 
+import { ErrorBoundary } from "./error-boundary"
 import {
   GenerationDetailModal,
   type GenerationDetail,
@@ -269,23 +270,25 @@ export function GenerationTile({
       onMouseLeave={onMouseLeave}
     >
       {canOpen ? (
-        <GenerationDetailModal
-          generation={generation}
-          trigger={
-            <button
-              type="button"
-              aria-label={
-                openLabel ??
-                (generation?.prompt
-                  ? `Open generation: ${generation.prompt}`
-                  : "Open generation")
-              }
-              className="absolute inset-0 z-[1] cursor-pointer focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none focus-visible:ring-inset"
-              onFocus={onFocus}
-              onBlur={onBlur}
-            />
-          }
-        />
+        <ErrorBoundary fallback={() => null}>
+          <GenerationDetailModal
+            generation={generation}
+            trigger={
+              <button
+                type="button"
+                aria-label={
+                  openLabel ??
+                  (generation?.prompt
+                    ? `Open generation: ${generation.prompt}`
+                    : "Open generation")
+                }
+                className="absolute inset-0 z-[1] cursor-pointer focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none focus-visible:ring-inset"
+                onFocus={onFocus}
+                onBlur={onBlur}
+              />
+            }
+          />
+        </ErrorBoundary>
       ) : null}
       {children}
       {resolved && resolved.length > 0 ? (
