@@ -458,7 +458,7 @@ export function StudioTemplate({
           : mergeMedia(
               media,
               role,
-              selected.map((item) => ({ ...item, role })),
+              selected.map((item) => ({ ...item, id: `${role}:${item.id}`, role })),
               roles[role] ?? 0
             )
       setLocalError(null)

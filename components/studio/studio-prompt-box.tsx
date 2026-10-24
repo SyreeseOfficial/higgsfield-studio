@@ -402,9 +402,6 @@ function MediaInputs({
               items={library.items}
               onUpload={library.onUpload}
               accept={[ROLE_KIND[role]]}
-              excludeIds={media
-                .filter((entry) => entry.role !== role)
-                .map((entry) => entry.url)}
               onSelect={(selection) => onMediaAdd(role, [selection])}
               trigger={
                 tilesOnly ? (
