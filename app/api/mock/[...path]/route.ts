@@ -19,7 +19,8 @@ export async function GET(_request: Request, { params }: Params) {
       headers: { "Content-Type": "video/mp4" },
     })
   const file = kind === "files" ? uploads.get(id) : undefined
-  if (file) return new Response(file.bytes, { headers: { "Content-Type": file.type } })
+  if (file)
+    return new Response(file.bytes, { headers: { "Content-Type": file.type } })
   return new Response(null, { status: 404 })
 }
 

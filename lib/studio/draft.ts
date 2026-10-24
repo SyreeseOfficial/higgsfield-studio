@@ -2,7 +2,7 @@ import { useEffect, useState } from "react"
 
 import type { MediaItem } from "@/generation/catalog"
 
-import { reportStorageFailure } from "./storage-warning"
+import { read as readStored, write } from "@/generation/stores/browser-storage"
 
 const KEY = "hf.draft.v1"
 
@@ -10,7 +10,7 @@ type Draft = { prompt: string; media: MediaItem[] }
 
 function read(): Draft | null {
   try {
-    const raw: unknown = JSON.parse(localStorage.getItem(KEY) ?? "null")
+    const raw: unknown = JSON.parse(readStored(KEY) ?? "null")
     if (raw === null || typeof raw !== "object") return null
     const { prompt, media } = raw as Partial<Draft>
     return {
@@ -41,18 +41,14 @@ export function useDraft() {
 
   useEffect(() => {
     if (!restored) return
-    try {
-      localStorage.setItem(
-        KEY,
-        JSON.stringify({
-          prompt,
-          // A blob: URL dies with the page; only uploaded references come back.
-          media: media.filter((m) => !m.url.startsWith("blob:")),
-        })
-      )
-    } catch {
-      reportStorageFailure()
-    }
+    // A blob: URL dies with the page; only uploaded references come back.
+    write(
+      KEY,
+      JSON.stringify({
+        prompt,
+        media: media.filter((m) => !m.url.startsWith("blob:")),
+      })
+    )
   }, [restored, prompt, media])
 
   return { prompt, setPrompt, media, setMedia }

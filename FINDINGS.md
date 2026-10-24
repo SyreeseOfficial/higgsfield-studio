@@ -217,10 +217,10 @@ Work that users don't see but keeps the app healthy.
 - [x] 🟡 **Catch typo'd model names** at build time. ⏱ 15 min
 - [x] 🟡 **Command to compare installed models** with the latest catalog. ⏱ 15 min *(`pnpm models:diff`. Written but not run: it needs network and the registry name `higgsfield-ai/app-templates/models`; override with `HF_MODELS_ITEM`.)*
 - [x] 🟡 **Lint rule against logging prompts/URLs.** ⏱ 15 min
-- [ ] 🟡 **Remove an unused add-on** (`radix-ui`) if confirmed. ⏱ 15 min
+- [x] 🟡 **Remove an unused add-on** (`radix-ui`) if confirmed. ⏱ 15 min
 - [x] 🟡 **Pin tool versions** and add hosted automatic checks. ⏱ 15 min
 - [x] 🟡 **Check update-bot coverage.** ⏱ 15 min
-- [ ] 🟡 **Dev page showing every component** with sample data. ⏱ 15 min
+- [x] 🟡 **Dev page showing every component** with sample data. ⏱ 15 min
 - [x] 🟡 **Settings check at build time** so a missing setting fails early. ⏱ 15 min
 - [x] 🟡 **Stronger accessibility and React lint rules.** ⏱ 15 min
 - [ ] ⚪ **Simplify how data flows** in the prompt box. *(see Decisions)*
@@ -239,21 +239,21 @@ Work that users don't see but keeps the app healthy.
 - [ ] ⚪ **One-diagram architecture note.**
 
 **Setup & running the app**
-- [ ] 🟡 **`/api/health` page** for uptime checks. ⏱ 15 min
-- [ ] 🟡 **Show version info in Settings.** ⏱ 15 min
+- [x] 🟡 **`/api/health` page** for uptime checks. ⏱ 15 min
+- [x] 🟡 **Show version info in Settings.** ⏱ 15 min
 
 **Cleanup**
-- [ ] 🟡 **Remove dead code:** unused saved-prompt and media stores. Wire them in or delete them.
-- [ ] ⚪ **Avoid running model sync twice** in config reloads. ⏱ 5 min
-- [ ] ⚪ **Make sure a build file isn't committed** (`tsconfig.tsbuildinfo`). ⏱ 5 min
-- [ ] ⚪ **Remove unused style rules.** ⏱ 5 min
-- [ ] ⚪ **Make `CLAUDE.md` and `AGENTS.md` point to each other.** ⏱ 5 min
-- [ ] ⚪ **Shrink this file** (done by this reorganization). ⏱ 5 min
-- [ ] ⚪ **Move tips storage** to the same helper as everything else. ⏱ 5 min
-- [ ] ⚪ **Document the storage version naming** and add a test listing all keys. ⏱ 5 min
-- [ ] ⚪ **Fail the build if placeholder images are still used.** ⏱ 5 min
-- [ ] ⚪ **Remove unused add-ons:** `radix-ui`, `next-themes`, empty placeholder files.
-- [ ] ⚪ **Check the package named `cn`** or replace it with a six-line local helper.
+- [x] 🟡 **Remove dead code:** unused saved-prompt and media stores. Wire them in or delete them.
+- [x] ⚪ **Avoid running model sync twice** in config reloads. ⏱ 5 min
+- [x] ⚪ **Make sure a build file isn't committed** (`tsconfig.tsbuildinfo`). ⏱ 5 min *(Checked: `*.tsbuildinfo` is ignored and not tracked.)*
+- [x] ⚪ **Remove unused style rules.** ⏱ 5 min *(Checked: every class in `app/globals.css` is used. Only the vendored Quanta design-system files have unused classes; left alone.)*
+- [x] ⚪ **Make `CLAUDE.md` and `AGENTS.md` point to each other.** ⏱ 5 min
+- [x] ⚪ **Shrink this file** (done by this reorganization). ⏱ 5 min
+- [x] ⚪ **Move tips storage** to the same helper as everything else. ⏱ 5 min
+- [x] ⚪ **Document the storage version naming** and add a test listing all keys. ⏱ 5 min
+- [x] ⚪ **Fail the build if placeholder images are still used.** ⏱ 5 min *(Done as an opt-in: `HF_FAIL_ON_PLACEHOLDERS=1` fails the build while `/presets/*` is referenced. Turn it on in production once the sample media is replaced.)*
+- [x] ⚪ **Remove unused add-ons:** `radix-ui`, `next-themes`, empty placeholder files.
+- [x] ⚪ **Check the package named `cn`** or replace it with a six-line local helper. *(Checked: it is shadcn's own package, repository shadcn-ui/cn; kept, since it replaces clsx + tailwind-merge.)*
 - [ ] ⚪ **Replace placeholder media** *(see Decisions)*.
 
 ---

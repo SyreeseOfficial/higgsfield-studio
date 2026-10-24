@@ -1,11 +1,48 @@
+import { execSync } from "node:child_process"
+import { readFileSync } from "node:fs"
+
 import type { NextConfig } from "next"
 
 import { checkEnv, formatProblems } from "./scripts/check-env.mjs"
+import { findPlaceholders } from "./scripts/check-placeholders.mjs"
 import { syncModels, watchModels } from "./scripts/sync-models.mjs"
 
+// Opt-in release gate: sample media from the template must be gone before shipping.
+if (process.env.HF_FAIL_ON_PLACEHOLDERS === "1") {
+  const left = findPlaceholders()
+  if (left.length)
+    throw new Error(
+      `Placeholder media is still referenced:\n${left.map((l) => `  - ${l}`).join("\n")}`
+    )
+}
+
 // Keep the model barrel + registry items in sync with generation/catalog/models/*.
-syncModels()
-if (process.env.NODE_ENV === "development") watchModels()
+// The config is evaluated more than once per process (reloads); sync and watch once.
+const once = globalThis as { __modelsSynced?: boolean }
+if (!once.__modelsSynced) {
+  once.__modelsSynced = true
+  syncModels()
+  if (process.env.NODE_ENV === "development") watchModels()
+}
+
+/** Shown in Settings and /api/health: package version plus the commit it was built from. */
+function buildInfo() {
+  const { version } = JSON.parse(readFileSync("package.json", "utf8")) as {
+    version: string
+  }
+  let commit = process.env.VERCEL_GIT_COMMIT_SHA?.slice(0, 7)
+  try {
+    commit ??= execSync("git rev-parse --short HEAD", {
+      stdio: ["ignore", "pipe", "ignore"],
+    })
+      .toString()
+      .trim()
+  } catch {
+    /* not a git checkout */
+  }
+  return { version, commit: commit ?? "" }
+}
+const build = buildInfo()
 
 const dev = process.env.NODE_ENV === "development"
 
@@ -28,7 +65,7 @@ const csp = [
   `script-src 'self' 'unsafe-inline'${dev ? " 'unsafe-eval'" : ""}`,
   "style-src 'self' 'unsafe-inline'",
   `img-src 'self' data: blob: ${remote}`,
-  `media-src 'self' blob: ${remote}`,
+  `media-src 'self' blob: ${dev ? "data: " : ""}${remote}`,
   `connect-src 'self' ${remote}${dev ? " ws: wss:" : ""}`,
   "font-src 'self' data:",
   "object-src 'none'",
@@ -42,6 +79,10 @@ const csp = [
 ].join("; ")
 
 const nextConfig: NextConfig = {
+  env: {
+    NEXT_PUBLIC_APP_VERSION: build.version,
+    NEXT_PUBLIC_APP_COMMIT: build.commit,
+  },
   agentRules: false,
   experimental: { agentUpgrade: "security" },
   async headers() {

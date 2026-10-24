@@ -21,3 +21,13 @@ describe("checkEnv", () => {
     expect(checkEnv({ ...ok, HF_DEBUG: "yes" })[0]).toMatch(/HF_DEBUG/)
   })
 })
+
+describe("findPlaceholders", () => {
+  it("lists references to the sample media, with file names", async () => {
+    const { findPlaceholders } =
+      await import("../scripts/check-placeholders.mjs")
+    const found = findPlaceholders()
+    expect(found.length).toBeGreaterThan(0) // until the sample media is replaced
+    for (const line of found) expect(line).toMatch(/\.tsx?: \/presets\//)
+  })
+})

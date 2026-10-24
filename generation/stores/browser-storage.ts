@@ -31,7 +31,7 @@ export function browserStorage<T>(): PersistStorage<T> {
   }
 }
 
-function read(name: string): string | null {
+export function read(name: string): string | null {
   try {
     if (typeof localStorage === "undefined") return null
     return localStorage.getItem(name)
@@ -40,12 +40,15 @@ function read(name: string): string | null {
   }
 }
 
-function write(name: string, value: string | null): void {
+/** False when the value could not be stored (no storage, quota, private mode). */
+export function write(name: string, value: string | null): boolean {
   try {
-    if (typeof localStorage === "undefined") return
+    if (typeof localStorage === "undefined") return false
     if (value === null) localStorage.removeItem(name)
     else localStorage.setItem(name, value)
+    return true
   } catch {
     reportStorageFailure() // quota, private mode, or a denied store
+    return false
   }
 }

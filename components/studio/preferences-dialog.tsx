@@ -245,6 +245,12 @@ export function PreferencesDialog({
                 </ul>
               )}
             </Section>
+            <p className="text-xs text-muted-foreground">
+              Studio {process.env.NEXT_PUBLIC_APP_VERSION}
+              {process.env.NEXT_PUBLIC_APP_COMMIT
+                ? ` · ${process.env.NEXT_PUBLIC_APP_COMMIT}`
+                : ""}
+            </p>
             <div className="flex justify-end border-t border-white/10 pt-3">
               <Button variant="ghost" size="sm" onClick={prefs.reset}>
                 <RotateCcw className="size-3.5" />

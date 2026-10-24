@@ -1,8 +1,10 @@
+import { read, write } from "@/generation/stores/browser-storage"
+
 const KEY = "hf.tips.v1"
 
 function seen(): string[] {
   try {
-    const parsed: unknown = JSON.parse(localStorage.getItem(KEY) ?? "[]")
+    const parsed: unknown = JSON.parse(read(KEY) ?? "[]")
     return Array.isArray(parsed)
       ? parsed.filter((t) => typeof t === "string")
       : []
@@ -15,10 +17,6 @@ function seen(): string[] {
 export function claimTip(id: string): boolean {
   const done = seen()
   if (done.includes(id)) return false
-  try {
-    localStorage.setItem(KEY, JSON.stringify([...done, id]))
-  } catch {
-    return false // storage blocked: skip tips rather than repeat them
-  }
-  return true
+  // Storage blocked: skip tips rather than repeat them.
+  return write(KEY, JSON.stringify([...done, id]))
 }

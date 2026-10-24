@@ -7,11 +7,9 @@
     "generation/*.worker.ts"
   ],
   "ignore": [
-    "components/theme-provider.tsx",
-    "components/ui/label.tsx",
-    "generation/plane.ts",
-    "generation/stores/media.ts",
-    "generation/stores/prompt.ts"
+    "components/ui/label.tsx"
   ],
-  "ignoreDependencies": ["next-themes", "radix-ui", "@tanstack/react-virtual"]
+  "ignoreDependencies": [
+    "@tanstack/react-virtual"
+  ]
 }

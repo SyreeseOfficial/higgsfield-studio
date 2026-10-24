@@ -1,5 +1,8 @@
 # Studio template contract
 
+(`CLAUDE.md` imports this file, so Claude Code reads it automatically. Keep the
+project rules here, and this file and `CLAUDE.md` pointing at each other.)
+
 This project is a starting scaffold for an AI-built product, not a finished
 demo. Adapt the Studio layout in place and finish the real user flow end to
 end. Rendering the shipped examples is not completion.

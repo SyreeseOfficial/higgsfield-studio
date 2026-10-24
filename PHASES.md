@@ -24,7 +24,7 @@ Source of truth for details: [FINDINGS.md](FINDINGS.md). Do one phase at a time.
 | 12 | Tests: pure logic | 9 | ☑ |
 | 13 | Tests: infrastructure & fake server | 7 | ☑ (2 ⛔) |
 | 14 | Code quality & lint | 10 | ☑ |
-| 15 | Cleanup & small ops | 14 | ☐ |
+| 15 | Cleanup & small ops | 14 | ☑ |
 | 16 | Docs | 8 | ☐ |
 | ⛔ | Blocked on you | 8 | see bottom |
 
@@ -175,20 +175,20 @@ Goal: one click = at most one paid job; one slow call never freezes the app.
 - [x] Check update-bot coverage
 
 ## Phase 15 — Cleanup & small ops
-- [ ] Remove dead code (unused saved-prompt and media stores)
-- [ ] Remove unused add-ons (`radix-ui`, `next-themes`, empty placeholders)
-- [ ] Check the `cn` package or replace with a local helper
-- [ ] Avoid running model sync twice
-- [ ] Make sure `tsconfig.tsbuildinfo` isn't committed
-- [ ] Remove unused style rules
-- [ ] `CLAUDE.md` and `AGENTS.md` point to each other
-- [ ] Shrink FINDINGS.md (done by this reorganization)
-- [ ] Move tips storage to the shared helper
-- [ ] Document storage version naming + test listing all keys
-- [ ] Dev page showing every component with sample data
-- [ ] `/api/health`
-- [ ] Version info in Settings
-- [ ] Fail the build if placeholder images are still used (only after placeholders are replaced; see Blocked)
+- [x] Remove dead code (unused saved-prompt and media stores)
+- [x] Remove unused add-ons (`radix-ui`, `next-themes`, empty placeholders)
+- [x] Check the `cn` package or replace with a local helper
+- [x] Avoid running model sync twice
+- [x] Make sure `tsconfig.tsbuildinfo` isn't committed
+- [x] Remove unused style rules
+- [x] `CLAUDE.md` and `AGENTS.md` point to each other
+- [x] Shrink FINDINGS.md (done by this reorganization)
+- [x] Move tips storage to the shared helper
+- [x] Document storage version naming + test listing all keys
+- [x] Dev page showing every component with sample data
+- [x] `/api/health`
+- [x] Version info in Settings
+- [x] Fail the build if placeholder images are still used (only after placeholders are replaced; see Blocked)
 
 ## Phase 16 — Docs
 - [ ] Rewrite the README
