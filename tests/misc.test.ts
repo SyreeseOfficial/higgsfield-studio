@@ -194,3 +194,22 @@ describe("zipFiles", () => {
     await expect(zipFiles([fake])).rejects.toBeInstanceOf(ZipTooLargeError)
   })
 })
+
+describe("runToCurl", () => {
+  it("builds a keyless curl for an image model and null for an unknown one", async () => {
+    const { runToCurl } = await import("@/lib/studio/export-run")
+    const { MODELS, parseSettings } = await import("@/generation/catalog")
+    const model = MODELS.find(
+      (m) => m.surface === "image" && !m.mediaModes?.length
+    )
+    if (!model) return
+    const curl = runToCurl({
+      modelId: model.id,
+      prompt: "it's a test",
+      settings: parseSettings(model, {}),
+    })
+    expect(curl).toContain("$HF_API_KEY")
+    expect(curl).toContain("it'\\''s a test")
+    expect(runToCurl({ modelId: "nope-0", prompt: "x" })).toBeNull()
+  })
+})

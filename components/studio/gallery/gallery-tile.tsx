@@ -38,6 +38,8 @@ export interface GalleryTileProps {
   onMove?: (item: GalleryItem) => void
   onVariation?: (item: GalleryItem) => void
   onStar?: (item: GalleryItem) => void
+  /** Open the result viewer (also for a run still generating, which updates live). */
+  onOpen?: (item: GalleryItem) => void
 }
 
 function rectStyle(rect: TileRect, top: number): CSSProperties {
@@ -62,6 +64,24 @@ function Elapsed({ since, usually }: { since: number; usually: string }) {
       {String(seconds % 60).padStart(2, "0")}
       <span className="font-normal opacity-70"> · usually {usually}</span>
     </>
+  )
+}
+
+/** Invisible full-tile button that opens the viewer; sits under the tile's own controls. */
+function OpenButton({
+  item,
+  onOpen,
+}: {
+  item: GalleryItem
+  onOpen: (item: GalleryItem) => void
+}) {
+  return (
+    <button
+      type="button"
+      aria-label={`Open generation: ${item.prompt}`}
+      className="absolute inset-0 z-[1] cursor-pointer focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none focus-visible:ring-inset"
+      onClick={() => onOpen(item)}
+    />
   )
 }
 
@@ -165,6 +185,7 @@ function GalleryTileComponent({
   onMove,
   onVariation,
   onStar,
+  onOpen,
 }: GalleryTileProps) {
   const [hovered, setHovered] = useState(false)
   const style = rectStyle(rect, top)
@@ -190,6 +211,9 @@ function GalleryTileComponent({
           }
           className="size-full"
         />
+        {onOpen && !item.queued ? (
+          <OpenButton item={item} onOpen={onOpen} />
+        ) : null}
         <div className="absolute right-2 bottom-2 z-[2] flex gap-2">
           {item.stalled && onRecheck ? (
             <button
@@ -327,23 +351,13 @@ function GalleryTileComponent({
         className="size-full"
         media={media}
         actions={actions}
-        generation={{
-          src: isVideo ? (item.videoSrc ?? item.src) : item.src,
-          poster: isVideo ? item.src || undefined : undefined,
-          mediaType: isVideo ? "video" : "image",
-          aspectRatio: item.width / item.height,
-          prompt: item.prompt,
-          model: item.modelLabel,
-          createdAt: item.createdAt,
-          settings: item.settings,
-          ...(item.completedAt ? { completedAt: item.completedAt } : {}),
-        }}
-        openLabel={`Open generation: ${item.prompt}`}
+        src={isVideo ? (item.videoSrc ?? item.src) : item.src}
         onMouseEnter={isVideo ? () => setHovered(true) : undefined}
         onMouseLeave={isVideo ? () => setHovered(false) : undefined}
         onFocus={isVideo ? () => setHovered(true) : undefined}
         onBlur={isVideo ? () => setHovered(false) : undefined}
       />
+      {onOpen ? <OpenButton item={item} onOpen={onOpen} /> : null}
       {item.starred ? (
         <Star
           aria-label="Starred"

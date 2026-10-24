@@ -1,4 +1,6 @@
 /** Data model for the justified-masonry feed. width/height only need the right ratio. */
+import type { MediaItem } from "@/generation/catalog"
+
 export type MediaKind = "image" | "video"
 export type ItemStatus = "ready" | "generating" | "failed"
 
@@ -28,6 +30,12 @@ export interface GalleryItem {
   prompt: string
   alt: string
   modelLabel: string
+  modelId?: string
+  /** Platform request id (the Support ID); empty while still queued locally. */
+  requestId?: string
+  /** Reference inputs the run was submitted with. */
+  references?: MediaItem[]
+  inputMode?: string
   settings: Record<string, unknown>
   groupId: string
   groupLabel: string

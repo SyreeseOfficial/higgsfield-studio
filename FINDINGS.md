@@ -118,15 +118,15 @@ Keeping your work safe and getting it out of the app.
 
 ## 9. Viewing results
 
-- [ ] 🔴 **Update the detail window live** when its run finishes.
-- [ ] 🔴 **Better video player:** scrub, speed, frame step, loop, keyboard controls.
-- [ ] 🟡 **Full details panel** (model, settings, seed, timings, ID) with "Copy as JSON" and "Copy as curl". ⏱ 15 min
-- [ ] 🟡 **Reference vs result side by side** in the detail window.
-- [ ] 🟡 **Fullscreen button** and `F` shortcut.
-- [ ] 🟡 **Zoom and pan** with a minimap.
+- [x] 🔴 **Update the detail window live** when its run finishes.
+- [x] 🔴 **Better video player:** scrub, speed, frame step, loop, keyboard controls.
+- [x] 🟡 **Full details panel** (model, settings, seed, timings, ID) with "Copy as JSON" and "Copy as curl". ⏱ 15 min
+- [x] 🟡 **Reference vs result side by side** in the detail window.
+- [x] 🟡 **Fullscreen button** and `F` shortcut.
+- [x] 🟡 **Zoom and pan** with a minimap.
 - [ ] 🟡 **Sound badge** on videos; mute globally.
 - [ ] 🟡 **Duration/resolution badge** on video tiles.
-- [ ] ⚪ **Support ID with a copy button** in the detail window.
+- [x] ⚪ **Support ID with a copy button** in the detail window.
 
 ## 11. Reference files
 
@@ -142,7 +142,7 @@ Pictures, videos and audio you give the AI as input.
 
 ## 12. Sharing, export & backup
 
-- [ ] 🟡 **Copy image to clipboard.**
+- [x] 🟡 **Copy image to clipboard.**
 
 ## 13. Cost & usage
 
@@ -441,7 +441,7 @@ Not doing these. Moved here from the sections above; kept in case you change you
 
 **9. Viewing results**
 - [ ] 🟡 **Filmstrip of related runs** below the media.
-- [ ] 🟡 **Copy buttons** for each field.
+- [x] 🟡 **Copy buttons** for each field.
 - [ ] 🟡 **Show size and dimensions;** download original vs WebP.
 - [ ] 🟡 **Color swatches** from the image.
 - [ ] 🟡 **"Describe this image"** to reuse as a prompt.

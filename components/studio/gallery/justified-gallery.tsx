@@ -12,6 +12,10 @@ import {
 } from "@/components/studio/screen-empty-state"
 
 import { DensityControl } from "./density-control"
+import {
+  GenerationDetailModal,
+  type GenerationDetail,
+} from "@/components/studio/generation-detail"
 import { GalleryTile } from "./gallery-tile"
 import type { GalleryItem, LoadTier } from "./gallery-types"
 import { useJustifiedGallery } from "./use-justified-gallery"
@@ -59,6 +63,10 @@ export function JustifiedGallery({
   onStar,
   toolbar,
 }: JustifiedGalleryProps) {
+  const [viewing, setViewing] = useState<{
+    itemId: string
+    runId: string
+  } | null>(null)
   const [selecting, setSelecting] = useState(false)
   const [selected, setSelected] = useState<ReadonlySet<string>>(new Set())
   const prefersReduced = useReducedMotion()
@@ -69,6 +77,11 @@ export function JustifiedGallery({
     loadingMore,
     onLoadMore,
   })
+  // The run may have finished (or changed id) since the viewer opened: follow it.
+  const viewed = viewing
+    ? (items.find((i) => i.id === viewing.itemId) ??
+      items.find((i) => i.runId === viewing.runId))
+    : undefined
   const viewBottom = gallery.scrollTop + gallery.viewportHeight
   // The heading of the day group scrolled to the top of the viewport.
   const passed = gallery.layout.rows
@@ -228,6 +241,7 @@ export function JustifiedGallery({
                     onRecheck={onRecheck}
                     onVariation={onVariation}
                     onStar={onStar}
+                    onOpen={(i) => setViewing({ itemId: i.id, runId: i.runId })}
                     {...(onMove
                       ? { onMove: (i: GalleryItem) => onMove([i]) }
                       : {})}
@@ -266,6 +280,34 @@ export function JustifiedGallery({
           </div>
         )}
       </div>
+      {viewed && viewed.status !== "failed" ? (
+        <GenerationDetailModal
+          open
+          onOpenChange={(open) => !open && setViewing(null)}
+          generation={toDetail(viewed)}
+        />
+      ) : null}
     </div>
   )
+}
+
+function toDetail(item: GalleryItem): GenerationDetail {
+  const isVideo = item.kind === "video"
+  const ready = item.status === "ready"
+  return {
+    src: ready ? (isVideo ? (item.videoSrc ?? item.src) : item.src) : "",
+    pending: !ready,
+    mediaType: item.kind,
+    ...(ready && isVideo && item.src ? { poster: item.src } : {}),
+    aspectRatio: item.width / item.height,
+    prompt: item.prompt,
+    model: item.modelLabel,
+    ...(item.modelId ? { modelId: item.modelId } : {}),
+    ...(item.requestId ? { requestId: item.requestId } : {}),
+    ...(item.references ? { references: item.references } : {}),
+    ...(item.inputMode ? { inputMode: item.inputMode } : {}),
+    createdAt: item.createdAt,
+    settings: item.settings,
+    ...(item.completedAt ? { completedAt: item.completedAt } : {}),
+  }
 }

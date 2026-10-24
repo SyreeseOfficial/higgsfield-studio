@@ -14,7 +14,7 @@ Source of truth for details: [FINDINGS.md](FINDINGS.md). Do one phase at a time.
 | 2 | Run lifecycle & recovery | 10 | ☑ |
 | 3 | History & data safety | 9 | ☑ |
 | 4 | Security & downloads | 5 | ☑ |
-| 5 | Result viewer | 9 | ☐ |
+| 5 | Result viewer | 9 | ☑ |
 | 6 | Tiles & status look | 10 | ☐ |
 | 7 | Prompt box & references | 9 | ☐ |
 | 8 | Gallery, cost & usage | 8 | ☐ |
@@ -72,15 +72,15 @@ Goal: one click = at most one paid job; one slow call never freezes the app.
 - [x] Fix zip dates (1980) and warn before >4 GB zips
 
 ## Phase 5 — Result viewer
-- [ ] Update the detail window live when the run finishes
-- [ ] Better video player (scrub, speed, frame step, loop, keys)
-- [ ] Full details panel + Copy as JSON / curl
-- [ ] Reference vs result side by side
-- [ ] Fullscreen button and `F`
-- [ ] Copy button for each field
-- [ ] Zoom and pan with minimap
-- [ ] Support ID with copy button
-- [ ] Copy image to clipboard
+- [x] Update the detail window live when the run finishes
+- [x] Better video player (scrub, speed, frame step, loop, keys)
+- [x] Full details panel + Copy as JSON / curl
+- [x] Reference vs result side by side
+- [x] Fullscreen button and `F`
+- [x] Copy button for each field
+- [x] Zoom and pan with minimap
+- [x] Support ID with copy button
+- [x] Copy image to clipboard
 
 ## Phase 6 — Tiles & status look
 - [ ] Video tiles: still frame until hover (no full player each)
