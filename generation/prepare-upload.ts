@@ -22,7 +22,8 @@ function getWorker(): Worker {
   }
   created.onerror = () => {
     // Give up on workers for this page: every waiter falls back to the main thread.
-    for (const done of pending.values()) done({ id: -1, error: "worker failed" })
+    for (const done of pending.values())
+      done({ id: -1, error: "worker failed" })
     pending.clear()
     worker = undefined
     broken = true

@@ -16,6 +16,7 @@ import { friendlyError } from "./errors"
 import { PlatformError, createPlatformClient } from "./platform"
 import type { QueuedGeneration, StatusResult } from "./platform"
 import { fail, ok, type Result } from "./result"
+import { MOCK_BASE_URL, isMockMode, mockPlatform } from "./mock-platform"
 import { toPlatform } from "./to-platform"
 
 // Keep in step with STATUS_BATCH in poll.ts.
@@ -160,6 +161,7 @@ export async function cancelGeneration(data: unknown): Promise<Result> {
 }
 
 async function readStoredCredentials() {
+  if (isMockMode()) return { apiKey: "mock-mock-mock" } // HF_MOCK=1: no key needed
   const jar = await cookies()
   return decodeCredentials(jar.get(PLATFORM_KEY_COOKIE)?.value)
 }
@@ -167,6 +169,8 @@ async function readStoredCredentials() {
 async function readCredentials() {
   const stored = await readStoredCredentials()
   if (!stored) throw new MissingCredentialsError()
+  if (isMockMode())
+    return { ...stored, baseUrl: MOCK_BASE_URL, fetch: mockPlatform.fetch }
   const baseUrl = process.env.HF_API_BASE_URL
   if (!baseUrl)
     throw new Error(

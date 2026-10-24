@@ -5,6 +5,7 @@ import {
   decodeCredentials,
   PLATFORM_KEY_COOKIE,
 } from "@/generation/credentials"
+import { isMockMode } from "@/generation/mock-platform"
 import { createPlatformClient, PlatformError } from "@/generation/platform"
 import { requireUploadContentType } from "@/generation/upload-contract"
 
@@ -27,6 +28,21 @@ export async function POST(request: Request): Promise<NextResponse> {
       error instanceof SyntaxError
         ? "Invalid upload request."
         : "Unsupported file type. Use JPEG, PNG, WebP, GIF, MP4, or WAV."
+    )
+  }
+
+  if (isMockMode()) {
+    // Demo mode: the app itself plays the storage service.
+    const id = `up-${crypto.randomUUID()}`
+    const base = `${new URL(request.url).origin}/api/mock`
+    return NextResponse.json(
+      {
+        upload_url: `${base}/upload/${id}`,
+        public_url: `${base}/files/${id}`,
+        content_type: contentType,
+        upload_headers: { "Content-Type": contentType },
+      },
+      { headers: { "Cache-Control": "no-store" } }
     )
   }
 

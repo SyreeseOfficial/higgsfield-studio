@@ -101,7 +101,14 @@ function isHttpsUrl(value: unknown): value is string {
   if (typeof value !== "string") return false
   try {
     const url = new URL(value)
-    return url.protocol === "https:" && !url.username && !url.password
+    // Loopback http is allowed so the mock platform (HF_MOCK=1) can serve uploads itself.
+    const loopback =
+      url.hostname === "localhost" || url.hostname === "127.0.0.1"
+    return (
+      (url.protocol === "https:" || (url.protocol === "http:" && loopback)) &&
+      !url.username &&
+      !url.password
+    )
   } catch {
     return false
   }

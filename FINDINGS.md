@@ -51,6 +51,7 @@ I couldn't do these without an answer from you. Each says what I need.
 - [ ] **Auto-generate a model list in the README.** Needs a small developer tool (`tsx`). *Need:* approve it.
 - [ ] **Automatic accessibility/speed scoring (Lighthouse).** *Need:* which pages to check and what minimum scores should fail a build.
 - [ ] **Clean up how the prompt box passes data around.** This one is a vague review, not a clear task. *Need:* tell me what bothers you, or drop it.
+- [ ] **Tests for the run controller (queue, retry, cancel, two tabs) and for screens (prompt box, key dialog, gallery tile).** These need to render React in a test, which needs a small dev-only add-on (`jsdom` + `@testing-library/react`, about 30 MB, never shipped to users). *Need:* approve it, or accept that these stay covered by the pure-logic tests and the fake platform.
 - [ ] **Show credit balance in the sidebar, with a warning before a run you can't afford.** I don't know which request returns the balance in the Higgsfield platform API (the one the API key calls), or whether it is free. *Need:* the endpoint (or a docs link) and confirmation it costs no credits.
 - [ ] **Session spend counter ("14 generations, ~320 credits today").** The model catalog has no credit prices. *Need:* a price per model/setting (or the endpoint that returns a quote), or accept a count of generations only.
 - [ ] **"Not charged" note on failed runs.** I don't know if Higgsfield refunds failed or filtered runs. *Need:* confirmation of which failure statuses are not charged.
@@ -195,11 +196,9 @@ Work that users don't see but keeps the app healthy.
 
 **Tests**
 - [x] 🔴 **Test the error messages** against real Higgsfield responses. *(Done against representative samples in `tests/fixtures/platform-errors.ts`; add real captures when a live failure shows new wording.)*
-- [ ] 🟡 **Tests for screens** (prompt box, key dialog, gallery tile). ⏱ 15 min
 - [x] 🟡 **Tests with random inputs** for settings parsing. ⏱ 15 min
-- [ ] 🟡 **Recorded-response tests** for the Higgsfield connection. ⏱ 15 min
-- [ ] 🟡 **Stress-test** the polling and run logic. ⏱ 15 min
-- [ ] 🟡 **Test the run controller** (queue, retry, cancel, two tabs). ⏱ 15 min
+- [x] 🟡 **Recorded-response tests** for the Higgsfield connection. ⏱ 15 min
+- [x] 🟡 **Stress-test** the polling and run logic. ⏱ 15 min
 - [x] 🟡 **Test merging of history** and skipping bad rows. ⏱ 15 min
 - [x] 🟡 **Stress-test error messages** with real samples. ⏱ 15 min
 - [x] 🟡 **Test metadata stripping** with broken files. ⏱ 15 min
@@ -208,10 +207,10 @@ Work that users don't see but keeps the app healthy.
 - [x] 🟡 **Test "failed runs stay visible."**
 - [x] 🟡 **Test idempotency key reuse.**
 - [x] 🟡 **Tests for model files** (icons, unique order, roles). ⏱ 15 min
-- [ ] 🟡 **Single `pnpm check` command** for all checks.
-- [ ] 🟡 **Fake Higgsfield server** for tests and demos without a key.
+- [x] 🟡 **Single `pnpm check` command** for all checks.
+- [x] 🟡 **Fake Higgsfield server** for tests and demos without a key.
 - [ ] ⚪ **Automatic accessibility/speed run** in CI. *(see Decisions)*
-- [ ] ⚪ **Mock mode** (`HF_MOCK=1`) for demos.
+- [x] ⚪ **Mock mode** (`HF_MOCK=1`) for demos.
 
 **Code quality**
 - [ ] 🟡 **Stricter TypeScript settings** and lint rules. ⏱ 15 min

@@ -22,7 +22,7 @@ Source of truth for details: [FINDINGS.md](FINDINGS.md). Do one phase at a time.
 | 10 | Speed: rendering | 7 | ☑ |
 | 11 | Speed: loading & bundle | 7 | ☑ |
 | 12 | Tests: pure logic | 9 | ☑ |
-| 13 | Tests: infrastructure & fake server | 7 | ☐ |
+| 13 | Tests: infrastructure & fake server | 7 | ☑ (2 ⛔) |
 | 14 | Code quality & lint | 10 | ☐ |
 | 15 | Cleanup & small ops | 14 | ☐ |
 | 16 | Docs | 8 | ☐ |
@@ -154,13 +154,13 @@ Goal: one click = at most one paid job; one slow call never freezes the app.
 - [x] Tests for model files (icons, unique order, roles)
 
 ## Phase 13 — Tests: infrastructure & fake server (free)
-- [ ] Fake Higgsfield server for tests and demos without a key
-- [ ] Mock mode (`HF_MOCK=1`)
-- [ ] Recorded-response tests for the Higgsfield connection
-- [ ] Stress-test polling and run logic
-- [ ] Test the run controller (queue, retry, cancel, two tabs)
-- [ ] Tests for screens (prompt box, key dialog, gallery tile)
-- [ ] Single `pnpm check` command
+- [x] Fake Higgsfield server for tests and demos without a key
+- [x] Mock mode (`HF_MOCK=1`)
+- [x] Recorded-response tests for the Higgsfield connection
+- [x] Stress-test polling and run logic
+- [ ] ⛔ Test the run controller (queue, retry, cancel, two tabs)
+- [ ] ⛔ Tests for screens (prompt box, key dialog, gallery tile)
+- [x] Single `pnpm check` command
 
 ## Phase 14 — Code quality & lint
 - [ ] Stricter TypeScript and lint rules
@@ -208,6 +208,7 @@ Also listed in FINDINGS.md → *Waiting on your decision*. Start these only afte
 - [ ] Show credit balance + pre-run warning (need the balance endpoint, free?)
 - [ ] Session spend counter (need credit prices per model)
 - [ ] "Not charged" note on failed runs (need to know which failures are refunded)
+- [ ] Run-controller and screen tests (approve jsdom + @testing-library/react dev add-on)
 - [ ] Auto-convert iPhone photos (HEIC): approve ~1 MB add-on, or keep current message
 - [ ] Replace placeholder media (brand direction; images from you or credits approval)
 - [ ] Store small thumbnails (needs confirmation Higgsfield's servers allow it)
