@@ -154,7 +154,10 @@
   background: transparent;
   outline: none;
   resize: none;
-  overflow: hidden;
+  /* Grows with the text (Chromium; elsewhere it keeps min-height and scrolls). */
+  field-sizing: content;
+  max-height: 14rem;
+  overflow-y: auto;
   color: var(--hf-color-text-primary);
   @apply text-q-body-sm-regular;
 

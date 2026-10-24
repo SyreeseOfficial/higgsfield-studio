@@ -19,6 +19,7 @@ import {
   Play,
   Plus,
   SlidersHorizontal,
+  SpellCheck,
   Trash2,
   X,
 } from "lucide-react"
@@ -618,6 +619,7 @@ export function StudioPromptBox({
 }: StudioPromptBoxProps) {
   const headline = headlineSetting(model)
   const headlineField = headline ? model.settings[headline] : undefined
+  const [spellcheck, setSpellcheck] = useState(true)
   const intake = useReferenceIntake({
     model,
     inputMode,
@@ -660,6 +662,7 @@ export function StudioPromptBox({
           <PromptBox.Field
             placeholder={placeholder}
             aria-label={placeholder}
+            spellCheck={spellcheck}
             value={prompt}
             onChange={(event: ChangeEvent<HTMLTextAreaElement>) =>
               onPromptChange(event.target.value)
@@ -718,6 +721,15 @@ export function StudioPromptBox({
                 }))}
               />
             ) : null}
+            <PromptBox.Pill
+              iconOnly
+              aria-label="Spellcheck"
+              aria-pressed={spellcheck}
+              title={spellcheck ? "Turn spellcheck off" : "Turn spellcheck on"}
+              className={spellcheck ? undefined : "opacity-50"}
+              start={<SpellCheck />}
+              onClick={() => setSpellcheck((on) => !on)}
+            />
             <SettingsDialog
               model={model}
               values={settings}
