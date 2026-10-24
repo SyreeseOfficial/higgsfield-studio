@@ -42,5 +42,14 @@ export async function wipeEverything(): Promise<void> {
   for (const key of Object.keys(localStorage))
     if (key.startsWith("hf.")) localStorage.removeItem(key)
   sessionStorage.clear()
+  // The offline file cache and its worker go too.
+  await globalThis.caches
+    ?.keys()
+    .then((keys) => Promise.all(keys.map((key) => caches.delete(key))))
+    .catch(() => undefined)
+  await navigator.serviceWorker
+    ?.getRegistrations()
+    .then((all) => Promise.all(all.map((r) => r.unregister())))
+    .catch(() => undefined)
   location.reload()
 }

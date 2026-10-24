@@ -1,6 +1,7 @@
 import type { Metadata, Viewport } from "next"
 import { IBM_Plex_Mono, Inter, Space_Grotesk } from "next/font/google"
 
+import { ServiceWorker } from "@/components/service-worker"
 import { cn } from "@/lib/utils"
 
 import "./globals.css"
@@ -57,6 +58,7 @@ export default function RootLayout({
     >
       <body className="min-h-svh bg-background text-foreground">
         {children}
+        <ServiceWorker />
       </body>
     </html>
   )

@@ -20,7 +20,7 @@ Source of truth for details: [FINDINGS.md](FINDINGS.md). Do one phase at a time.
 | 8 | Gallery, cost & usage | 8 | ☑ (3 ⛔) |
 | 9 | First-run & visual polish | 7 | ☑ (1 ⛔) |
 | 10 | Speed: rendering | 7 | ☑ |
-| 11 | Speed: loading & bundle | 7 | ☐ |
+| 11 | Speed: loading & bundle | 7 | ☑ |
 | 12 | Tests: pure logic | 9 | ☐ |
 | 13 | Tests: infrastructure & fake server | 7 | ☐ |
 | 14 | Code quality & lint | 10 | ☐ |
@@ -134,13 +134,13 @@ Goal: one click = at most one paid job; one slow call never freezes the app.
 - [x] Skip off-screen parts of the detail window
 
 ## Phase 11 — Speed: loading & bundle
-- [ ] Load rarely used windows only when opened
-- [ ] Preload images only near the screen
-- [ ] Load first-row images first
-- [ ] Heavy file work (fingerprinting, stripping) off the main thread
-- [ ] Analyze the bundle once, lazy-load more windows
-- [ ] Cache static files offline
-- [ ] Split the two biggest files (886 and 816 lines)
+- [x] Load rarely used windows only when opened
+- [x] Preload images only near the screen
+- [x] Load first-row images first
+- [x] Heavy file work (fingerprinting, stripping) off the main thread
+- [x] Analyze the bundle once, lazy-load more windows
+- [x] Cache static files offline
+- [x] Split the two biggest files (886 and 816 lines)
 
 ## Phase 12 — Tests: pure logic (free)
 - [ ] Test the error messages against recorded real responses

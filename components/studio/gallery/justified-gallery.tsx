@@ -20,14 +20,22 @@ import {
 } from "@/components/studio/screen-empty-state"
 
 import { DensityControl } from "./density-control"
-import {
-  GenerationDetailModal,
-  type GenerationDetail,
-} from "@/components/studio/generation-detail"
+import dynamic from "next/dynamic"
+
+import type { GenerationDetail } from "@/components/studio/generation-detail"
 import { GalleryTile } from "./gallery-tile"
 import type { GalleryItem, LoadTier } from "./gallery-types"
 import { useJustifiedGallery } from "./use-justified-gallery"
 import { useReducedMotion } from "./use-reduced-motion"
+
+// The viewer (video player, zoom) loads the first time a result is opened.
+const GenerationDetailModal = dynamic(
+  () =>
+    import("@/components/studio/generation-detail").then(
+      (m) => m.GenerationDetailModal
+    ),
+  { ssr: false }
+)
 
 /**
  * JustifiedGallery — the virtualized justified-masonry feed. The engine owns
@@ -350,6 +358,7 @@ export function JustifiedGallery({
                     reducedMotion={reducedMotion}
                     {...handlers}
                     enter={entering && row.y === firstRowY}
+                    first={row.y === firstRowY}
                     onOpen={openItem}
                   />
                   {selecting ? (

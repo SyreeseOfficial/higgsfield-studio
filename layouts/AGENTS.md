@@ -1,6 +1,7 @@
 # Studio layout contract
 
-`studio.tsx` is the full creative workspace. Six structural parts stay intact
+`studio.tsx` is the full creative workspace (state, handlers and shell; the
+Home and Feed screens live in `studio-views.tsx`). Six structural parts stay intact
 when adapting; replace their content, not their presence:
 
 1. **Projects-first sidebar** (`StudioSidebar`): Home, All Generations, the

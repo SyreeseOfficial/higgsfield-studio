@@ -55,6 +55,8 @@ export interface GalleryTileProps {
   onSaveAsReference?: (item: GalleryItem) => void
   /** First row on load: fade in. */
   enter?: boolean
+  /** In the top row: its images are fetched before the rest. */
+  first?: boolean
 }
 
 const TILE_BUTTON =
@@ -101,6 +103,11 @@ function OpenButton({
       onClick={() => onOpen(item)}
     />
   )
+}
+
+/** The top row loads first; rows merely near the viewport wait for everything else. */
+function fetchPriorityFor(tier: LoadTier, first?: boolean) {
+  return first ? "high" : tier === "full" ? "auto" : "low"
 }
 
 /** Reports the media's true shape once, so the layout settles after the first load. */
@@ -161,10 +168,12 @@ function Placeholder() {
 function StillMedia({
   item,
   tier,
+  first,
   onMeasured,
 }: {
   item: GalleryItem
   tier: LoadTier
+  first?: boolean
   onMeasured?: (item: GalleryItem, aspect: number) => void
 }) {
   return (
@@ -175,6 +184,7 @@ function StillMedia({
         src={item.src}
         alt={item.alt}
         loading={tier === "full" ? "eager" : "lazy"}
+        fetchPriority={fetchPriorityFor(tier, first)}
         decoding="async"
         onLoad={(event) =>
           reportShape(
@@ -229,12 +239,14 @@ let playingVideo: HTMLVideoElement | null = null
 function HoverVideo({
   item,
   tier,
+  first,
   playing,
   reducedMotion,
   onMeasured,
 }: {
   item: GalleryItem
   tier: LoadTier
+  first?: boolean
   playing: boolean
   reducedMotion: boolean
   onMeasured?: (item: GalleryItem, aspect: number) => void
@@ -277,6 +289,7 @@ function HoverVideo({
           src={item.src}
           alt={item.alt}
           loading={tier === "full" ? "eager" : "lazy"}
+          fetchPriority={fetchPriorityFor(tier, first)}
           decoding="async"
           style={{ opacity: showVideo ? 0 : 1 }}
           onLoad={(event) =>
@@ -332,6 +345,7 @@ function GalleryTileComponent({
   onUseAsReference,
   onSaveAsReference,
   enter,
+  first,
 }: GalleryTileProps) {
   const [hovered, setHovered] = useState(false)
   const style = rectStyle(rect, top)
@@ -450,6 +464,7 @@ function GalleryTileComponent({
     <HoverVideo
       item={item}
       tier={tier}
+      {...(first ? { first } : {})}
       playing={hovered}
       reducedMotion={reducedMotion}
       {...(onMeasured ? { onMeasured } : {})}
@@ -458,6 +473,7 @@ function GalleryTileComponent({
     <StillMedia
       item={item}
       tier={tier}
+      {...(first ? { first } : {})}
       {...(onMeasured ? { onMeasured } : {})}
     />
   )

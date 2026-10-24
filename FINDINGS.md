@@ -176,17 +176,17 @@ Pictures, videos and audio you give the AI as input.
 - [x] 🟡 **Smoother layout on resize.** ⏱ 15 min
 - [x] 🟡 **Skip rendering off-screen tiles** while keeping loaded media. ⏱ 15 min
 - [x] 🟡 **Don't recompute lists** on every poll tick. ⏱ 15 min
-- [ ] 🟡 **Split the two biggest files** (886 and 816 lines) into smaller pieces. ⏱ 15 min
+- [x] 🟡 **Split the two biggest files** (886 and 816 lines) into smaller pieces. ⏱ 15 min
 - [x] 🟡 **Only update the part of the gallery that changed.** ⏱ 15 min
-- [ ] 🟡 **Load rarely used windows only when opened.** ⏱ 15 min
-- [ ] 🟡 **Preload images only near the screen.** ⏱ 15 min
+- [x] 🟡 **Load rarely used windows only when opened.** ⏱ 15 min
+- [x] 🟡 **Preload images only near the screen.** ⏱ 15 min
 - [ ] 🟡 **Store small thumbnails** for instant reopening.
 - [x] 🟡 **Cap simultaneous videos** at a hard limit.
-- [ ] 🟡 **Do heavy file work** (fingerprinting, metadata stripping) in the background.
+- [x] 🟡 **Do heavy file work** (fingerprinting, metadata stripping) in the background.
 - [x] 🟡 **Only re-render the tile that changed.**
-- [ ] ⚪ **Analyze the bundle once** and lazy-load more windows.
+- [x] ⚪ **Analyze the bundle once** and lazy-load more windows. *(Done: ~930 KB raw JS across six big chunks, about 360 KB of it React/Next runtime. The key dialog, result viewer and image editor now load on first use.)*
 - [x] ⚪ **Skip off-screen parts** of the detail window.
-- [ ] ⚪ **Load first-row images first,** others later.
+- [x] ⚪ **Load first-row images first,** others later.
 - [ ] ⚪ **Cache static files** offline.
 
 ## 20. Behind the scenes (tests, docs, cleanup)

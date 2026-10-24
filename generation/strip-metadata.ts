@@ -3,13 +3,20 @@
     browser. Other types (WAV) pass through untouched.
     A JPEG whose EXIF rotates it is re-encoded instead, so stripping cannot flip the picture. */
 export async function stripMetadata(file: File): Promise<File> {
-  const strip = STRIPPERS[file.type]
-  if (!strip) return file
-  const bytes = new Uint8Array(await file.arrayBuffer())
-  const clean = strip(bytes)
+  if (!STRIPPERS[file.type]) return file
+  const clean = stripBytes(file.type, new Uint8Array(await file.arrayBuffer()))
   if (clean === "rotated") return reencode(file)
   if (!clean) return file
   return new File([clean], file.name, { type: file.type })
+}
+
+/** The byte-level work, free of DOM APIs so it can run in a worker. `null`: nothing to strip or
+    unreadable (upload as is). `"rotated"`: EXIF rotates the picture, so the caller re-encodes it. */
+export function stripBytes(
+  type: string,
+  bytes: Uint8Array<ArrayBuffer>
+): Uint8Array<ArrayBuffer> | "rotated" | null {
+  return STRIPPERS[type]?.(bytes) ?? null
 }
 
 const STRIPPERS: Record<
@@ -89,7 +96,7 @@ function exifOrientation(
   return 1
 }
 
-async function reencode(file: File): Promise<File> {
+export async function reencode(file: File): Promise<File> {
   try {
     const bitmap = await createImageBitmap(file) // applies EXIF orientation
     const canvas = document.createElement("canvas")
