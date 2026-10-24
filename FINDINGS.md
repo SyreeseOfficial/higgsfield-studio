@@ -1,526 +1,662 @@
-# Higgsfield Studio — Findings
+# Higgsfield Studio — To-Do List
 
-Rounds 1 and 2 (both 2026-10-23) added to the existing Planned / Skipped / New-ideas lists and merged everything into one list sorted by value; audited against commit `59fbef0` (server actions, platform client, poller, run controller, storage, upload path, catalog, tests). Open items from the earlier lists are included below (effort `?` where no estimate existed), the 72 done items are kept at the bottom, and the earlier "Issues Needing Review" decisions are kept verbatim after them. `AGENTS.md` is the contract: nothing here breaks the server boundary, dark-only theme or the full model catalog. "(older item)" marks an entry that extends one already in this list.
+A list of ideas and fixes for the app, written in plain language. Finished work is at the very bottom.
 
-Effort: **XS** under 5 min · **S** about 15 min · **M** about an hour · **L** half a day · **?** not estimated. Sorted by value, then effort, then area.
+**How to read this**
 
-**494 items.** 28 high, 290 medium, 176 low.
+| Mark | Meaning |
+|---|---|
+| 🔴 | Important. Do these first. |
+| 🟡 | Worth doing. |
+| ⚪ | Nice to have. Can wait. |
+| ⏱ | Rough time for a developer. Items with no ⏱ have not been estimated. |
 
-## Do these first
+`[ ]` = not done yet. `[x]` = done.
 
-1. The platform client has no fetch timeout _[Platform, S]_
-2. Idempotency is only as good as the client key _[Platform, S]_
-3. Starred runs can silently vanish _[Reliability, S]_
-4. Result URLs may expire _[Reliability, S]_
-5. Server errors reach users verbatim when config is wrong: `readCredentials` throws `Missing… _[Reliability, S]_
-6. Bulk download can exhaust memory and silently double-download _[Reliability, S]_
-7. The API key sits in the cookie as plain JSON (`encodeCredentials` → `{"apiKey":"…"}`) _[Security, S]_
-8. Strengthen the CSP: `script-src 'self' 'unsafe-inline'` negates most XSS protection, and `connect-src… _[Security, S]_
+**Plan:** work is split into phases in [PHASES.md](PHASES.md). Mark items `[x]` here when done. Anything blocked on you goes to *Waiting on your decision*. Everything not in a phase is under [Skip](#-skip).
 
-## High value
+**Rule for tests:** only free tests. Nothing may call the real Higgsfield API or use credits.
 
-1. [ ] **[S]** _Platform_ — The platform client has no fetch timeout. `send()` in `generation/platform.ts` calls `fetchImpl(url, …)` with no `AbortSignal`, and `actions.ts` documents that Next dispatches server actions one at a time per client, so a single hung platform call stalls submit, cancel and every status poll behind it. Add `signal: AbortSignal.timeout(15_000)` (30 s for submit) and map the abort to a retryable `unknown` failure.
-2. [ ] **[S]** _Platform_ — Idempotency is only as good as the client key. The server action accepts an optional `idempotencyKey` from the browser; a missing key (older client, direct action call) submits a non-idempotent paid job. Generate a key server-side when absent and return it, so every submit has one and the browser can reuse it on retry.
-3. [ ] **[S]** _Reliability_ — Starred runs can silently vanish. `saveHistory` truncates to `HISTORY_MAX_RECORDS = 400` with `records.slice(0, 400)`, newest first, so a starred image from last month is dropped once 400 newer runs exist. Exempt starred runs (and runs in a project) from the cap, or archive overflow into a second key instead of deleting.
-4. [ ] **[S]** _Reliability_ — Result URLs may expire. History stores the platform's CDN URLs, not the media; if those links are time-limited or the account's retention ends, the gallery shows broken tiles after days. On completion, copy each result into IndexedDB/OPFS as a Blob (with a size budget and eviction of unstarred items) and fall back to the CDN URL; this needs the CDN to send CORS headers, so verify that first (see the thumbnail-cache note under Issues Needing Review).
-5. [ ] **[S]** _Reliability_ — Server errors reach users verbatim when config is wrong: `readCredentials` throws `Missing HF_API_BASE_URL`, which `friendlyError` passes through as the tile error. Validate env at boot (`instrumentation.ts` or a Zod-checked `env.ts`) and show a single "Studio isn't configured" screen with the fix, instead of failing every generation.
-6. [ ] **[S]** _Reliability_ — Bulk download can exhaust memory and silently double-download. `downloadMany` fetches every URL in parallel (`Promise.all`), keeps all blobs in memory, builds the zip from `arrayBuffer()` copies, and on any single failure falls back to `downloadMedia` for every URL (so already-fetched files are fetched again and browsers block the burst of automatic downloads). Fetch with a small concurrency (3), stream into the zip, skip failed files with a report, and fall back only for those.
-7. [ ] **[S]** _Security_ — The API key sits in the cookie as plain JSON (`encodeCredentials` → `{"apiKey":"…"}`). The cookie is httpOnly, but anything that reads the browser profile or a proxy log of `Set-Cookie` gets a reusable key. Encrypt/sign the cookie value with a server secret (AES-GCM with `SESSION_SECRET`) so a copied cookie is useless on another deployment, and rotate on key change.
-8. [ ] **[S]** _Security_ — Strengthen the CSP: `script-src 'self' 'unsafe-inline'` negates most XSS protection, and `connect-src 'self' https:`/`img-src https:` allow any host. Move to a nonce-based CSP via middleware (`proxy.ts`), and allow-list the platform CDN/storage hosts learned from `HF_API_BASE_URL` and upload tickets.
-9. [ ] **[?]** _Accessibility and i18n_ — Announce generation state changes to screen readers with an `aria-live="polite"` region ("Image ready", "Failed: content filter").
-10. [ ] **[?]** _Accessibility and i18n_ — Keyboard path to every tile action (menu button reachable by Tab, not hover-only).
-11. [ ] **[?]** _Assets and references_ — "Save as reference" on any finished tile adds it to the asset library without a re-upload (result URL is already public).
-12. [ ] **[?]** _Assets and references_ — Reference role picker with plain-language names ("First frame", "Last frame", "Style", "Character") instead of raw role keys.
-13. [ ] **[?]** _Code quality testing and dev experience_ — Unit-test `errors.ts` mapping with a table of real platform responses (content filter, credits, rate limit, unknown).
-14. [ ] **[?]** _Cost and usage awareness_ — Credits/balance indicator in the sidebar if the platform exposes it *(check)*; warn before a run that exceeds it.
-15. [ ] **[?]** _Detail modal and viewers_ — Keep the detail modal open and update it live when its run finishes (running -> ready) instead of requiring a close and reopen.
-16. [ ] **[?]** _Editing and post-processing_ — Upscale action on image tiles (platform has upscale endpoints in the Higgsfield toolset; wire as a catalog model or action).
-17. [ ] **[?]** _Gallery and organization_ — Search history by prompt text, model, and date.
-18. [ ] **[?]** _Gallery and organization_ — Text search over prompts in the feed header (client-side over the 400 records), debounced, with match highlight. Narrower than the "search history" item above and cheap to ship first.
-19. [ ] **[?]** _Generation workflow_ — Seed control and "lock seed" toggle for models that expose one, so the user can A/B a single setting.
-20. [ ] **[?]** _Generation workflow_ — "Retry with edits": on a failed tile, open the dock prefilled with the run's prompt and settings, with the error reason shown above the box.
-21. [ ] **[?]** _Generation workflow_ — Duplicate-submit guard: if the prompt, model, settings and references are identical to a run submitted in the last 10 s, ask before sending a second paid job.
-22. [ ] **[?]** _Models and settings_ — "Why this model" compare drawer: side-by-side table of all models for the current surface (inputs, max duration, speed, aspect ratios).
-23. [ ] **[?]** _Onboarding and first run_ — First-run checklist card: add key -> first image -> first video, ticks off as done, dismissible.
-24. [ ] **[?]** _Product gaps_ — No way to retry, remix or vary a generation. Grep finds no Retry/Regenerate/Reuse action anywhere; a failed tile just says "Generation unavailable" (`components/studio/generation-card.tsx`), and the tile menu offers Download, Copy prompt, Share, Delete (`gallery-tile.tsx:171-175`). Add **Retry** (resubmit the same plane with a new key) on failed tiles and **Reuse settings** (load prompt, model, settings and references into the dock) on every tile; `RunRecord` already stores `prompt`, `modelId` and `settings`.
-25. [ ] **[?]** _Product gaps_ — Chain image to video in one click. The core workflow is generate a still, then animate it, but a finished image can only reach the video dock through the asset library. Add "Animate" on image tiles (switch to a video surface/model that takes a start frame and attach the image as `start`) and "Extend" on video tiles for models that support it (Seedance 2.5 Edit/Extend is already wired). `mergeMedia`/`inputRoles` do the role handling.
-26. [ ] **[?]** _Prompt box and input_ — Persist the unsent prompt and attached references per surface (draft survives reload). Overlaps the dead `stores/prompt.ts` item; this is the user-facing outcome.
-27. [ ] **[?]** _Resilience safety and privacy_ — Show a clear "runs recovered after reload" notice when in-flight runs resume polling, so the user knows nothing was lost.
-28. [ ] **[?]** _Video viewer and tools_ — Custom player: scrub, speed (0.25-2x), frame step, loop, mute default, keyboard (`space`, `j/l`, `,` `.`).
+**Totals:** about 140 open items in phases (a few appear twice), 8 decisions waiting on you, 345 skipped.
 
-## Medium value
+**Jump to:**
+[Do first](#-do-these-first) · [Your decisions](#-waiting-on-your-decision) · [Reliability](#1-generating-reliably) · [Saving & downloads](#2-saving-history--downloads) · [Small bugs](#3-small-bugs--glitches) · [Security](#4-security--privacy) · [Prompt box](#5-prompt-box--typing) · [Models](#7-models--settings) · [Gallery](#8-gallery--finding-things) · [Viewing](#9-viewing-results) · [References](#11-reference-files) · [Sharing](#12-sharing-export--backup) · [Cost](#13-cost--usage) · [Looks](#15-look--feel) · [First-time](#16-first-time-experience) · [Speed](#18-speed) · [Behind the scenes](#20-behind-the-scenes-tests-docs-cleanup) · [Skip](#-skip) · [Done](#done)
 
-29. [ ] **[XS]** _Bug_ — `kv.ts` opens a new IndexedDB connection on every `get`/`set` and never closes it. With a 250 ms debounced history save, one session leaks hundreds of open connections, and `wipeEverything`'s `deleteDatabase` gets `onblocked` (the code resolves on blocked and relies on the reload). Cache one connection promise, handle `onversionchange` by closing, and await the delete.
-30. [ ] **[XS]** _Bug_ — `friendlyError` matches substrings loosely: `/credit|insufficient|balance|payment|quota/` classifies any message containing "credit" (a prompt about a "credit card", a model named "credit") as "Not enough credits", and `/safety/` flags generic text as content-filter. Match on status codes and known platform error codes first, and fall back to text patterns only when no code exists.
-31. [ ] **[XS]** _Bug_ — `aspectFromSettings` reads only `aspect_ratio`/`aspectRatio`/`ratio` and defaults to 1; models whose settings use `size` or `resolution` strings with ratios (`1280x720`) get square placeholder tiles that then jump when media loads. Resolve aspect from the result's natural size on first load and persist it on the record.
-32. [ ] **[XS]** _Bug_ — `usageStats.perDay` buckets by local midnight using `setHours(0,0,0,0)` with fixed 86,400,000 ms steps; across a DST change the buckets shift by an hour and a day gets double or missing counts. Step by calendar days (`setDate`).
-33. [ ] **[XS]** _Bug_ — `usageStats` median seconds uses `completedAt - createdAt`, but `createdAt` is set when the run is added after submit returns (not when the user pressed Generate or when the job started), so queue wait inflates "median time". Record `submittedAt`, `startedAt` (first running status) and `completedAt` separately.
-34. [ ] **[XS]** _Bug_ — `zip.ts` writes no modification time (DOS time/date fields stay 0), so extracted files show 1980-00-00 in most tools, and uses 32-bit sizes with no ZIP64, so a bundle over 4 GB (a few long videos) corrupts silently. Set DOS time from the run's `completedAt`, and refuse or split archives approaching 4 GB.
-35. [ ] **[XS]** _Bug_ — Zip entry names come from `${i+1}-${filenameFromUrl(...)}` where the file name is the CDN path's last segment (`decodeURIComponent` of whatever the storage uses); names with path separators or control characters from `decodeURIComponent` can create odd entries. Sanitize names and prefix with model and prompt slug.
-36. [ ] **[S]** _Accessibility_ — Give every gallery tile a descriptive accessible name (prompt excerpt + model + status) and keyboard roving focus (arrow keys) in the virtualized gallery without unmounting loaded media (AGENTS rule).
-37. [ ] **[S]** _Accessibility_ — Respect `prefers-reduced-motion` for autoplaying hover videos and shimmer skeletons; the preferences dialog has "hover play", but the OS setting should override it by default.
-38. [ ] **[S]** _Accessibility_ — Provide alt text for generated images derived from the prompt (and let users edit), used in downloads' metadata and the detail modal.
-39. [ ] **[S]** _Accessibility_ — Dialog focus management audit: key dialog, settings, usage, privacy, move dialog (Base UI handles most); verify focus returns to the invoker and that Escape closes nested popovers first.
-40. [ ] **[S]** _Accessibility_ — Add skip links and landmark roles (`nav` for sidebar, `main` for feed, `form` for the dock) and a visible focus ring token in `app/globals.css` meeting 3:1 contrast on the dark surface.
-41. [ ] **[S]** _Accessibility_ — High-contrast preference within the dark-only theme (larger text, stronger borders) since a theme toggle is disallowed by AGENTS.
-42. [ ] **[S]** _Accessibility_ — Right-to-left and localization readiness: wrap strings in a `t()` helper and use logical CSS properties; no i18n layer exists today.
-43. [ ] **[S]** _Accessibility_ — Provide visible text alternatives for model icons (SVG in `public/model-icons`) and ensure icon-only buttons have `aria-label`s; run `axe` on the dock, the picker and the detail modal in CI.
-44. [ ] **[S]** _Bug_ — `mergeRecords` ignores deletions and edits made in another tab (documented), so a run deleted in tab A reappears when tab B saves; and starring in one tab is overwritten by the other's older copy. Add per-record `updatedAt` plus tombstones and merge by newest.
-45. [ ] **[S]** _Bug_ — `stopWatching()` clears every watch when the studio unmounts, but `waiting`/`inflight` are module-level; React StrictMode double-mount in development can drop watches that started in the first mount. Make watchers owned by a controller instance created in an effect, not by module state.
-46. [ ] **[S]** _Bug_ — `round()` in `poll.ts` fetches statuses for all waiters sequentially in batches of 50 and then `deliver`s; if a batch throws, earlier batches' results are discarded (`results` is local and the catch only counts a miss). Deliver each batch as it returns.
-47. [ ] **[S]** _Bug_ — Poll cadence follows the newest watch only (`Math.max(startedAt)`); a long video started an hour ago plus a new image run polls every 4 s for both, wasting calls for the old video. Poll each request on its own backoff schedule and batch only those due.
-48. [ ] **[S]** _Bug_ — `getGenerationStatuses` throws `Too many request ids` instead of returning results for the first 50; the client batches at 50 but a bug elsewhere turns into a failed poll round, counted as a "miss". Slice and return partial results.
-49. [ ] **[S]** _Bug_ — `submitGeneration` classifies any 4xx as `rejected` (safe to retry with a fresh key) including 408 and 409; a 409 conflict usually means "already accepted", and 408 is a timeout. Treat 408/409/425 as `unknown` so the same idempotency key is reused.
-50. [ ] **[S]** _Bug_ — `cancelGeneration` ignores which state the job is in; the platform only cancels queued jobs (docs comment) and returns 202; the UI then shows "Already running, can't cancel" only when the call fails, but a 202 on a running job leaves `canceling: true` until the next poll reports otherwise. Time out the canceling state after two polls and revert.
-51. [ ] **[S]** _Bug_ — `settle()` treats `completed` with no URLs as a failure "The generation did not produce media" but a transient empty-result race (status flips before assets attach) is possible; re-poll once or twice before failing.
-52. [ ] **[S]** _Bug_ — `settle()` maps `nsfw` to a fixed string but keeps no platform request id on the record; failed tiles want a "Support ID" (platform log says the request id doubles as one) yet queued/failed records only keep `requestId` for submitted runs. Show and copy it on every failed tile and in the detail modal.
-53. [ ] **[S]** _Bug_ — `variation()` resubmits `record.media` URLs; if those reference URLs were signed with an expiry, the variation fails with a confusing platform error long after the original run. Store upload expiry (from the upload ticket) and re-upload from the cached blob, or warn on expired references.
-54. [ ] **[S]** _Bug_ — `submit()` creates the queued record with `createdAt = Date.now()`, but `start()` creates a new record at submit time; the queue placeholder and the real record have different ids and the gallery briefly shows both or reorders (placeholder disappears when queue entry is filtered). Reuse the placeholder id for the real record so the tile doesn't flicker.
-55. [ ] **[S]** _Bug_ — `pending.current` holds one fingerprint; two sequential retries of different planes (user changed the prompt after an ambiguous failure) leave the first job's key forgotten, so a retry of the first plane later creates a duplicate paid job. Keep a small LRU map of fingerprint → key with TTL.
-56. [ ] **[S]** _Bug_ — `MAX_RUNNING = 2` is enforced client-side only; opening the studio in two tabs doubles concurrency and the 20-item queue is per tab. Coordinate with `BroadcastChannel` (or a Web Lock) so the cap is global to the browser profile.
-57. [ ] **[S]** _Bug_ — `exportHistory` downloads only metadata JSON (URLs), not media; combined with URL expiry the export can't restore a library. Offer "Export with media" (zip via the existing `zip.ts`) and an import that re-creates runs.
-58. [ ] **[S]** _Bug_ — `wipeEverything` removes localStorage keys starting with `hf.` and the `studio` IndexedDB only; any other persisted store name (zustand `persist` keys without the prefix) survives. Centralize storage keys and test that wipe leaves nothing.
-59. [ ] **[S]** _Bug_ — `usage-dialog` computes stats from the 400 retained records; the dialog reads "Total" as lifetime. Label it "last 400 runs" or maintain running counters outside the capped history.
-60. [ ] **[S]** _Bug_ — Downloaded files get opaque CDN names (`generation.bin` when no extension is known). Name downloads `<model>-<prompt-slug>-<yyyymmdd-hhmm>.<ext>` and keep the extension from `Content-Type` or the URL; the history knows model, prompt and time.
-61. [ ] **[S]** _Bug_ — `downloadMedia`'s fallback `clickDownload(url, filename, true)` opens the CDN URL in a new tab with a `download` attribute that cross-origin links ignore, so users see a raw image/video tab instead of a download. Show a toast ("Opened in a new tab; use Save as") when the fetch path fails.
-62. [ ] **[S]** _Bug_ — `useRunSignals` creates a `Notification` without `tag`, `data` or a click handler: repeated completions stack identical popups and clicking one does not focus the studio tab. Add `tag: r.id`, `onclick = () => window.focus()`, and an icon.
-63. [ ] **[S]** _Bug_ — `playChime()` constructs a new `AudioContext` for every finished run and closes it after 1 s; browsers cap contexts and block creation without a user gesture after long idle. Keep one lazily created context, resume it on first interaction, and reuse it.
-64. [ ] **[S]** _Bug_ — Prompt length is unbounded. The prompt boxes have no `maxLength` or counter and the catalog has no per-model prompt limit, so an over-long prompt is rejected by the platform with a generic 4xx after the user waited. Add `maxPromptChars` to `ModelEntry` (default 2,000), show a counter near the limit and block submit above it.
-65. [ ] **[S]** _Bug_ — `runToGalleryItems` gives completed videos `src: ""` and only `videoSrc`, so every video tile mounts a `<video>` to show anything; with dozens of videos the gallery decodes many streams. Use a lightweight poster: `<video preload="metadata" src="…#t=0.1">` for the first frame, and mount full playback only on hover/focus.
-66. [ ] **[S]** _Bug_ — Library items use the URL as `id` (`AssetLibraryItem.id = url`), so the same image as an upload and as a generation result collapses or duplicates depending on source; and URLs with signed query strings change per session. Use content hashes or run ids as stable ids and keep URL as an attribute.
-67. [ ] **[S]** _Bug_ — `useUploads` keeps only 200 items and drops the oldest, but runs may still reference those URLs; and `slice(0, 200)` is silent. Show "Library holds the 200 most recent references" and let starred references be pinned.
-68. [ ] **[S]** _Bug_ — The local storage keys are all `hf.*.v1` with no migration hook; the first schema change to `projects`, `uploads` or `settings` will either lose data or crash on parse. Add a small `migrate(version, state)` in each persist config now and a test that old shapes load.
-69. [ ] **[S]** _Bug_ — `persist` stores use `browserStorage()` that silently swallows `QuotaExceededError` on `setItem`; when localStorage is full (large `uploads`), settings stop saving with no message. Surface a "Storage is full" toast and offer to prune.
-70. [ ] **[S]** _Bug_ — `dayGroup()` computes "Today/Yesterday" at render with the current date but memoized gallery items keep the old group labels past midnight; recompute groups on a minute timer or when the date changes.
-71. [ ] **[S]** _Bug_ — `runToLibraryItems` names assets with `run.prompt.slice(0, 60)` which can cut mid-word and includes whitespace/newlines; use a cleaned single-line excerpt with an ellipsis.
-72. [ ] **[S]** _Deployment_ — Document and test deployment targets (Vercel, Docker, self-hosted Node): env vars, cookie `secure` behavior behind a proxy (`NODE_ENV` only), and `Trusted-Proxy`/`X-Forwarded-Proto` handling so the key cookie gets `Secure` in real HTTPS deployments.
-73. [ ] **[S]** _Deployment_ — Add a Dockerfile (multi-stage, standalone output, non-root) and `output: "standalone"` in `next.config.ts`.
-74. [ ] **[S]** _Deployment_ — Rate limiting for server actions and `/api/upload` (per IP/cookie) to protect a shared deployment from abuse of the owner's platform quota; today any visitor with a key uses their own, but `/api/upload` and actions are unthrottled.
-75. [ ] **[S]** _Deployment_ — Add `robots` noindex and a minimal `manifest.webmanifest` + icons; the favicon is 26 KB `.ico`, and the app is meant as an installable tool.
-76. [ ] **[S]** _Docs_ — Rewrite README into a real product README: purpose, screenshots, architecture diagram (browser ↔ server actions ↔ platform), configuration table, data locations and limits (400 runs, 2 concurrent, 20 queued).
-77. [ ] **[S]** _Docs_ — Add `docs/ARCHITECTURE.md` with the run lifecycle (queued → submitting → running → settled), the poll scheduler, idempotency rules and the server boundary; AGENTS.md has rules but no flow diagrams.
-78. [ ] **[S]** _Docs_ — Add `docs/ADDING_A_MODEL.md` with a worked example (settings types, mappers, icon, tests) and a checklist, since the catalog is the main extension point.
-79. [ ] **[S]** _Docs_ — Document platform error mapping (`friendlyError`) as a table of status/text → message so support can predict what users see.
-80. [ ] **[S]** _Docs_ — Add a `CHANGELOG.md` and tag releases; the repo is a template scaffold and downstream copies need a diff-friendly upgrade path (`agentUpgrade` is configured).
-81. [ ] **[S]** _Docs_ — Add `docs/RUN_LIFECYCLE.md` with a state diagram covering queued, submitting, running, stalled, canceling, completed, failed, plus the exact retry/idempotency rules in `use-runs.ts` and `actions.ts`.
-82. [ ] **[S]** _Docs_ — Add `docs/PRIVACY.md` listing what leaves the browser (prompts and reference URLs to the Higgsfield platform via the server; uploads to signed storage) and what stays local; the privacy dialog's text should be generated from it.
-83. [ ] **[S]** _Feature_ — Seed control. There is no seed anywhere in the app (grep finds none) and "More like this" only re-rolls; add an optional seed field per model that supports it, show the seed on the detail view, and add "Same seed, new prompt" and "Lock seed" actions for iteration.
-84. [ ] **[S]** _Feature_ — Negative prompt and prompt-adherence (CFG/guidance) settings for models that expose them, rendered from the catalog schema instead of hard-coding in the UI.
-85. [ ] **[S]** _Feature_ — Batch/size settings surfaced consistently: only one catalog model has `batchSize`; add an "N variations" stepper to the dock for every image model by queueing N runs with different seeds when the model lacks native batching.
-86. [ ] **[S]** _Feature_ — Aspect-ratio preview chips in the dock showing the exact crop for each setting, and a "match reference" option that reads the first reference image's ratio.
-87. [ ] **[S]** _Feature_ — Prompt library with tags: save prompts as reusable entries (separate from templates), search them from the command palette, and insert with variables (`{subject}`).
-88. [ ] **[S]** _Feature_ — Prompt variables and batching: `{red|blue|green}` and `[a, b, c]` syntax expands to one run per combination (capped), a standard pattern for exploring options.
-89. [ ] **[S]** _Feature_ — Compare view: select two or more completed runs and view them side by side with synced zoom and the settings diff highlighted.
-90. [ ] **[S]** _Feature_ — Reference image picker from history: use any previous result as a start/reference frame in one click (the asset library exists; add a "Use as reference" action on tiles and in the viewer).
-91. [ ] **[S]** _Feature_ — Frame extraction from video results: pick a frame at the playhead and use it as the start frame of the next video ("continue this shot"); needs a canvas capture and an upload.
-92. [ ] **[S]** _Feature_ — Upscale/extend/edit as follow-up actions on a result if the catalog exposes such models; wire them as tile menu entries that prefill the dock with the right model and references.
-93. [ ] **[S]** _Feature_ — Local favorites folders ("collections") separate from projects: a result can live in a project and several collections; filter and share by collection.
-94. [ ] **[S]** _Feature_ — Notes and ratings per run: 1-5 stars and a free-text note shown in the detail view and searchable; star exists, add rating and note fields to `RunRecord`.
-95. [ ] **[S]** _Feature_ — Search over history: full-text across prompts, notes, model names and settings values, with filters (model, surface, status, date) in the feed controls and the command palette.
-96. [ ] **[S]** _Feature_ — Cost awareness: if the platform returns credit cost or the catalog knows relative cost, show an estimate before submit and a running total in the usage dialog (existing items mention cost; this ties it to a catalog field `cost`).
-97. [ ] **[S]** _Feature_ — Scheduled/off-peak generation: queue runs to start later (when credits refresh or after a time), stored locally and run while the tab is open.
-98. [ ] **[S]** _Feature_ — Share a run as a read-only link or image card (prompt, model, settings) without exposing the key; a static export of a result with metadata for posting.
-99. [ ] **[S]** _Feature_ — Import/export a project as a folder or zip (media + `project.json`) and re-import on another machine; today data is browser-local only.
-100. [ ] **[S]** _Feature_ — Optional sync backend adapter: the app says to replace `history.ts`/`projects.ts` for shared persistence; provide a documented `Storage` interface and a sample adapter (S3-compatible or Supabase) behind env flags.
-101. [ ] **[S]** _Feature_ — Multi-account/key profiles: store several named API keys, switch the active profile in the sidebar, and keep history per profile.
-102. [ ] **[S]** _Feature_ — Model recommendations: a "which model?" helper that suggests models from the prompt and references (video vs image, character consistency, text rendering), based on catalog tags.
-103. [ ] **[S]** _Feature_ — Catalog tags and capability metadata (text rendering, character consistency, max duration, sound, aspect ratios) so the picker can filter and compare 28 models; today the picker is a flat list ordered by `order`.
-104. [ ] **[S]** _Feature_ — Model changelog/deprecation banner: flag models marked `deprecated` or `preview` in the catalog and steer users to successors.
-105. [ ] **[S]** _Feature_ — Saved presets per model: named setting bundles ("cinematic 16:9 1080p") applied from the dock settings popover.
-106. [ ] **[S]** _Feature_ — Global default settings per surface (aspect, resolution) overriding per-model defaults where compatible.
-107. [ ] **[S]** _Feature_ — Image-to-prompt: describe an uploaded image into prompt text using a platform captioning model if available, or a local WebGPU model.
-108. [ ] **[S]** _Feature_ — Prompt enhancement via the platform's `enhancePrompt` setting where it exists, with a diff view of the enhanced prompt (the setting exists on one model; surface the result text if returned).
-109. [ ] **[S]** _Feature_ — Audio tools for video models: waveform preview for uploaded audio references and trimming before upload (WAV only supported).
-110. [ ] **[S]** _Feature_ — Strip metadata from WebP, GIF and MP4 as well; `stripMetadata` handles only JPEG and PNG, so a WebP with EXIF/XMP or an MP4 with GPS atoms leaves the browser untouched.
-111. [ ] **[S]** _Feature_ — Paste-to-attach: pasting an image or URL anywhere in the studio attaches it as a reference (outside the prompt textarea), with a toast.
-112. [ ] **[S]** _Feature_ — Drag a result tile into the dock to use it as a reference (HTML5 drag from gallery to prompt box).
-113. [ ] **[S]** _Feature_ — Prompt autosave with undo history inside the textarea (beyond the browser's default), and a "restore last submitted prompt" button.
-114. [ ] **[S]** _Feature_ — Keyboard shortcuts: remap in Preferences, plus a "?" cheat sheet that reflects custom bindings (`shortcuts-dialog.tsx` is static).
-115. [ ] **[S]** _Feature_ — Notifications: Web Push for completion when the tab is closed requires a server; document an opt-in design using a lightweight webhook relay, or notify via the Notifications API while open (already partly done).
-116. [ ] **[S]** _Feature_ — Sound/chime options and per-model completion tones; the chime setting exists, add choice and volume.
-117. [ ] **[S]** _Feature_ — Gallery density and grouping options (by day, project, model, status) with sticky headers; the justified gallery has one layout.
-118. [ ] **[S]** _Feature_ — Timeline view of generation activity (per day, per model) from `usage.ts` data with click-through to that day's runs.
-119. [ ] **[S]** _Feature_ — Tile hover preview scrub for videos (move the mouse across the tile to scrub frames) and poster-frame selection stored per run.
-120. [ ] **[S]** _Feature_ — Detail modal: show full metadata panel (model, settings, seed, timings, request id, references) with "Copy as JSON" and "Copy as curl" for debugging against the platform API.
-121. [ ] **[S]** _Feature_ — Compare prompts across models: "Run on all selected models" with one prompt and a side-by-side results grid.
-122. [ ] **[S]** _Feature_ — Run templates for repeated workflows (product shot, character sheet, social post sizes) as multi-run recipes producing several aspect ratios at once.
-123. [ ] **[S]** _Feature_ — Brand kit: stored style words, color palette and reference images auto-attached to prompts for a given project.
-124. [ ] **[S]** _Feature_ — Project settings: default model, default settings, shared references, and a project description/notes, applied when generating inside the project.
-125. [ ] **[S]** _Feature_ — Project cover image and pinning, sorting projects by recent use or manual order in the sidebar.
-126. [ ] **[S]** _Feature_ — Archive (not delete) for runs and projects, hidden from the main feed but restorable; reduces accidental loss beyond the undo toast.
-127. [ ] **[S]** _Feature_ — Trash with 30-day retention for deleted runs and projects instead of immediate removal (undo toast lasts seconds).
-128. [ ] **[S]** _Feature_ — Descriptive file metadata: write the prompt, model, settings and seed into downloaded PNG (`tEXt` chunk) or JPEG EXIF/XMP so files remain self-documenting outside the app, with a preference to disable it for privacy.
-129. [ ] **[S]** _Feature_ — "Copy prompt", "Copy settings as JSON" and "Copy link to this run" (a deep link `#run=<id>` that opens the detail modal) in the tile menu and the detail view.
-130. [ ] **[S]** _Feature_ — Deep links: URL state for project, surface, model and open run so browser back/forward and bookmarks work; the studio is one route today and a reload loses the current view context.
-131. [ ] **[S]** _Feature_ — Keyboard-first prompt box: `Ctrl/Cmd+Enter` to generate, `Ctrl+Shift+Enter` to generate and keep the dock, `Alt+Up/Down` to cycle models, `Alt+1..9` for aspect ratios; list them in the shortcuts dialog from one registry so the dialog can't drift.
-132. [ ] **[S]** _Feature_ — A `/` command in the prompt box (e.g. `/model kling-3`, `/ar 9:16`, `/dur 8`) that sets dock options without leaving the keyboard, alongside the command palette.
-133. [ ] **[S]** _Feature_ — Reference slots with roles shown inline (start, end, reference) using the catalog's `roles`/`mediaModes`, including drag reordering and a swap-start/end button; the picker exists, but role clarity is the most common confusion with multi-input video models.
-134. [ ] **[S]** _Feature_ — Per-model "what's different" tooltips: show max duration, supported aspect ratios and whether sound/audio references are supported, derived from the catalog `settings`/`roles` so every model's constraints are visible before submit.
-135. [ ] **[S]** _Feature_ — Warn before submitting settings known to be unsupported together (e.g. `multiShots` with an end frame) using declarative `incompatible` rules in the catalog (older item notes the need; define the schema: `{when: {...}, disable: [...]}`).
-136. [ ] **[S]** _Feature_ — Presets for aspect ratio + resolution + duration bundles ("Vertical 9:16 short", "Cinematic 16:9") that apply across models by mapping to each model's closest supported values.
-137. [ ] **[S]** _Feature_ — Run lineage: record `parentRunId` when creating a variation or using a result as a reference, show a small lineage chain in the detail modal and a "revert to parent" action.
-138. [ ] **[S]** _Feature_ — Prompt A/B mode: submit two prompts (or two models) as a linked pair and show them side by side with a vote to keep one; records the winner as a star.
-139. [ ] **[S]** _Feature_ — Auto-naming runs for the sidebar/projects: derive a short title from the prompt (first 5 words) so lists are scannable; editable in the detail modal.
-140. [ ] **[S]** _Feature_ — Smart project suggestions: when a prompt shares keywords with an existing project's runs, suggest filing the generation there at submit time.
-141. [ ] **[S]** _Feature_ — Export a project as a Markdown "shot list" (prompt, model, settings, thumbnails) plus a zip of media; pairs with the shot list view idea and stays local.
-142. [ ] **[S]** _Feature_ — Import/restore from the exported history JSON (the export exists, import doesn't) with duplicate detection by request id.
-143. [ ] **[S]** _Feature_ — Media library cleanup tools: find unused references (not used by any run), duplicates (hash exists), and expired URLs (HEAD check) with bulk delete.
-144. [ ] **[S]** _Feature_ — A "recent errors" panel in Settings listing the last 20 failed runs with friendly reason, platform request id and a one-click "retry with same settings".
-145. [ ] **[S]** _Feature_ — Cost/credit estimates per model in the catalog (`credits` field with a note on uncertainty) feeding a pre-submit estimate and a weekly summary in the usage dialog.
-146. [ ] **[S]** _Feature_ — Rate-limit aware queueing: when the platform returns 429, pause the local queue for the `Retry-After` period automatically with a visible countdown instead of failing runs.
-147. [ ] **[S]** _Observability_ — Structured server logs: `log()` prints JSON lines for submit/cancel/error but not status failures or upload tickets; add a request id per action and log durations, platform status and retry classification (never prompts or URLs).
-148. [ ] **[S]** _Observability_ — Client error reporting (opt-in, privacy-preserving): capture error boundary hits and failed-run reasons with model id and platform request id for debugging, with a visible "Send diagnostics" button.
-149. [ ] **[S]** _Observability_ — A `/api/health` route returning build version, model count and whether `HF_API_BASE_URL` is set, for deploy checks and uptime monitors.
-150. [ ] **[S]** _Observability_ — Expose build info (commit, version) in Settings and the diagnostics copy, so bug reports include it.
-151. [ ] **[S]** _Performance_ — Virtualization row measurement in `justified-engine.ts` recomputes on resize; debounce with `ResizeObserver` + `requestAnimationFrame` and cache layout by width/aspect hash.
-152. [ ] **[S]** _Performance_ — Use `content-visibility: auto` and `contain-intrinsic-size` for off-screen tiles that are mounted (loaded media must stay mounted per AGENTS), and `loading="lazy"` + `decoding="async"` for posters.
-153. [ ] **[S]** _Performance_ — Pause offscreen `<video>` elements (pause + `preload="none"`) while keeping their loaded state; many simultaneous autoplay-on-hover videos can exhaust decoders on mobile.
-154. [ ] **[S]** _Performance_ — Move history persistence to per-record IndexedDB rows (keyed by id with indexes on createdAt/projectId) instead of one `history.v1` array; the whole 400-record array is rewritten on every debounced save.
-155. [ ] **[S]** _Performance_ — Memoize `groupMedia`, `parseSettings` and `usageStats` computations; the layout (886 lines) recomputes derived lists on every poll tick.
-156. [ ] **[S]** _Performance_ — Split `layouts/studio.tsx` (27 KB, 886 lines) and `studio-prompt-box.tsx` (816 lines) into smaller components and hooks to reduce re-render scope and ease testing.
-157. [ ] **[S]** _Performance_ — Bundle analysis (`@next/bundle-analyzer`) in CI with a budget; `lucide-react` icons and Base UI tree-shaking should be verified, and the model registry JSON (21 KB) shouldn't ship to routes that don't need it.
-158. [ ] **[S]** _Performance_ — Server actions use `cookies()` and a fresh platform client per call; cache the client per request and avoid re-parsing the cookie in each of status/submit/cancel.
-159. [ ] **[S]** _Performance_ — Defer `usageStats`, `runToLibraryItems` and gallery item mapping to `useMemo` keyed by `records` identity plus a cheap version counter; currently each poll tick creates a new records array and recomputes derived lists even when nothing changed visually.
-160. [ ] **[S]** _Performance_ — Make `use-justified-gallery`'s layout incremental: when a new run is added at the top only recompute the affected groups instead of the whole feed; test with 400 records.
-161. [ ] **[S]** _Performance_ — Lazy-load `asset-library.tsx` (19 KB), `template-picker`, `usage-dialog` and `privacy-dialog` with `next/dynamic` since they're modal-only; reduces first-load JS.
-162. [ ] **[S]** _Performance_ — Prefetch the next page of media only for tiles near the viewport using `IntersectionObserver` with `rootMargin`, and use `fetchPriority="low"` for off-screen posters.
-163. [ ] **[S]** _Privacy_ — Make the privacy dialog data-driven from a single storage registry (keys, purpose, location, retention) so it can't drift from code; add a "Download my data" and a "Delete everything" in one flow (wipe exists).
-164. [ ] **[S]** _Privacy_ — Redact prompts in any client-side diagnostics copy by default (there is "Copy diagnostics"-style data in several places); include an opt-in toggle to include prompts.
-165. [ ] **[S]** _Privacy_ — Warn when pasting something that looks like an API key into the prompt box (key regex) before sending it to a model.
-166. [ ] **[S]** _Privacy_ — Per-project "private" flag that excludes runs from exports, usage stats and the command palette search.
-167. [ ] **[S]** _Quality_ — Add component tests (Testing Library + jsdom/happy-dom) for the prompt box, key dialog and gallery tile; the test suite covers catalog, errors, poll, strip-metadata and misc only.
-168. [ ] **[S]** _Quality_ — Property-based tests for `parseSettings` (any input yields valid settings within bounds) and `toPlatform` (every model builds a request from defaults — exists — and from random valid settings).
-169. [ ] **[S]** _Quality_ — Contract tests for the platform client with recorded fixtures (submit/status/cancel/upload ticket) in `tests/fixtures/`, so mapper changes show up as diffs.
-170. [ ] **[S]** _Quality_ — Mutation testing on `poll.ts` and `use-runs.ts` (Stryker) — they carry the reliability promise; the current poll tests cover the happy path and misses.
-171. [ ] **[S]** _Quality_ — Enforce `exactOptionalPropertyTypes` (the code already uses conditional spreads for optional props) and `noUncheckedIndexedAccess` (already on) — verify `tsconfig` has both and add `@typescript-eslint/switch-exhaustiveness-check`.
-172. [ ] **[S]** _Quality_ — Type-safe model registry: generate a union type of model ids from `registry.json` so `getModel("typo")` is a compile error and pickers can't reference unknown ids.
-173. [ ] **[S]** _Quality_ — Validate `models/*.ts` at test time for icon existence in `public/model-icons`, unique `order`, label length and presence of each declared role in mappers.
-174. [ ] **[S]** _Quality_ — Add a script `pnpm models:check` that diffs the installed catalog against the template's latest (shadcn registry) to flag new models, deprecated paths and changed settings ranges.
-175. [ ] **[S]** _Quality_ — Unit tests for `stripJpeg`/`stripPng` with truncated/malformed inputs and fuzzing (they parse binary headers manually); return the original file on any parse doubt.
-176. [ ] **[S]** _Quality_ — Lint rule forbidding `console.*` outside `generation/platform.ts` logging (there is a lint rule for logging per commit `0734053`; extend to forbid prompt/URL fields in log calls).
-177. [ ] **[S]** _Quality_ — Dependency hygiene: `radix-ui` and `@base-ui/react` are both dependencies, and `cn` plus `class-variance-authority` appear; confirm `radix-ui` is still used (knip is configured) and remove if not.
-178. [ ] **[S]** _Quality_ — Pin `pnpm` and Node via `engines`/`.nvmrc`/Corepack and add a CI workflow (typecheck, lint, test, build, knip) — `.githooks` exists locally but there's no hosted CI.
-179. [ ] **[S]** _Quality_ — Add Renovate/Dependabot groups for Next/React/Base UI (dependabot exists per `0734053`; verify ecosystem coverage for GitHub Actions and pnpm).
-180. [ ] **[S]** _Quality_ — Add a storybook-less "component gallery" route in dev (`/dev/components`) rendering each studio component with fixture data for visual review; AGENTS says to read component docs before composing, so a live catalog helps.
-181. [ ] **[S]** _Quality_ — Add `tests/use-runs.test.ts` using fake timers and a mocked `submitGeneration`/`watchRequest`: queue → running → completed, ambiguous failure retry reuses the idempotency key, cancel queued vs running, two-tab merge.
-182. [ ] **[S]** _Quality_ — Add tests for `mergeRecords` (tombstone-free today): same id different status, added from other tab, ordering by createdAt; and for `readHistory` skipping malformed rows.
-183. [ ] **[S]** _Quality_ — Fuzz `friendlyError` with real platform error samples and assert no raw JSON/stack ever reaches the UI; keep a table of recorded messages as a regression suite.
-184. [ ] **[S]** _Quality_ — Introduce an `env.ts` validated at build (`HF_API_BASE_URL` format, https) and an `.env.example` check in CI; today a missing env only fails when the first generation runs.
-185. [ ] **[S]** _Quality_ — Add `eslint-plugin-jsx-a11y` rules (Next config includes some) and `eslint-plugin-react-compiler`; gallery and dock code carry many effects with refs where compiler rules would catch stale closures.
-186. [ ] **[?]** _Accessibility and i18n_ — Visible focus rings on every tile and menu item; verify contrast of dim text on the dark tokens (WCAG AA).
-187. [ ] **[?]** _Accessibility and i18n_ — Alt text for results = the prompt (truncated); `aria-label` on icon-only buttons (audit).
-188. [ ] **[?]** _Accessibility and i18n_ — Focus trap and return-focus on all dialogs; confirm Base UI defaults are not overridden.
-189. [ ] **[?]** _Accessibility and i18n_ — Skip link to the prompt box and to the feed.
-190. [ ] **[?]** _Accessibility and i18n_ — Roving tabindex across the tile grid so Tab does not walk 400 tiles.
-191. [ ] **[?]** _Accessibility and i18n_ — Announce queue position changes ("Queued, 2nd") politely, throttled.
-192. [ ] **[?]** _Accessibility and i18n_ — High-contrast check for status colors (failed, running, queued) without relying on hue alone; add icons.
-193. [ ] **[?]** _Assets and references_ — Asset library folders or tags (characters, products, styles).
-194. [ ] **[?]** _Assets and references_ — Asset search and rename.
-195. [ ] **[?]** _Assets and references_ — Reference limit meter ("2 of 4 images") per model, with the reason when full.
-196. [ ] **[?]** _Assets and references_ — Bulk delete and bulk tag in the asset library.
-197. [ ] **[?]** _Assets and references_ — "Used in" list on an asset: which runs referenced it.
-198. [ ] **[?]** _Assets and references_ — Sort and filter the library by type, date, size and last used.
-199. [ ] **[?]** _Assets and references_ — Paste-from-clipboard video thumbnail preview before upload so a wrong file is caught early.
-200. [ ] **[?]** _Code quality testing and dev experience_ — Playwright smoke test for the AGENTS.md verification scenarios (missing key, cancel, empty history).
-201. [ ] **[?]** _Code quality testing and dev experience_ — Unit tests for history load/migrate (corrupt row skipped, order kept, cap respected).
-202. [ ] **[?]** _Code quality testing and dev experience_ — Component test for the gallery's rule "failed terminal runs stay visible" so it cannot regress.
-203. [ ] **[?]** _Code quality testing and dev experience_ — Test for idempotency-key reuse and rotation (ties to the double-charge fix).
-204. [ ] **[?]** _Code quality testing and dev experience_ — `pnpm check` script that runs typecheck, lint, test and knip in one command.
-205. [ ] **[?]** _Code quality testing and dev experience_ — Fake platform server (tiny Node script behind `HF_API_BASE_URL`) usable by tests and local dev without a key.
-206. [ ] **[?]** _Cost and usage awareness_ — Session spend counter ("14 generations, ~320 credits today") from per-model cost metadata.
-207. [ ] **[?]** _Cost and usage awareness_ — Confirm dialog for expensive combos (long 4K video, batch >2) with "don't ask again".
-208. [ ] **[?]** _Cost and usage awareness_ — Per-project budget cap that disables Generate when hit.
-209. [ ] **[?]** _Cost and usage awareness_ — Weekly summary in the Usage dialog (runs, success rate, failures by reason).
-210. [ ] **[?]** _Cost and usage awareness_ — Failure-reason breakdown (content filter, credits, timeout) with counts.
-211. [ ] **[?]** _Cost and usage awareness_ — Busiest-hour and busiest-day heatmap from local history.
-212. [ ] **[?]** _Dead code and dependencies_ — Persisted prompt and media stores exist but nothing uses them. `generation/stores/prompt.ts`, `generation/stores/media.ts` and `generation/plane.ts` (`assemblePlane`) have no importers; `StudioTemplate` keeps `prompt` and `media` in plain `useState` (`layouts/studio.tsx:273-274`). Result: refreshing the page loses an unsent prompt and attached references. Either wire the persisted per-surface stores into the dock (and keep blob URLs out, as `media.ts` already does) or delete the three files.
-213. [ ] **[?]** _Dead code and dependencies_ — `batch` is half-built: `MAX_BATCH` and `batch`/`setBatch` live in `stores/active.ts`, but no component or submit path reads them (grep), and only Soul has its own `batchSize` setting. Either add a "Variations x1 / x2 / x4" control that submits N planes with distinct idempotency keys and shows N placeholder tiles, or remove the field.
-214. [ ] **[?]** _Detail modal and viewers_ — Side-by-side "reference vs result" layout in the modal for image-to-image and image-to-video runs.
-215. [ ] **[?]** _Detail modal and viewers_ — Filmstrip of siblings (same project or same prompt) under the media for quick browsing.
-216. [ ] **[?]** _Detail modal and viewers_ — Fullscreen button and `F` shortcut for both images and videos.
-217. [ ] **[?]** _Detail modal and viewers_ — Copy-settings buttons per field (prompt, model, aspect ratio) rather than only "Copy as JSON".
-218. [ ] **[?]** _Editing and post-processing_ — Upscale action on video tiles.
-219. [ ] **[?]** _Editing and post-processing_ — Background removal action on image tiles.
-220. [ ] **[?]** _Editing and post-processing_ — Outpaint / reframe to another aspect ratio from the tile menu (9:16 for Shorts, 1:1 for feed).
-221. [ ] **[?]** _Editing and post-processing_ — Inpaint brush: paint a mask on an image tile, then prompt the change.
-222. [ ] **[?]** _Editing and post-processing_ — Trim video in the detail modal (in/out handles) and save the cut as a new asset client-side.
-223. [ ] **[?]** _Editing and post-processing_ — "Edit with prompt" on image tiles: attach the image as a reference and focus the dock in one click (works with any image-edit model).
-224. [ ] **[?]** _Editing and post-processing_ — Relight or restyle presets as tile-menu items that prefill the prompt.
-225. [ ] **[?]** _Editing and post-processing_ — Aspect-ratio crop preview for 9:16, 1:1, 4:5, 16:9 with save-as-new-asset (client canvas only for same-origin or uploaded files).
-226. [ ] **[?]** _Gallery and organization_ — Tags (free text) on runs with tag filter.
-227. [ ] **[?]** _Gallery and organization_ — Keyboard navigation in the gallery: arrow keys move focus, Enter opens, `f` favorites, `Delete` removes (with undo).
-228. [ ] **[?]** _Gallery and organization_ — Detail modal prev/next arrows and swipe on touch.
-229. [ ] **[?]** _Gallery and organization_ — Saved filters ("Starred videos, Kling") as chips the user can pin.
-230. [ ] **[?]** _Gallery and organization_ — Select-range with Shift+click in multi-select.
-231. [ ] **[?]** _Gallery and organization_ — "Select all in this day" from the day heading.
-232. [ ] **[?]** _Gallery and organization_ — Collapse a day group to a one-line summary ("12 images, 2 failed").
-233. [ ] **[?]** _Gallery and organization_ — Pin a run to the top of the feed regardless of sort.
-234. [ ] **[?]** _Gallery and organization_ — Show a count badge next to each project in the sidebar and in the filter chips.
-235. [ ] **[?]** _Gallery and organization_ — Drag a tile onto a sidebar project to move it.
-236. [ ] **[?]** _Gallery and organization_ — Smart collections: auto-projects such as "All videos from this week" (saved query, no copying).
-237. [ ] **[?]** _Generation workflow_ — Compare mode: pin two tiles side by side (slider wipe for images, synced playback for videos).
-238. [ ] **[?]** _Generation workflow_ — Run the same prompt on N models at once ("Model shootout") and show results in one grouped row.
-239. [ ] **[?]** _Generation workflow_ — Prompt templates with `{variables}` (e.g. `{subject} in {style}`), fill-in form, run a grid of combinations.
-240. [ ] **[?]** _Generation workflow_ — Negative prompt field for models that support it, hidden for others.
-241. [ ] **[?]** _Generation workflow_ — "Enhance prompt" button that rewrites a short prompt per model's best practice (server action, key stays server side).
-242. [ ] **[?]** _Generation workflow_ — Persist the queue (the "Queued · n" tiles) in IndexedDB so a reload resumes it instead of dropping it.
-243. [ ] **[?]** _Generation workflow_ — Reorder and remove queued tiles by drag, before they start.
-244. [ ] **[?]** _Generation workflow_ — Pause the queue (let running jobs finish, hold the rest) with a single toggle.
-245. [ ] **[?]** _Generation workflow_ — Auto-retry transient submit failures (5xx, 429) once with the same idempotency key and a visible "Retrying…" state.
-246. [ ] **[?]** _Generation workflow_ — Sequential "chain" mode: output of run A becomes the reference of run B (image -> image -> video) from a saved list of steps.
-247. [ ] **[?]** _Generation workflow_ — Re-run a whole project's prompts on a different model to compare.
-248. [ ] **[?]** _Image viewer_ — Zoom/pan with minimap in the detail modal; 100% pixel view.
-249. [ ] **[?]** _Image viewer_ — Show dimensions and file size; "Download original" vs "Download WebP".
-250. [ ] **[?]** _Image viewer_ — Color palette extraction (5 swatches) per image, click to copy hex and insert into the prompt.
-251. [ ] **[?]** _Image viewer_ — "Describe this image" (caption) to reuse as a prompt (server action).
-252. [ ] **[?]** _Mobile and PWA_ — PWA manifest + icons so it installs; offline shell with cached history thumbnails.
-253. [ ] **[?]** _Mobile and PWA_ — Bottom-sheet model/settings pickers on narrow viewports (no second app shell, per AGENTS.md).
-254. [ ] **[?]** _Mobile and PWA_ — Camera capture as a reference source via `<input capture>`.
-255. [ ] **[?]** _Mobile and PWA_ — Web Share Target so photos shared from the phone open as references.
-256. [ ] **[?]** _Mobile and PWA_ — Dock collapses to a single "+" sheet on narrow screens, keeping one app shell.
-257. [ ] **[?]** _Mobile and PWA_ — Pull-to-refresh disabled inside the feed so scrolling does not reload the page.
-258. [ ] **[?]** _Models and settings_ — Disable (grey out with reason) settings combos a model rejects, instead of failing at the platform.
-259. [ ] **[?]** _Models and settings_ — Model favorites pinned to the top of the picker.
-260. [ ] **[?]** _Models and settings_ — Detect surface from references automatically (video attached as input -> offer video models that accept it).
-261. [ ] **[?]** _Models and settings_ — Per-model "last used settings" summary line in the picker so the user sees what they will get before selecting.
-262. [ ] **[?]** _Models and settings_ — Hide-model toggle in app Settings (visual only, still installed, always reachable via search; keeps the AGENTS.md "all models visible" rule by showing a "n hidden" row).
-263. [ ] **[?]** _Models and settings_ — Settings presets the user names and recalls ("Reels 9:16 High").
-264. [ ] **[?]** _Models and settings_ — Copy settings from one model to another where the keys match.
-265. [ ] **[?]** _Onboarding and first run_ — Example prompts per surface as clickable chips in the empty state (real, on-brand, per AGENTS.md).
-266. [ ] **[?]** _Onboarding and first run_ — Guided "first video from your image" tour using a bundled sample image.
-267. [ ] **[?]** _Onboarding and first run_ — Empty-state hero shows the three actions that matter (add key, make an image, make a video) with real state (done or not).
-268. [ ] **[?]** _Onboarding and first run_ — Inline "what does this setting do" help text under each setting in the dialog, from the catalog description.
-269. [ ] **[?]** _Onboarding and first run_ — Key dialog test button after the Issues item is resolved ("Check key"), with a clear pass or fail.
-270. [ ] **[?]** _Performance_ — Generate and cache thumbnails in IndexedDB so reopening is instant offline.
-271. [ ] **[?]** _Performance_ — Measure and cap the number of `<video>` elements alive at once (virtualization already helps; add a hard ceiling and test it).
-272. [ ] **[?]** _Performance_ — Move SHA-256 hashing and EXIF stripping into a Web Worker for large files.
-273. [ ] **[?]** _Performance_ — Memoize tile props so a single run update re-renders one tile, not the row.
-274. [ ] **[?]** _Product expansion_ — Audio surface (TTS/music) if the platform catalog adds it; the Surface type already splits image/video *(check)*.
-275. [ ] **[?]** _Product expansion_ — Lip-sync / talking-head flow: image + audio -> video with a dedicated mini-wizard.
-276. [ ] **[?]** _Product expansion_ — Character library: named reusable characters with reference sets, `@name` in prompts.
-277. [ ] **[?]** _Product expansion_ — Style library: saved style references + prompt suffix, applied in one click.
-278. [ ] **[?]** _Product expansion_ — Brand kit (logo, colors, fonts) used by template presets.
-279. [ ] **[?]** _Product expansion_ — Template gallery of real presets (AGENTS.md DoD): each loads prompt, model, and settings.
-280. [ ] **[?]** _Product expansion_ — Prompt marketplace-style "Recipes" page built from the user's own best (starred) runs.
-281. [ ] **[?]** _Product expansion_ — Shot list view for a project: ordered cards of prompt + result, printable.
-282. [ ] **[?]** _Product expansion_ — Reference-pack presets (a character's front, side, back images attach together).
-283. [ ] **[?]** _Product expansion_ — Scheduled batch at a quiet hour *(skip unless asked; needs the tab open)*.
-284. [ ] **[?]** _Product gaps_ — History silently caps at 400 runs (`MAX_RECORDS`, `history.ts:27`), dropping the oldest. Tell the user when it happens and add Export / Import history (JSON) in a menu so a browser reset isn't a data loss. If the platform's result URLs expire, also offer "Download all" for completed runs.
-285. [ ] **[?]** _Prompt box and input_ — Prompt history dropdown with search (extends the Up-arrow recall item in section 2).
-286. [ ] **[?]** _Prompt box and input_ — Saved prompts / snippets library ("my style suffix") inserted with `/` command.
-287. [ ] **[?]** _Prompt box and input_ — `Cmd/Ctrl+Enter` to generate, `Esc` to cancel focus, shown as hint on the button.
-288. [ ] **[?]** _Prompt box and input_ — Character counter and per-model prompt length limit warning.
-289. [ ] **[?]** _Prompt box and input_ — Prompt diff: when re-using a prompt from a tile, highlight what changed against the original before submit.
-290. [ ] **[?]** _Prompt box and input_ — Insert-from-history picker (`@@`) that pastes a previous prompt at the cursor.
-291. [ ] **[?]** _Prompt box and input_ — Prompt linting hints: warn on contradictions ("day" and "night"), duplicated words, or text the model cannot render *(check)*.
-292. [ ] **[?]** _Prompt box and input_ — Undo/redo that survives "Enhance"/template inserts (own history stack, not browser default).
-293. [ ] **[?]** _Resilience safety and privacy_ — Content-filter tile shows which input tripped it when known, and an "Edit prompt and retry" button.
-294. [ ] **[?]** _Resilience safety and privacy_ — Warn before attaching images of people for models with likeness restrictions *(check)*.
-295. [ ] **[?]** _Resilience safety and privacy_ — Detect IndexedDB being blocked (private window) and show "History won't be saved in this window" once.
-296. [ ] **[?]** _Resilience safety and privacy_ — Conflict-safe import: merge by run id instead of replacing history.
-297. [ ] **[?]** _Resilience safety and privacy_ — Log a local, user-visible "activity log" of submit/cancel/error events (no prompts) for debugging.
-298. [ ] **[?]** _Resilience safety and privacy_ — Rate-limit key-save attempts server-side to blunt brute-force of the key dialog.
-299. [ ] **[?]** _Resilience safety and privacy_ — Verify that error messages never echo the key or a signed URL (add a test with a fake key).
-300. [ ] **[?]** _Sharing export and sync_ — Zip export of a project (media + a `prompts.csv`).
-301. [ ] **[?]** _Sharing export and sync_ — Copy image to clipboard from the tile menu.
-302. [ ] **[?]** _Sharing export and sync_ — Share page: read-only link for a single result *(needs server storage; only if product wants it)*.
-303. [ ] **[?]** _Sharing export and sync_ — Optional cloud sync adapter behind the existing `useRuns` interface (AGENTS.md allows replacing history/projects modules).
-304. [ ] **[?]** _Sharing export and sync_ — Multi-device: QR code that opens the app with an export bundle to import.
-305. [ ] **[?]** _Sharing export and sync_ — Shareable "recipe link" (prompt/model/settings in the URL hash, no media) that preloads the dock.
-306. [ ] **[?]** _Sharing export and sync_ — "Download all in project" as a zip with progress and a cancel button.
-307. [ ] **[?]** _Sharing export and sync_ — Filename template setting (`{project}-{model}-{date}-{n}`) used by every download.
-308. [ ] **[?]** _Sharing export and sync_ — Copy result URL with a note about its lifetime *(check platform TTL)*.
-309. [ ] **[?]** _Sharing export and sync_ — Export history as CSV (prompt, model, status, created, finished) for spreadsheets.
-310. [ ] **[?]** _Video viewer and tools_ — Storyboard mode: ordered list of shots (prompt + start frame), run all, auto-chain last frame to next start.
-311. [ ] **[?]** _Video viewer and tools_ — Audio toggle badge: show which results have sound and let the user mute globally.
-312. [ ] **[?]** _Video viewer and tools_ — Show duration and resolution as a badge on every video tile.
-313. [ ] **[?]** _Video viewer and tools_ — Picture-in-picture button in the detail modal.
-314. [ ] **[?]** _Visual design polish_ — Skeleton tiles sized to the requested aspect ratio so the layout doesn't jump on completion.
-315. [ ] **[?]** _Visual design polish_ — Completion animation (subtle scale/fade), disabled under reduced motion.
-316. [ ] **[?]** _Visual design polish_ — Tile status as a small consistent chip system (running, queued, failed, starred) with one shared component.
-317. [ ] **[?]** _Visual design polish_ — Smooth reflow when tiles are added at the top (FLIP-style, off under reduced motion).
-318. [ ] **[?]** _Visual design polish_ — Better drop-zone overlay when files are dragged over the window, not just the dock.
+---
 
-## Low value / nice to have
+## 🚦 Do these first
 
-319. [ ] **[XS]** _Cleanup_ — `next.config.ts` runs `syncModels()` at import and `watchModels()` in dev; guard against running twice during config reloads and make the barrel write idempotent (skip when contents are unchanged).
-320. [ ] **[XS]** _Cleanup_ — `tsconfig.tsbuildinfo` is in the working tree; confirm it is gitignored (it should not be committed).
-321. [ ] **[XS]** _Cleanup_ — `app/favicon.ico` (26 KB) can be replaced by an SVG icon + small PNG fallbacks to cut weight.
-322. [ ] **[XS]** _Cleanup_ — `public/model-icons/*.svg` include large files (`happy-horse.svg` 9.4 KB); run SVGO and add a test that each icon has a viewBox and no scripts.
-323. [ ] **[XS]** _Cleanup_ — `styles/quanta/*` (many CSS files, ~100 KB) are design tokens and component CSS; run a CSS coverage report and delete unused rules, or confirm tree-shaking in the Tailwind layer.
-324. [ ] **[XS]** _Cleanup_ — `CLAUDE.md` and `AGENTS.md` overlap; point one at the other to avoid drift.
-325. [ ] **[XS]** _Cleanup_ — `FINDINGS.md` is 58 KB with three overlapping sections (Planned, Skipped, New ideas); this reorganization into one sorted list removes the duplication.
-326. [ ] **[XS]** _Cleanup_ — `lib/studio/tips.ts` uses `localStorage` directly while all other stores go through `browserStorage()`; move it behind the same helper for consistent SSR safety and the `hf.` wipe rule.
-327. [ ] **[XS]** _Cleanup_ — `generation/stores/active.ts` persists as `hf.active.v2` while others are `.v1`; document the versioning convention in `AGENTS.md` and add a test listing all persist keys so `wipeEverything` can't miss one.
-328. [ ] **[XS]** _Cleanup_ — `public/presets/studio-*.svg` and placeholder templates remain (AGENTS requires replacing them); track as a launch checklist item with a script that fails the build if `placeholder-` assets are referenced.
-329. [ ] **[S]** _Feature_ — Mobile layout pass: bottom-sheet dock, swipe between image/video surfaces, pull-to-refresh status, and a PWA install prompt (AGENTS: no second app shell, so adapt in place).
-330. [ ] **[S]** _Feature_ — Offline mode: show history/gallery from cached media offline, queue submissions until online (they need the server, so queue locally and flush), and display connectivity state (`use-online` exists).
-331. [ ] **[S]** _Feature_ — Bring-your-own-storage: let users configure an S3 bucket/WebDAV target to archive results automatically.
-332. [ ] **[S]** _Feature_ — Webhooks/automation: an outgoing webhook on completion (URL in Settings) to trigger Zapier/n8n workflows with the result URL and metadata.
-333. [ ] **[S]** _Feature_ — Public gallery export: generate a static HTML site from a project (grid + lightbox) for portfolios.
-334. [ ] **[S]** _Feature_ — Prompt translation: auto-translate non-English prompts for models that perform better in English, shown with a diff before submit.
-335. [ ] **[S]** _Feature_ — Voice input for prompts via the Web Speech API with language selection.
-336. [ ] **[S]** _Feature_ — Collaboration (comments on runs, shared projects) requires a backend; design an adapter interface first and keep local-first as the default.
-337. [ ] **[S]** _Feature_ — Optional PWA install with offline gallery browsing (cached posters) so the studio opens instantly and shows history without network.
-338. [ ] **[S]** _Feature_ — Contact sheet export: a single PNG/PDF with N selected results, prompts as captions and model labels, for sending to clients.
-339. [ ] **[S]** _Feature_ — Experiments tab: a table of runs for a fixed prompt across models/settings with columns for time-to-complete and star rating, to learn which settings work best.
-340. [ ] **[M]** _Feature_ — Plugin API for post-processing steps (upscale, background removal, format conversion) running client-side via WASM and attachable to a run's output.
-341. [ ] **[M]** _Feature_ — A CLI companion (`studio-cli`) sharing `generation/` code to run batch jobs from a prompt file and write results to disk, using the same catalog and error mapping.
-342. [ ] **[?]** _Accessibility and i18n_ — Respect `prefers-reduced-motion` for video autoplay (show poster + play button), not just animations.
-343. [ ] **[?]** _Accessibility and i18n_ — Touch targets >= 44 px on narrow viewports for tile menu and dock controls.
-344. [ ] **[?]** _Accessibility and i18n_ — Tooltips with shortcut hints on all icon buttons.
-345. [ ] **[?]** _Accessibility and i18n_ — Extract user-facing strings to one module to make translation possible later.
-346. [ ] **[?]** _Accessibility and i18n_ — Format dates and durations with `Intl` using the browser locale.
-347. [ ] **[?]** _Accessibility and i18n_ — Provide text equivalents for the elapsed-time ring on running tiles.
-348. [ ] **[?]** _Accessibility and i18n_ — `lang` and `dir` attributes tied to a locale setting for future RTL.
-349. [ ] **[?]** _Accessibility and i18n_ — Pluralization helper for "1 run / 2 runs" instead of string concatenation.
-350. [ ] **[?]** _Assets and references_ — Auto-convert HEIC to JPEG in the browser before upload instead of refusing.
-351. [ ] **[?]** _Assets and references_ — Auto-downscale oversized images to the model's max input size before upload.
-352. [ ] **[?]** _Assets and references_ — Crop and rotate reference images before upload.
-353. [ ] **[?]** _Assets and references_ — Reference reorder by drag, with role badges (start, end, style, character).
-354. [ ] **[?]** _Assets and references_ — Mark an asset as "Character" and auto-attach it to prompts tagged `@name`.
-355. [ ] **[?]** _Assets and references_ — Expire notice: if signed/public asset URLs expire, show "Re-upload needed" instead of failing at submit *(check platform TTL)*.
-356. [ ] **[?]** _Assets and references_ — Show file size, dimensions and duration on each library card.
-357. [ ] **[?]** _Assets and references_ — Duplicate-detection toast ("already uploaded, reusing") when the hash matches.
-358. [ ] **[?]** _Assets and references_ — Drag a reference thumbnail from the dock to reorder or remove.
-359. [ ] **[?]** _Assets and references_ — Remove-all-references one-click in the dock.
-360. [ ] **[?]** _Code quality testing and dev experience_ — Replace the typed event bus idea with zustand selectors only; audit for prop drilling in `prompt-box.tsx`.
-361. [ ] **[?]** _Code quality testing and dev experience_ — Generate a models table in the README from the catalog so docs never drift.
-362. [ ] **[?]** _Code quality testing and dev experience_ — Lighthouse/axe run in CI against the built app.
-363. [ ] **[?]** _Code quality testing and dev experience_ — Mock mode flag (`HF_MOCK=1`) that returns canned results, for screenshots and demos.
-364. [ ] **[?]** _Code quality testing and dev experience_ — Typed `env.ts` that validates `HF_API_BASE_URL` at boot with a readable error.
-365. [ ] **[?]** _Code quality testing and dev experience_ — Remove `console.*` from client code via an ESLint rule, routing through one logger.
-366. [ ] **[?]** _Code quality testing and dev experience_ — Add a `docs/architecture.md` with one diagram of submit -> poll -> history.
-367. [ ] **[?]** _Cost and usage awareness_ — Mark runs as free vs paid in the detail view.
-368. [ ] **[?]** _Cost and usage awareness_ — Failed-run refund note ("not charged") when the platform says so *(check)*.
-369. [ ] **[?]** _Cost and usage awareness_ — Average wait per model, so the "typical time" hint becomes per model after enough runs.
-370. [ ] **[?]** _Cost and usage awareness_ — Export the usage stats as CSV.
-371. [ ] **[?]** _Cost and usage awareness_ — Streak / habit counter (days with at least one generation); opt-in, off by default.
-372. [ ] **[?]** _Dead code and dependencies_ — Unused dependencies and files: `radix-ui` (no component imports it; the UI is Base UI), `next-themes` and `components/theme-provider.tsx` (AGENTS.md says dark only, no toggle), the empty `components/.gitkeep`, `hooks/.gitkeep`, `lib/.gitkeep`. Remove them and run `pnpm install` to shrink the 595 MB `node_modules` a little and the dependency surface.
-373. [ ] **[?]** _Dead code and dependencies_ — `lib/utils.ts` re-exports `cn` from an npm package literally named `cn` (`export { cn } from "cn"`, and `components/ui/*` import it directly). The usual shadcn helper is a six-line `clsx` + `tailwind-merge` function. Confirm what `cn@0.4.0` is and who maintains it, or replace it with the local helper so a third-party package isn't on the render path of every component.
-374. [ ] **[?]** _Detail modal and viewers_ — Show the platform request id with a copy button for support.
-375. [ ] **[?]** _Detail modal and viewers_ — Swipe-down to close on touch.
-376. [ ] **[?]** _Detail modal and viewers_ — Preload the next and previous media while the modal is open.
-377. [ ] **[?]** _Detail modal and viewers_ — Remember zoom level while paging between images.
-378. [ ] **[?]** _Detail modal and viewers_ — Show "ago" and exact timestamp on hover for created and finished times.
-379. [ ] **[?]** _Docs tests repo_ — AGENTS.md says every `/presets/placeholder-*.svg` and mock template must be replaced with real media and the placeholders deleted. `public/presets/studio-1..4.svg` and the starter `TEMPLATES` in `template-picker.tsx` are still the scaffold's (`HERO_FALLBACKS` in `layouts/studio.tsx` too). Either generate real example outputs with the app and use those, or remove the Explore tab until there is real content.
-380. [ ] **[?]** _Editing and post-processing_ — Extract a frame from a video at the scrubber position and attach it as a reference or save as PNG.
-381. [ ] **[?]** _Editing and post-processing_ — Convert video to GIF or WebM in the browser for sharing.
-382. [ ] **[?]** _Editing and post-processing_ — Stitch several finished clips into one reel (client-side, `mediabunny` or `ffmpeg.wasm` only if asked).
-383. [ ] **[?]** _Editing and post-processing_ — Flip / rotate for reference images before upload.
-384. [ ] **[?]** _Editing and post-processing_ — Mask import (upload a PNG mask) for inpainting-capable models *(check)*.
-385. [ ] **[?]** _Editing and post-processing_ — Speed up or slow down a finished video (client playback only, not a re-encode) for review.
-386. [ ] **[?]** _Editing and post-processing_ — Add captions overlay preview (text on top of video, not burned in).
-387. [ ] **[?]** _Editing and post-processing_ — Compare two takes with an A/B toggle key (`1`/`2`) in the modal.
-388. [ ] **[?]** _Gallery and organization_ — "Open in new tab" and "Copy link" for result media.
-389. [ ] **[?]** _Gallery and organization_ — Density control remembered per surface, plus a "Compact list" view with prompt text.
-390. [ ] **[?]** _Gallery and organization_ — Project cover image picker (defaults to latest completed run).
-391. [ ] **[?]** _Gallery and organization_ — Project descriptions and per-project default model/settings.
-392. [ ] **[?]** _Gallery and organization_ — Duplicate project (copy run references into a new project).
-393. [ ] **[?]** _Gallery and organization_ — Archive projects instead of only delete.
-394. [ ] **[?]** _Gallery and organization_ — Comments/notes on a run (local) for review workflows.
-395. [ ] **[?]** _Gallery and organization_ — Approval status on runs (Draft / Approved / Rejected) with filter.
-396. [ ] **[?]** _Gallery and organization_ — A/B rating (thumbs up/down) on results, feeding a local "what works" prompt stats view.
-397. [ ] **[?]** _Gallery and organization_ — "Jump to date" control and a mini scroll-rail with day ticks.
-398. [ ] **[?]** _Gallery and organization_ — Hide failed runs with one toggle (without deleting; the AGENTS.md rule still holds for runs the user already saw generating).
-399. [ ] **[?]** _Gallery and organization_ — Row-height / density slider with live relayout.
-400. [ ] **[?]** _Gallery and organization_ — "Recently deleted" bin kept for 7 days with restore, backing the Undo toast.
-401. [ ] **[?]** _Gallery and organization_ — Show the project name as a small chip on tiles when viewing "All".
-402. [ ] **[?]** _Generation reliability_ — The API key is never verified on save. `savePlatformCredentials` only checks the character set (`credentials.ts:52-58`), so a wrong key shows "connected" until the first generation 401s. After saving, make one cheap authenticated request (for example `GET /requests/<random uuid>/status`: 401/403 = bad key, 404 = key accepted; confirm the platform really answers that way first) and show the result in the dialog.
-403. [ ] **[?]** _Generation workflow_ — Auto-fill last frame: "Use last frame as next start frame" for video continuation chains.
-404. [ ] **[?]** _Generation workflow_ — Batch CSV import: one prompt per row, run through a queue with a concurrency cap.
-405. [ ] **[?]** _Generation workflow_ — Per-model "recommended settings" preset chips (Draft / Balanced / Final) mapped onto the settings dialog.
-406. [ ] **[?]** _Generation workflow_ — Scheduled run: "Run again every N minutes" for daily-content use. *(skip unless asked)*
-407. [ ] **[?]** _Generation workflow_ — "Re-run failed only" button for a selection or project.
-408. [ ] **[?]** _Generation workflow_ — Show a per-run timeline in the detail modal (queued, started, finished) from timestamps we already record.
-409. [ ] **[?]** _Generation workflow_ — Run notes: a free-text field on the dock that is saved with the run ("client wants warmer").
-410. [ ] **[?]** _Generation workflow_ — Concurrency setting (1-4) in app Settings instead of the fixed 2.
-411. [ ] **[?]** _Image viewer_ — Before/after toggle against the reference used.
-412. [ ] **[?]** _Image viewer_ — Grid overlay (thirds, safe areas) toggle in the viewer.
-413. [ ] **[?]** _Image viewer_ — Pinch-zoom in the detail modal for images.
-414. [ ] **[?]** _Image viewer_ — Blur-up placeholder using a tiny base64 thumb stored with the run.
-415. [ ] **[?]** _Image viewer_ — Dominant-color tile background while loading, to reduce flash.
-416. [ ] **[?]** _Mobile and PWA_ — Safe-area insets (`env(safe-area-inset-bottom)`) for the dock on iOS.
-417. [ ] **[?]** _Mobile and PWA_ — Long-press tile menu on touch instead of hover-only actions.
-418. [ ] **[?]** _Mobile and PWA_ — Haptic tick (`navigator.vibrate`) on completion where supported.
-419. [ ] **[?]** _Mobile and PWA_ — Share-sheet "Add to Studio" for images from the camera roll *(overlaps Web Share Target)*.
-420. [ ] **[?]** _Mobile and PWA_ — Install prompt shown once after the third completed run.
-421. [ ] **[?]** _Mobile and PWA_ — Reduce motion and autoplay by default on data-saver connections (`navigator.connection.saveData`).
-422. [ ] **[?]** _Models and settings_ — Duration slider with live cost/time hint per model.
-423. [ ] **[?]** _Models and settings_ — Model changelog/"new" badge when `registry.json` adds an entry since last visit.
-424. [ ] **[?]** _Models and settings_ — "Cheapest model that supports these inputs" suggestion chip.
-425. [ ] **[?]** _Models and settings_ — Show a "needs reference" badge on models that require an input image or video.
-426. [ ] **[?]** _Models and settings_ — Model deprecation notice if the platform stops returning a model *(check)*.
-427. [ ] **[?]** _Models and settings_ — Group the picker by vendor with collapsible sections.
-428. [ ] **[?]** _Onboarding and first run_ — Sample project pre-seeded on first load that the user can delete.
-429. [ ] **[?]** _Onboarding and first run_ — "What's new" dialog driven by a version constant.
-430. [ ] **[?]** _Onboarding and first run_ — Contextual tip when the user's first video is slow: "Videos take a few minutes; you can leave the tab".
-431. [ ] **[?]** _Onboarding and first run_ — "Replay tour" entry in the command palette.
-432. [ ] **[?]** _Onboarding and first run_ — Link to docs/help from the shortcuts dialog.
-433. [ ] **[?]** _Performance_ — Analyze the bundle (`@next/bundle-analyzer`) once; lazy-load the settings dialog, detail modal, asset library. *(Partly: the command palette, shortcuts, usage, privacy and move dialogs now load on first use. The analyzer was not run, and the settings dialog, detail modal and asset library stay eager because they are opened by their own trigger buttons.)*
-434. [ ] **[?]** _Performance_ — Prefetch the next page of history on idle. *(Not applicable: IndexedDB history is read in one go, capped at 400 runs.)*
-435. [ ] **[?]** _Performance_ — Turn on `reactCompiler` in Next 16 and measure re-renders in the gallery.
-436. [ ] **[?]** _Performance_ — `content-visibility: auto` on off-screen sections of the detail modal.
-437. [ ] **[?]** _Performance_ — Use `fetchpriority="high"` for the first row of images and `low` for the rest.
-438. [ ] **[?]** _Performance_ — Service-worker cache for static assets only (not signed URLs).
-439. [ ] **[?]** _Product expansion_ — Mood-board: drag finished tiles onto a free-form canvas inside a project.
-440. [ ] **[?]** _Product expansion_ — Webhook/notify URL when a run finishes *(needs server; only if asked)*.
-441. [ ] **[?]** _Product expansion_ — Public read-only API route to submit prompts (server-key mode for teams) *(security review first)*.
-442. [ ] **[?]** _Product expansion_ — Team mode: shared key held server-side instead of per-browser cookie *(changes AGENTS.md boundary; ask first)*.
-443. [ ] **[?]** _Product expansion_ — Project templates ("Product ad", "Social reel") that create a project with starter prompts.
-444. [ ] **[?]** _Product expansion_ — Public "gallery mode" fullscreen slideshow of a project for presenting.
-445. [ ] **[?]** _Product expansion_ — Plugin point for custom post-processing actions in the tile menu.
-446. [ ] **[?]** _Product expansion_ — Read-only "client review" export: a static HTML file with the project's media embedded.
-447. [ ] **[?]** _Product gaps_ — Model picker for 28 models: add search and a "Recent" group at the top (`useActive` already persists the selection), since Kling alone has five entries.
-448. [ ] **[?]** _Product gaps_ — Prompt recall: keep the last ~30 distinct prompts per surface and open them with Up arrow in the empty prompt box, so reruns don't depend on finding the right tile and using Copy prompt.
-449. [ ] **[?]** _Prompt box and input_ — Voice dictation for the prompt via Web Speech API (feature-detect).
-450. [ ] **[?]** _Prompt box and input_ — Image-to-prompt: describe an attached reference into the prompt box (server action).
-451. [ ] **[?]** _Prompt box and input_ — Slash commands: `/image`, `/video`, `/model kling`, `/project name` to drive the dock from the keyboard.
-452. [ ] **[?]** _Prompt box and input_ — Word-wrap-aware token estimate shown under the box for models with a limit.
-453. [ ] **[?]** _Prompt box and input_ — Drag text from a tile's prompt into the dock to reuse it.
-454. [ ] **[?]** _Prompt box and input_ — Paste a URL to an image and have the server fetch and attach it as a reference (needs an SSRF-safe allowlist).
-455. [ ] **[?]** _Prompt box and input_ — Smart quotes / whitespace cleanup on paste (toggle).
-456. [ ] **[?]** _Prompt box and input_ — Rotating placeholder text that shows a real example per surface.
-457. [ ] **[?]** _Resilience safety and privacy_ — Rate-limit Generate clicks client-side and show the server's `Retry-After`.
-458. [ ] **[?]** _Resilience safety and privacy_ — Blur-NSFW-by-default toggle for results flagged by the platform *(check)*.
-459. [ ] **[?]** _Resilience safety and privacy_ — Idle lock: hide the gallery behind a click after N minutes (shared screens).
-460. [ ] **[?]** _Resilience safety and privacy_ — Panic key / "Hide previews" toggle for screen sharing.
-461. [ ] **[?]** _Resilience safety and privacy_ — Subresource integrity / pinned CDN hosts list in CSP for media origins only.
-462. [ ] **[?]** _Resilience safety and privacy_ — Auto-clear clipboard-pasted images from memory (revoke object URLs) once uploaded.
-463. [ ] **[?]** _Resilience safety and privacy_ — "Private mode" toggle: do not write new runs to history until switched off.
-464. [ ] **[?]** _Resilience safety and privacy_ — Warn when the origin is not HTTPS (cookie `secure` flag will not apply).
-465. [ ] **[?]** _Resilience safety and privacy_ — Version the exported file format and reject files from the future with a clear message.
-466. [ ] **[?]** _Sharing export and sync_ — Download with a meaningful filename (`{slug-of-prompt}-{model}-{id}.png`) rather than a hash.
-467. [ ] **[?]** _Sharing export and sync_ — Native Web Share on mobile for the Share action.
-468. [ ] **[?]** _Sharing export and sync_ — Export a "recipe" JSON (prompt + model + settings + reference URLs) and import it to reproduce.
-469. [ ] **[?]** _Sharing export and sync_ — Export/import the *entire* app state (settings, projects, history index, prompts) in one file.
-470. [ ] **[?]** _Sharing export and sync_ — Contact-sheet export: one PNG grid of a project's images.
-471. [ ] **[?]** _Sharing export and sync_ — Print/contact-sheet layout CSS (`@media print`) for a project.
-472. [ ] **[?]** _Sharing export and sync_ — Embed metadata (prompt, model) in downloaded PNG/MP4 where cheap.
-473. [ ] **[?]** _Sharing export and sync_ — URL state for surface, model, and project so back/forward and bookmarks work.
-474. [ ] **[?]** _Sharing export and sync_ — Deep link to a single generation (`?run=id`) opening the detail modal.
-475. [ ] **[?]** _Sharing export and sync_ — Import prompts from a text file, one per line, into the prompt library.
-476. [ ] **[?]** _Sharing export and sync_ — Auto-backup reminder: "Last export 30 days ago" nudge when history is large.
-477. [ ] **[?]** _Sharing export and sync_ — Share sheet that builds a markdown snippet (prompt + link) for chat tools.
-478. [ ] **[?]** _Sharing export and sync_ — Email-to-self of a recipe link via `mailto:`.
-479. [ ] **[?]** _Video viewer and tools_ — Loop-seam preview: play last 1 s into first 1 s to judge loopability.
-480. [ ] **[?]** _Video viewer and tools_ — Hover-scrub preview on video tiles (mouse X maps to time).
-481. [ ] **[?]** _Video viewer and tools_ — Poster-frame picker: choose which frame is the tile thumbnail.
-482. [ ] **[?]** _Video viewer and tools_ — Playback fallback message when the browser can't decode the codec, with Download.
-483. [ ] **[?]** _Video viewer and tools_ — Remember mute/volume across sessions.
-484. [ ] **[?]** _Video viewer and tools_ — Burn-in watermark/caption export (canvas + MediaRecorder) *(only if product asks)*.
-485. [ ] **[?]** _Video viewer and tools_ — Background music attach for silent models (client-side mux) *(heavy; skip unless asked)*.
-486. [ ] **[?]** _Visual design polish_ — Distinct, readable failed-tile design with the reason inline and Retry/Delete.
-487. [ ] **[?]** _Visual design polish_ — Consistent model badges/icons per vendor in picker and tiles.
-488. [ ] **[?]** _Visual design polish_ — Sticky dock that collapses to a single line while scrolling the feed.
-489. [ ] **[?]** _Visual design polish_ — Toast stack with Undo, dedupe, and a max of 3 visible.
-490. [ ] **[?]** _Visual design polish_ — Subtle gradient glow behind running tiles keyed to the model vendor.
-491. [ ] **[?]** _Visual design polish_ — Consistent icon set audit (one stroke width and size across the app).
-492. [ ] **[?]** _Visual design polish_ — Typographic scale review: one set of sizes for labels, metadata and headings.
-493. [ ] **[?]** _Visual design polish_ — Empty-state illustrations replaced with on-brand art (ties to the placeholders Issue).
-494. [ ] **[?]** _Visual design polish_ — Page-load fade of the first row only, so there is no large layout flash.
+The 8 most important items. Each one is also listed in its category below.
 
-## Done (earlier rounds, kept for reference)
+1. [ ] **Add a timeout to calls to Higgsfield.** One stuck call can freeze everything else. ⏱ 15 min
+2. [ ] **Stop accidental double charges.** Make sure every "Generate" click has a unique ID so a retry never creates a second paid job. ⏱ 15 min
+3. [ ] **Don't lose starred items.** The app keeps only the newest 400 generations. Starred ones should never be dropped. ⏱ 15 min
+4. [ ] **Save results in case links expire.** Right now we only save links to the images/videos. If those links die, the gallery shows blank tiles. ⏱ 15 min
+5. [ ] **Show a friendly message when the app isn't set up right.** Today users see a raw technical error. ⏱ 15 min
+6. [ ] **Fix "Download all".** It can crash the browser and download files twice. ⏱ 15 min
+7. [ ] **Protect the saved API key better.** It's stored in a readable form in the browser cookie. ⏱ 15 min
+8. [ ] **Tighten the browser security rules.** The current ones leave a gap that hackers could use. ⏱ 15 min
+
+---
+
+## ❓ Waiting on your decision
+
+I couldn't do these without an answer from you. Each says what I need.
+
+- [ ] **Check the API key when it's saved.** Right now a wrong key looks fine until the first generation fails. I can test the key on save, but I'm not sure how Higgsfield answers a test request. If I guess wrong, **every good key would be rejected**. *Need:* confirm how Higgsfield responds, or name a safe test request.
+- [ ] **Replace the sample/placeholder pictures with real ones.** The starter images and templates are still from the original template. Real ones cost Higgsfield credits and need your brand direction. *Pick one:* (a) tell me the brand and approve spending credits, (b) send me the images, or (c) remove the Explore tab until there's real content.
+- [ ] **Auto-convert iPhone photos (HEIC) to JPEG.** This needs a ~1 MB add-on. *Pick one:* approve the add-on, or keep the current message asking users to convert the photo themselves.
+- [ ] **Keep small copies of images for faster loading.** This only works if Higgsfield's servers allow it, and I can't test that without a key. *Pick one:* confirm they allow it, or accept no offline thumbnails.
+- [ ] **Automatic click-through test of the whole app (Playwright).** Needs a big add-on (hundreds of MB). *Pick one:* approve it, and say whether to use a fake Higgsfield server or the real one.
+- [ ] **Auto-generate a model list in the README.** Needs a small developer tool (`tsx`). *Need:* approve it.
+- [ ] **Automatic accessibility/speed scoring (Lighthouse).** *Need:* which pages to check and what minimum scores should fail a build.
+- [ ] **Clean up how the prompt box passes data around.** This one is a vague review, not a clear task. *Need:* tell me what bothers you, or drop it.
+
+---
+
+## 1. Generating reliably
+
+Jobs getting stuck, charged twice, or failing for no reason.
+
+- [ ] 🔴 **Add a timeout to calls to Higgsfield.** One hung call freezes submit, cancel and status checks. ⏱ 15 min
+- [ ] 🔴 **Make sure every generation has a unique ID**, even from older browsers, so a retry can't double-charge. ⏱ 15 min
+- [ ] 🔴 **Show a clear "app isn't set up" screen** instead of raw errors on every generation when settings are missing. ⏱ 15 min
+- [ ] 🟡 **Dev-mode glitch:** checking on jobs can get dropped when the page reloads itself while developing. Fix it. ⏱ 15 min
+- [ ] 🟡 **Don't throw away good results.** If one group of status checks fails, results from the groups that worked are lost. ⏱ 15 min
+- [ ] 🟡 **Handle "too many jobs" gracefully** instead of failing the whole status check. ⏱ 15 min
+- [ ] 🟡 **Treat "timeout" and "conflict" errors as "maybe it worked"**, not "it failed". Prevents double-charging. ⏱ 15 min
+- [ ] 🟡 **Fix "Canceling…" getting stuck** if the job was already running and can't be canceled. ⏱ 15 min
+- [ ] 🟡 **Wait a moment before declaring "no media produced".** Sometimes results are just a second late. ⏱ 15 min
+- [ ] 🟡 **Warn when a reference link has expired** instead of failing with a confusing error when using "More like this" later. ⏱ 15 min
+- [ ] 🟡 **Stop the tile from flickering** between "queued" and "running". ⏱ 15 min
+- [ ] 🟡 **Remember several pending retries**, not just one, so changing a prompt after a failure can't cause a duplicate paid job. ⏱ 15 min
+- [ ] 🟡 **Limit running jobs across all browser tabs.** Two tabs currently allow double the limit. ⏱ 15 min
+- [ ] 🟡 **Show "Retrying…" and auto-retry once** on temporary server errors.
+- [ ] 🟡 **Pause the queue automatically** when Higgsfield says "slow down", with a visible countdown. ⏱ 15 min
+- [ ] 🟡 **Keep the queue after a page reload** instead of dropping it.
+- [ ] 🔴 **Show a notice after reload:** "Your runs were recovered."
+- [ ] 🟡 **"Recent errors" panel** in Settings: last 20 failures, with reason, support ID and a one-click retry. ⏱ 15 min
+
+## 2. Saving, history & downloads
+
+Keeping your work safe and getting it out of the app.
+
+- [ ] 🔴 **Don't drop starred items** when history passes 400 runs. ⏱ 15 min
+- [ ] 🔴 **Save copies of results** in case the original links expire. ⏱ 15 min
+- [ ] 🔴 **Fix "Download all".** It loads everything at once, can crash, and downloads files twice if one fails. ⏱ 15 min
+- [ ] 🟡 **Fix a memory leak** in how the app opens browser storage. ⏱ 5 min
+- [ ] 🟡 **Fix the zip file dates** (show as 1980) and warn before creating zips over 4 GB that would silently corrupt. ⏱ 5 min
+- [ ] 🟡 **"Wipe everything" may miss some data.** Make sure it clears all of it. ⏱ 15 min
+- [ ] 🟡 **Label the Usage numbers correctly.** "Total" really means "last 400 runs". ⏱ 15 min
+- [ ] 🟡 **Give saved library items stable IDs** so the same image doesn't get duplicated or merged. ⏱ 15 min
+- [ ] 🟡 **Prepare for future updates:** add a way to upgrade saved data without losing it. ⏱ 15 min
+- [ ] 🟡 **Warn when browser storage is full** instead of silently not saving. ⏱ 15 min
+
+## 3. Small bugs & glitches
+
+- [ ] 🟡 **Error messages guess wrong.** A prompt containing "credit card" gets treated as "not enough credits". Check the real error code first. ⏱ 5 min
+- [ ] 🟡 **Video tiles are heavy.** Each one loads a full video player. Show a still frame until hover. ⏱ 15 min
+
+## 4. Security & privacy
+
+- [ ] 🔴 **Encrypt the API key** stored in the browser cookie. Today it's readable if someone gets the cookie. ⏱ 15 min
+- [ ] 🔴 **Tighten browser security rules** (CSP). They're too loose and allow any website's content. ⏱ 15 min
+- [ ] 🟡 **Remove hidden data from WebP, GIF and MP4 files** before upload (location, camera info). Today only JPEG/PNG are cleaned. ⏱ 15 min
+
+## 5. Prompt box & typing
+
+- [ ] 🔴 **Keep unsent prompts and attached files** when the page reloads.
+
+## 7. Models & settings
+
+- [ ] 🟡 **Aspect ratio previews** showing the exact crop, plus "match my reference image". ⏱ 15 min
+
+## 8. Gallery & finding things
+
+- [ ] 🟡 **Count badge** next to each project.
+- [ ] 🟡 **Drag a tile onto a project** to move it.
+
+## 9. Viewing results
+
+- [ ] 🔴 **Update the detail window live** when its run finishes.
+- [ ] 🔴 **Better video player:** scrub, speed, frame step, loop, keyboard controls.
+- [ ] 🟡 **Full details panel** (model, settings, seed, timings, ID) with "Copy as JSON" and "Copy as curl". ⏱ 15 min
+- [ ] 🟡 **Reference vs result side by side** in the detail window.
+- [ ] 🟡 **Fullscreen button** and `F` shortcut.
+- [ ] 🟡 **Zoom and pan** with a minimap.
+- [ ] 🟡 **Sound badge** on videos; mute globally.
+- [ ] 🟡 **Duration/resolution badge** on video tiles.
+- [ ] ⚪ **Support ID with a copy button** in the detail window.
+
+## 11. Reference files
+
+Pictures, videos and audio you give the AI as input.
+
+- [ ] 🔴 **"Save as reference"** on any finished tile, with no re-upload.
+- [ ] 🟡 **"Use as reference"** on tiles and in the viewer. ⏱ 15 min
+- [ ] ⚪ **Auto-convert iPhone photos (HEIC).** *(see Decisions)*
+- [ ] ⚪ **Crop and rotate** before upload.
+- [ ] ⚪ **Show size, dimensions, length** on each card.
+- [ ] ⚪ **"Already uploaded, reusing" message.**
+- [ ] ⚪ **Drag a thumbnail** to reorder or remove.
+
+## 12. Sharing, export & backup
+
+- [ ] 🟡 **Copy image to clipboard.**
+
+## 13. Cost & usage
+
+- [ ] 🔴 **Credit balance in the sidebar** (if Higgsfield provides it), with a warning before a run you can't afford.
+- [ ] 🟡 **Activity timeline** per day and model. ⏱ 15 min
+- [ ] 🟡 **Session spend counter** ("14 generations, ~320 credits today").
+- [ ] ⚪ **"Not charged" note** on failed runs when known.
+
+## 15. Look & feel
+
+- [ ] 🟡 **Skeleton tiles in the right shape** so the layout doesn't jump.
+- [ ] 🟡 **Gentle completion animation** (off for reduced motion).
+- [ ] 🟡 **Consistent status chips** (running, queued, failed, starred).
+- [ ] 🟡 **Smooth reflow** when tiles are added.
+- [ ] 🟡 **Better drop zone** when dragging files over the window.
+- [ ] ⚪ **Clearer failed tiles** with reason and Retry/Delete.
+- [ ] ⚪ **Consistent model badges** per company.
+- [ ] ⚪ **Toast stack with Undo,** max 3 visible.
+- [ ] ⚪ **Glow behind running tiles** by company color.
+- [ ] ⚪ **One icon style** across the app.
+- [ ] ⚪ **One set of text sizes.**
+- [ ] ⚪ **Fade in the first row only** on load.
+
+## 16. First-time experience
+
+- [ ] 🟡 **Help text under each setting** in the dialog.
+- [ ] 🟡 **"Check key" button** in the key dialog.
+
+## 18. Speed
+
+- [ ] 🟡 **Smoother layout on resize.** ⏱ 15 min
+- [ ] 🟡 **Skip rendering off-screen tiles** while keeping loaded media. ⏱ 15 min
+- [ ] 🟡 **Don't recompute lists** on every poll tick. ⏱ 15 min
+- [ ] 🟡 **Split the two biggest files** (886 and 816 lines) into smaller pieces. ⏱ 15 min
+- [ ] 🟡 **Only update the part of the gallery that changed.** ⏱ 15 min
+- [ ] 🟡 **Load rarely used windows only when opened.** ⏱ 15 min
+- [ ] 🟡 **Preload images only near the screen.** ⏱ 15 min
+- [ ] 🟡 **Store small thumbnails** for instant reopening.
+- [ ] 🟡 **Cap simultaneous videos** at a hard limit.
+- [ ] 🟡 **Do heavy file work** (fingerprinting, metadata stripping) in the background.
+- [ ] 🟡 **Only re-render the tile that changed.**
+- [ ] ⚪ **Analyze the bundle once** and lazy-load more windows.
+- [ ] ⚪ **Skip off-screen parts** of the detail window.
+- [ ] ⚪ **Load first-row images first,** others later.
+- [ ] ⚪ **Cache static files** offline.
+
+## 20. Behind the scenes (tests, docs, cleanup)
+
+Work that users don't see but keeps the app healthy.
+
+**Tests**
+- [ ] 🔴 **Test the error messages** against real Higgsfield responses.
+- [ ] 🟡 **Tests for screens** (prompt box, key dialog, gallery tile). ⏱ 15 min
+- [ ] 🟡 **Tests with random inputs** for settings parsing. ⏱ 15 min
+- [ ] 🟡 **Recorded-response tests** for the Higgsfield connection. ⏱ 15 min
+- [ ] 🟡 **Stress-test** the polling and run logic. ⏱ 15 min
+- [ ] 🟡 **Test the run controller** (queue, retry, cancel, two tabs). ⏱ 15 min
+- [ ] 🟡 **Test merging of history** and skipping bad rows. ⏱ 15 min
+- [ ] 🟡 **Stress-test error messages** with real samples. ⏱ 15 min
+- [ ] 🟡 **Test metadata stripping** with broken files. ⏱ 15 min
+- [ ] 🟡 **Browser test of the main scenarios** (missing key, cancel, empty history). *(see Decisions)*
+- [ ] 🟡 **Test history loading** (bad row skipped, order, cap).
+- [ ] 🟡 **Test "failed runs stay visible."**
+- [ ] 🟡 **Test idempotency key reuse.**
+- [ ] 🟡 **Tests for model files** (icons, unique order, roles). ⏱ 15 min
+- [ ] 🟡 **Single `pnpm check` command** for all checks.
+- [ ] 🟡 **Fake Higgsfield server** for tests and demos without a key.
+- [ ] ⚪ **Automatic accessibility/speed run** in CI. *(see Decisions)*
+- [ ] ⚪ **Mock mode** (`HF_MOCK=1`) for demos.
+
+**Code quality**
+- [ ] 🟡 **Stricter TypeScript settings** and lint rules. ⏱ 15 min
+- [ ] 🟡 **Catch typo'd model names** at build time. ⏱ 15 min
+- [ ] 🟡 **Command to compare installed models** with the latest catalog. ⏱ 15 min
+- [ ] 🟡 **Lint rule against logging prompts/URLs.** ⏱ 15 min
+- [ ] 🟡 **Remove an unused add-on** (`radix-ui`) if confirmed. ⏱ 15 min
+- [ ] 🟡 **Pin tool versions** and add hosted automatic checks. ⏱ 15 min
+- [ ] 🟡 **Check update-bot coverage.** ⏱ 15 min
+- [ ] 🟡 **Dev page showing every component** with sample data. ⏱ 15 min
+- [ ] 🟡 **Settings check at build time** so a missing setting fails early. ⏱ 15 min
+- [ ] 🟡 **Stronger accessibility and React lint rules.** ⏱ 15 min
+- [ ] ⚪ **Simplify how data flows** in the prompt box. *(see Decisions)*
+- [ ] ⚪ **Generate the model table in the README.** *(see Decisions)*
+- [ ] ⚪ **Check settings at startup** with a readable error.
+- [ ] ⚪ **Replace `console.*` in browser code** with one logger.
+
+**Docs**
+- [ ] 🟡 **Rewrite the README** (purpose, screenshots, setup table, limits). ⏱ 15 min
+- [ ] 🟡 **Architecture guide.** ⏱ 15 min
+- [ ] 🟡 **"Adding a model" guide.** ⏱ 15 min
+- [ ] 🟡 **Table of error messages** for support. ⏱ 15 min
+- [ ] 🟡 **Changelog** and release tags. ⏱ 15 min
+- [ ] 🟡 **Run lifecycle diagram.** ⏱ 15 min
+- [ ] 🟡 **Privacy doc** of what leaves the browser. ⏱ 15 min
+- [ ] ⚪ **One-diagram architecture note.**
+
+**Setup & running the app**
+- [ ] 🟡 **`/api/health` page** for uptime checks. ⏱ 15 min
+- [ ] 🟡 **Show version info in Settings.** ⏱ 15 min
+
+**Cleanup**
+- [ ] 🟡 **Remove dead code:** unused saved-prompt and media stores. Wire them in or delete them.
+- [ ] ⚪ **Avoid running model sync twice** in config reloads. ⏱ 5 min
+- [ ] ⚪ **Make sure a build file isn't committed** (`tsconfig.tsbuildinfo`). ⏱ 5 min
+- [ ] ⚪ **Remove unused style rules.** ⏱ 5 min
+- [ ] ⚪ **Make `CLAUDE.md` and `AGENTS.md` point to each other.** ⏱ 5 min
+- [ ] ⚪ **Shrink this file** (done by this reorganization). ⏱ 5 min
+- [ ] ⚪ **Move tips storage** to the same helper as everything else. ⏱ 5 min
+- [ ] ⚪ **Document the storage version naming** and add a test listing all keys. ⏱ 5 min
+- [ ] ⚪ **Fail the build if placeholder images are still used.** ⏱ 5 min
+- [ ] ⚪ **Remove unused add-ons:** `radix-ui`, `next-themes`, empty placeholder files.
+- [ ] ⚪ **Check the package named `cn`** or replace it with a six-line local helper.
+- [ ] ⚪ **Replace placeholder media** *(see Decisions)*.
+
+---
+
+## ⏭ Skip
+
+Not doing these. Moved here from the sections above; kept in case you change your mind.
+
+**❓ Waiting on your decision**
+- [ ] **Grey out setting combos a model refuses.** Nothing in the app says which combos don't work (like certain resolution + length pairs). *Need:* a list of bad combos per model, or a link to Higgsfield's docs.
+- [ ] **Auto-shrink huge images before upload.** No model says its maximum image size, so I have nothing to shrink to. *Need:* the max size (per model or one global value).
+- [ ] **Turn on React Compiler (a speed-up tool).** Needs a new add-on and someone to measure before/after in a browser. *Pick one:* approve it, or drop the idea.
+
+**1. Generating reliably**
+- [ ] 🟡 **Check old jobs less often.** A video started an hour ago is checked every 4 seconds just because a new image started. ⏱ 15 min
+- [ ] 🟡 **Show a "Support ID" on every failed tile** so you can quote it to Higgsfield support. ⏱ 15 min
+- [ ] ⚪ **Limit how fast Generate can be clicked** and show how long to wait.
+
+**2. Saving, history & downloads**
+- [ ] 🟡 **Clean up file names inside zips** so odd characters don't cause problems. ⏱ 5 min
+- [ ] 🟡 **Fix two-tab conflicts.** Delete or star something in one tab and the other tab can bring it back. ⏱ 15 min
+- [ ] 🟡 **"Export with media":** current export saves only links, which break when links expire. ⏱ 15 min
+- [ ] 🟡 **Give downloads real names** like `kling-sunset-beach-20261024.mp4` instead of random ones. ⏱ 15 min
+- [ ] 🟡 **When download fails,** tell the user a new tab opened and to use "Save as". ⏱ 15 min
+- [ ] 🟡 **Warn when the library hits 200 items** instead of silently dropping the oldest. ⏱ 15 min
+- [ ] 🟡 **Save each generation separately** instead of rewriting all 400 every time (faster). ⏱ 15 min
+- [ ] 🟡 **Tell the user when history hits 400** and add Export/Import so a browser reset isn't a disaster.
+- [ ] 🟡 **Warn when history can't be saved** (e.g. private browsing window).
+- [ ] 🟡 **Safe import:** merge by ID instead of replacing everything.
+- [ ] ⚪ **Reject backup files from the future** with a clear message.
+
+**3. Small bugs & glitches**
+- [ ] 🟡 **Video/image tiles start as squares** for some models, then jump when the real picture loads. ⏱ 5 min
+- [ ] 🟡 **Usage chart is off by an hour** on daylight-saving days. ⏱ 5 min
+- [ ] 🟡 **"Median time" counts waiting in line** as generation time. Record start and finish properly. ⏱ 5 min
+- [ ] 🟡 **Notifications stack up** and clicking one doesn't open the app. ⏱ 15 min
+- [ ] 🟡 **Finish sound is unreliable.** Use one sound player instead of making a new one each time. ⏱ 15 min
+- [ ] 🟡 **No prompt length limit.** Users wait, then get a vague error. Add a counter and block over-long prompts. ⏱ 15 min
+- [ ] 🟡 **"Today / Yesterday" labels go stale** after midnight. ⏱ 15 min
+- [ ] 🟡 **Library names cut off mid-word** or include line breaks. ⏱ 15 min
+
+**4. Security & privacy**
+- [ ] 🟡 **Limit how often the app can be called** so a shared site can't be abused to burn the owner's quota. ⏱ 15 min
+- [ ] 🟡 **Make the privacy page build itself** from a single list so it can't get out of date. Add "Download my data". ⏱ 15 min
+- [ ] 🟡 **Hide prompts in copied diagnostics** by default. ⏱ 15 min
+- [ ] 🟡 **Warn if someone pastes an API key** into the prompt box. ⏱ 15 min
+- [ ] 🟡 **"Private" projects** that are left out of exports, stats and search. ⏱ 15 min
+- [ ] 🟡 **Slow down key-guessing** in the key dialog.
+- [ ] 🟡 **Test that errors never reveal the key** or private links.
+- [ ] 🟡 **Warn before attaching photos of people** to models with restrictions.
+- [ ] ⚪ **Hide possibly unsafe results by default** (blur).
+- [ ] ⚪ **Auto-lock:** hide the gallery after some idle minutes.
+- [ ] ⚪ **"Hide previews" panic button** for screen sharing.
+- [ ] ⚪ **Only allow trusted media sources** in the security rules.
+- [ ] ⚪ **Free up memory** from pasted images after upload.
+- [ ] ⚪ **"Private mode":** don't save new runs to history.
+- [ ] ⚪ **Warn if the site isn't HTTPS** (key protection won't fully apply).
+
+**5. Prompt box & typing**
+- [ ] 🟡 **Prompt library with tags:** save, search and reuse prompts; add placeholders like `{subject}`. ⏱ 15 min
+- [ ] 🟡 **Prompt variations:** typing `{red|blue|green}` creates one run for each option. ⏱ 15 min
+- [ ] 🟡 **Paste anywhere to attach** an image or link as a reference. ⏱ 15 min
+- [ ] 🟡 **Drag a finished image** into the prompt box to use it as a reference. ⏱ 15 min
+- [ ] 🟡 **Prompt undo history** and a "restore last prompt" button. ⏱ 15 min
+- [ ] 🟡 **Customizable keyboard shortcuts** and a help sheet that updates itself. ⏱ 15 min
+- [ ] 🟡 **Keyboard-first prompt box:** Ctrl+Enter to generate, shortcuts to switch model or aspect ratio. ⏱ 15 min
+- [ ] 🟡 **Type `/` commands** like `/model kling-3` or `/ar 9:16`. ⏱ 15 min
+- [ ] 🟡 **Describe an image as a prompt** (image-to-prompt). ⏱ 15 min
+- [ ] 🟡 **"Enhance prompt"** that improves a short prompt. ⏱ 15 min
+- [ ] 🟡 **Saved snippets** (like "my style suffix") inserted with `/`.
+- [ ] 🟡 **Ctrl+Enter hint** on the Generate button.
+- [ ] 🟡 **Character counter and length warning** per model.
+- [ ] 🟡 **Show what changed** when reusing an old prompt.
+- [ ] 🟡 **Insert an old prompt** at the cursor with `@@`.
+- [ ] 🟡 **Prompt hints:** warn about contradictions like "day" and "night", or repeated words.
+- [ ] 🟡 **Better undo/redo** that survives "Enhance" and template inserts.
+- [ ] 🟡 **Prompt history dropdown** with search.
+- [ ] ⚪ **Dictate prompts** with your voice.
+- [ ] ⚪ **Describe an attached image** into the prompt box.
+- [ ] ⚪ **More `/` commands:** `/image`, `/video`, `/project name`.
+- [ ] ⚪ **Estimate length** for models with a limit.
+- [ ] ⚪ **Drag prompt text** from a tile into the box.
+- [ ] ⚪ **Paste an image URL** and have the app fetch it.
+- [ ] ⚪ **Clean up pasted text** (curly quotes, extra spaces).
+- [ ] ⚪ **Rotating example text** in the empty prompt box.
+- [ ] ⚪ **Auto-translate prompts** into English with a preview. ⏱ 15 min
+- [ ] ⚪ **Voice input** with language choice. ⏱ 15 min
+
+**6. Generating workflow**
+- [ ] 🔴 **"Retry with edits"** on failed tiles: reopen the prompt with the error shown above. 
+- [ ] 🔴 **Ask before sending a duplicate** paid job within 10 seconds.
+- [ ] 🔴 **Retry / Reuse buttons on tiles.** Retry a failed one; reuse the prompt, model and settings of any one.
+- [ ] 🔴 **"Animate" button on images** to turn a still into a video in one click. Also "Extend" on videos.
+- [ ] 🔴 **Seed control + "lock seed"** so you can test one change at a time.
+- [ ] 🟡 **Seed field per model,** shown on the detail view, plus "same seed, new prompt". ⏱ 15 min
+- [ ] 🟡 **"N variations" control** (1, 2, 4) for every image model. ⏱ 15 min
+- [ ] 🟡 **Run one prompt on many models** and compare side by side. ⏱ 15 min
+- [ ] 🟡 **Family tree of runs:** track which run came from which. ⏱ 15 min
+- [ ] 🟡 **A/B mode:** send two prompts as a pair and pick a winner. ⏱ 15 min
+- [ ] 🟡 **Reusable workflows** (product shot, social sizes) that make several ratios at once. ⏱ 15 min
+- [ ] 🟡 **Scheduled generation** to start later. ⏱ 15 min
+- [ ] 🟡 **Turn on notifications when the tab is closed.** ⏱ 15 min
+- [ ] 🟡 **Sound options and volume** for the finish chime. ⏱ 15 min
+- [ ] 🟡 **Finish the half-built batch feature** or delete it.
+- [ ] 🟡 **Compare mode:** two tiles side by side with a slider.
+- [ ] 🟡 **"Model shootout":** same prompt on N models in one row.
+- [ ] 🟡 **Prompt templates** with fill-in blanks and grid of combinations.
+- [ ] 🟡 **Negative prompt field** (what to avoid) for models that support it.
+- [ ] 🟡 **Reorder or remove queued tiles** before they start.
+- [ ] 🟡 **Pause the queue** with one toggle.
+- [ ] 🟡 **Chain mode:** output of step A becomes input of step B.
+- [ ] 🟡 **Re-run a whole project** on a different model.
+- [ ] ⚪ **"Use last frame as next start frame"** for video chains.
+- [ ] ⚪ **Batch from a spreadsheet (CSV):** one prompt per row.
+- [ ] ⚪ **Quick presets** (Draft / Balanced / Final) for each model.
+- [ ] ⚪ **"Run again every N minutes"** *(skip unless asked)*.
+- [ ] ⚪ **"Re-run failed only"** button.
+- [ ] ⚪ **Per-run timeline** (queued, started, finished).
+- [ ] ⚪ **Notes on a run** saved with it.
+- [ ] ⚪ **Choose how many jobs run at once** (1–4) in Settings.
+
+**7. Models & settings**
+- [ ] 🔴 **"Why this model" comparison table** for all models. 
+- [ ] 🟡 **Negative prompt and strictness (CFG) settings** for models that offer them. ⏱ 15 min
+- [ ] 🟡 **Model suggestions** based on your prompt and files. ⏱ 15 min
+- [ ] 🟡 **Tags on models** (text rendering, characters, sound…) so the picker can filter 28 models. ⏱ 15 min
+- [ ] 🟡 **Flag old/preview models** and point to newer ones. ⏱ 15 min
+- [ ] 🟡 **Saved setting bundles** like "cinematic 16:9 1080p". ⏱ 15 min
+- [ ] 🟡 **Global default settings** per surface. ⏱ 15 min
+- [ ] 🟡 **Explain each model's limits** (max length, ratios, sound) before you generate. ⏱ 15 min
+- [ ] 🟡 **Warn about settings that don't work together.** ⏱ 15 min
+- [ ] 🟡 **Cross-model presets** like "Vertical 9:16 short". ⏱ 15 min
+- [ ] 🟡 **Grey out invalid setting combos** with the reason. *(see Decisions)*
+- [ ] 🟡 **Pin favorite models** to the top.
+- [ ] 🟡 **Auto-suggest video models** when you attach a video.
+- [ ] 🟡 **Show last-used settings** in the picker.
+- [ ] 🟡 **Hide models in Settings** (still searchable, with "n hidden" row).
+- [ ] 🟡 **Name and recall your setting presets** ("Reels 9:16 High").
+- [ ] 🟡 **Copy settings between models** where they match.
+- [ ] ⚪ **Duration slider** with live cost/time hint.
+- [ ] ⚪ **"New" badge** when a model is added.
+- [ ] ⚪ **"Cheapest model that fits"** suggestion.
+- [ ] ⚪ **"Needs reference" badge** on models that require an input.
+- [ ] ⚪ **Notice when a model disappears** from the platform.
+- [ ] ⚪ **Group models by company** with collapsible sections.
+- [ ] ⚪ **Model search and a "Recent" group** (Kling alone has five entries).
+
+**8. Gallery & finding things**
+- [ ] 🔴 **Search by prompt, model and date.**
+- [ ] 🔴 **Quick text search** in the feed header, with matches highlighted.
+- [ ] 🟡 **Collections** (favorites folders) separate from projects. ⏱ 15 min
+- [ ] 🟡 **Notes and 1–5 star ratings** on runs. ⏱ 15 min
+- [ ] 🟡 **Full search** across prompts, notes, models and settings, with filters. ⏱ 15 min
+- [ ] 🟡 **Show gallery by day, project, model or status** with sticky headers. ⏱ 15 min
+- [ ] 🟡 **Project settings:** default model, shared references, notes. ⏱ 15 min
+- [ ] 🟡 **Project cover image, pinning and sorting.** ⏱ 15 min
+- [ ] 🟡 **Archive** runs and projects instead of deleting. ⏱ 15 min
+- [ ] 🟡 **Trash with 30-day recovery.** ⏱ 15 min
+- [ ] 🟡 **Auto-name runs** from the prompt. ⏱ 15 min
+- [ ] 🟡 **Suggest the right project** when you generate. ⏱ 15 min
+- [ ] 🟡 **Tags** on runs, with a tag filter.
+- [ ] 🟡 **Keyboard navigation** in the gallery (arrows, Enter, `f`, Delete).
+- [ ] 🟡 **Prev/next arrows and swipe** in the detail window.
+- [ ] 🟡 **Saved filters** as pinned chips.
+- [ ] 🟡 **Shift+click** to select a range.
+- [ ] 🟡 **"Select all in this day."**
+- [ ] 🟡 **Collapse a day** into a summary ("12 images, 2 failed").
+- [ ] 🟡 **Pin a run** to the top.
+- [ ] 🟡 **Smart collections** like "All videos this week".
+- [ ] ⚪ **"Open in new tab" and "Copy link"** for results.
+- [ ] ⚪ **Density remembered per surface** + compact list view.
+- [ ] ⚪ **Pick the project cover image.**
+- [ ] ⚪ **Project descriptions** and default model.
+- [ ] ⚪ **Duplicate a project.**
+- [ ] ⚪ **Archive projects.**
+- [ ] ⚪ **Comments on a run** for review.
+- [ ] ⚪ **Approval status** (Draft / Approved / Rejected).
+- [ ] ⚪ **Thumbs up/down** feeding a "what works" view.
+- [ ] ⚪ **"Jump to date"** control and scroll rail.
+- [ ] ⚪ **Hide failed runs** with one toggle.
+- [ ] ⚪ **Row-height slider.**
+- [ ] ⚪ **"Recently deleted" bin** for 7 days.
+- [ ] ⚪ **Project name chip** on tiles in "All".
+
+**9. Viewing results**
+- [ ] 🟡 **Filmstrip of related runs** below the media.
+- [ ] 🟡 **Copy buttons** for each field.
+- [ ] 🟡 **Show size and dimensions;** download original vs WebP.
+- [ ] 🟡 **Color swatches** from the image.
+- [ ] 🟡 **"Describe this image"** to reuse as a prompt.
+- [ ] 🟡 **Picture-in-picture** button.
+- [ ] 🟡 **Storyboard mode:** ordered shots, run all, chain last frame to next start.
+- [ ] ⚪ **Swipe down to close** on touch.
+- [ ] ⚪ **Preload next/previous** media.
+- [ ] ⚪ **Remember zoom** between images.
+- [ ] ⚪ **Exact timestamp on hover.**
+- [ ] ⚪ **Before/after toggle** against the reference.
+- [ ] ⚪ **Grid overlay** (thirds, safe areas).
+- [ ] ⚪ **Pinch-zoom** on images.
+- [ ] ⚪ **Blur-up placeholder** while loading.
+- [ ] ⚪ **Dominant-color background** while loading.
+- [ ] ⚪ **Loop-seam preview.**
+- [ ] ⚪ **Hover-scrub** on video tiles.
+- [ ] ⚪ **Pick the video poster frame.**
+- [ ] ⚪ **Message if the browser can't play the video,** with Download.
+- [ ] ⚪ **Remember mute/volume.**
+- [ ] ⚪ **Burn in a watermark/caption** *(only if asked)*.
+- [ ] ⚪ **Attach background music** to silent videos *(heavy; skip unless asked)*.
+
+**10. Editing results**
+- [ ] 🔴 **Upscale button** on image tiles.
+- [ ] 🟡 **Grab a frame from a video** and use it as the next start frame. ⏱ 15 min
+- [ ] 🟡 **Upscale/extend/edit** as tile-menu follow-ups. ⏱ 15 min
+- [ ] 🟡 **Audio tools:** waveform preview and trimming before upload. ⏱ 15 min
+- [ ] 🟡 **Upscale videos.**
+- [ ] 🟡 **Remove background** on images.
+- [ ] 🟡 **Outpaint / reframe** to 9:16, 1:1, etc.
+- [ ] 🟡 **Paint a mask** on an image, then describe the change.
+- [ ] 🟡 **Trim a video** in the detail window.
+- [ ] 🟡 **"Edit with prompt":** attach the image and focus the prompt in one click.
+- [ ] 🟡 **Relight / restyle presets.**
+- [ ] 🟡 **Crop preview** for 9:16, 1:1, 4:5, 16:9.
+- [ ] ⚪ **Extract a frame as PNG.**
+- [ ] ⚪ **Convert video to GIF/WebM.**
+- [ ] ⚪ **Stitch clips into one reel.**
+- [ ] ⚪ **Flip / rotate** reference images.
+- [ ] ⚪ **Import a mask PNG** for inpainting.
+- [ ] ⚪ **Preview speed changes** on videos.
+- [ ] ⚪ **Caption overlay preview.**
+- [ ] ⚪ **A/B toggle** between two takes.
+- [ ] ⚪ **Plug-in system** for post-processing steps. ⏱ 1 hr
+
+**11. Reference files**
+- [ ] 🔴 **Plain-language role names:** "First frame", "Last frame", "Style", "Character".
+- [ ] 🟡 **Show roles on slots** (start, end, reference) with drag-reorder and a swap button. ⏱ 15 min
+- [ ] 🟡 **Library folders / tags** (characters, products, styles).
+- [ ] 🟡 **Library search and rename.**
+- [ ] 🟡 **Limit meter** ("2 of 4 images") with a reason when full.
+- [ ] 🟡 **Bulk delete / tag** in the library.
+- [ ] 🟡 **"Used in" list** for each asset.
+- [ ] 🟡 **Sort and filter** the library.
+- [ ] 🟡 **Preview video before upload** to catch a wrong file.
+- [ ] 🟡 **Clean up the library:** unused files, duplicates, expired links. ⏱ 15 min
+- [ ] ⚪ **Auto-shrink huge images.** *(see Decisions)*
+- [ ] ⚪ **Drag to reorder** references, with role badges.
+- [ ] ⚪ **Mark an asset as "Character"** and auto-attach with `@name`.
+- [ ] ⚪ **"Re-upload needed" notice** when a link expires.
+- [ ] ⚪ **Remove-all-references** button.
+
+**12. Sharing, export & backup**
+- [ ] 🟡 **Share a run as a read-only link or image card** (no key exposed). ⏱ 15 min
+- [ ] 🟡 **Export/import a whole project** (media + info) to another machine. ⏱ 15 min
+- [ ] 🟡 **Optional sync** across devices, with a sample setup. ⏱ 15 min
+- [ ] 🟡 **Multiple API key profiles** with separate history. ⏱ 15 min
+- [ ] 🟡 **Save prompt/model/settings inside downloaded files** so they describe themselves. ⏱ 15 min
+- [ ] 🟡 **"Copy prompt / settings / link to this run"** in the tile menu. ⏱ 15 min
+- [ ] 🟡 **Web addresses for views and runs** so Back button and bookmarks work. ⏱ 15 min
+- [ ] 🟡 **Project as Markdown shot list** plus media zip. ⏱ 15 min
+- [ ] 🟡 **Import a history backup,** skipping duplicates. ⏱ 15 min
+- [ ] 🟡 **Zip a project** with a `prompts.csv`.
+- [ ] 🟡 **Public share page** for one result *(needs a server)*.
+- [ ] 🟡 **Cloud sync** behind the existing history interface.
+- [ ] 🟡 **QR code** to move to another device.
+- [ ] 🟡 **Shareable "recipe link"** that preloads the prompt box.
+- [ ] 🟡 **"Download all in project"** with progress and cancel.
+- [ ] 🟡 **File name template** setting.
+- [ ] 🟡 **Copy result link** with a note about its lifetime.
+- [ ] 🟡 **Export history as CSV.**
+- [ ] ⚪ **Auto-archive to your own storage** (S3 / WebDAV). ⏱ 15 min
+- [ ] ⚪ **Webhook on completion** for Zapier / n8n. ⏱ 15 min
+- [ ] ⚪ **Static web gallery** from a project. ⏱ 15 min
+- [ ] ⚪ **Comments / shared projects** (needs a backend first). ⏱ 15 min
+- [ ] ⚪ **Contact sheet PNG/PDF** for clients. ⏱ 15 min
+- [ ] ⚪ **Meaningful download names.**
+- [ ] ⚪ **Native Share on mobile.**
+- [ ] ⚪ **Export/import a "recipe"** file.
+- [ ] ⚪ **Export/import the whole app state** in one file.
+- [ ] ⚪ **One-image contact sheet** of a project.
+- [ ] ⚪ **Print layout** for a project.
+- [ ] ⚪ **Embed prompt/model** in downloads.
+- [ ] ⚪ **Web addresses for surface, model, project.**
+- [ ] ⚪ **Link to a single generation.**
+- [ ] ⚪ **Import prompts from a text file.**
+- [ ] ⚪ **Backup reminder** ("Last export 30 days ago").
+- [ ] ⚪ **Markdown snippet** for chat tools.
+- [ ] ⚪ **Email-to-self** of a recipe link.
+- [ ] ⚪ **Client-review export:** one HTML file with media inside.
+
+**13. Cost & usage**
+- [ ] 🟡 **Cost estimate before you generate** and a running total. ⏱ 15 min
+- [ ] 🟡 **Per-model credit estimates** feeding a weekly summary. ⏱ 15 min
+- [ ] 🟡 **Confirm expensive combos** (long 4K, batches over 2).
+- [ ] 🟡 **Per-project budget cap.**
+- [ ] 🟡 **Weekly summary** (runs, success rate, failures by reason).
+- [ ] 🟡 **Failure reasons breakdown** with counts.
+- [ ] 🟡 **Busiest hour/day heatmap.**
+- [ ] ⚪ **Mark runs free vs paid.**
+- [ ] ⚪ **Average wait per model.**
+- [ ] ⚪ **Export usage as CSV.**
+- [ ] ⚪ **Streak counter** (opt-in, off by default).
+
+**14. Phone & installing the app**
+- [ ] 🟡 **Install as an app** (manifest and icons) with an offline shell.
+- [ ] 🟡 **Bottom-sheet pickers** on narrow screens.
+- [ ] 🟡 **Camera capture** as a reference.
+- [ ] 🟡 **Accept photos shared from the phone.**
+- [ ] 🟡 **Prompt box collapses to a "+" sheet** on narrow screens.
+- [ ] 🟡 **No pull-to-refresh** inside the feed.
+- [ ] 🟡 **Add `robots` noindex, manifest and icons;** the favicon is 26 KB. ⏱ 15 min
+- [ ] 🟡 **Phone layout pass** (bottom prompt box, swipe between surfaces). ⏱ 15 min
+- [ ] 🟡 **Offline mode:** browse history offline; queue sends until online. ⏱ 15 min
+- [ ] ⚪ **Offline gallery** with cached posters. ⏱ 15 min
+- [ ] ⚪ **Safe-area spacing** for iPhones.
+- [ ] ⚪ **Long-press tile menu** on touch.
+- [ ] ⚪ **Vibrate on completion.**
+- [ ] ⚪ **Share-sheet "Add to Studio."**
+- [ ] ⚪ **Install prompt** after the third run.
+- [ ] ⚪ **Less motion and autoplay** on data-saver connections.
+- [ ] ⚪ **Bigger touch targets** (44 px) on narrow screens.
+
+**15. Look & feel**
+- [ ] ⚪ **Prompt box shrinks to one line** while scrolling.
+- [ ] ⚪ **On-brand empty-state art.**
+
+**16. First-time experience**
+- [ ] 🔴 **First-run checklist:** add key → first image → first video.
+- [ ] 🟡 **Example prompts** as clickable chips in the empty state.
+- [ ] 🟡 **Guided "first video from your image"** tour.
+- [ ] 🟡 **Empty-state hero** with the three key actions and real progress.
+- [ ] ⚪ **Sample project** on first load.
+- [ ] ⚪ **"What's new" window.**
+- [ ] ⚪ **Tip:** "Videos take a few minutes; you can leave the tab."
+- [ ] ⚪ **"Replay tour"** in the command palette.
+- [ ] ⚪ **Help link** in the shortcuts window.
+
+**17. Accessibility & languages**
+- [ ] 🔴 **Announce state changes to screen readers** ("Image ready", "Failed: content filter").
+- [ ] 🔴 **Keyboard access to every tile action** (not hover-only).
+- [ ] 🟡 **Name every tile** (prompt + model + status) and allow arrow-key movement. ⏱ 15 min
+- [ ] 🟡 **Respect "reduce motion"** for hover video and shimmer. ⏱ 15 min
+- [ ] 🟡 **Alt text for images** from the prompt (editable). ⏱ 15 min
+- [ ] 🟡 **Check dialogs** return focus properly and Escape closes in the right order. ⏱ 15 min
+- [ ] 🟡 **Skip links and page landmarks,** plus a clearer focus outline. ⏱ 15 min
+- [ ] 🟡 **High-contrast option** within the dark theme. ⏱ 15 min
+- [ ] 🟡 **Prepare for translation** and right-to-left languages. ⏱ 15 min
+- [ ] 🟡 **Label every icon button;** run an automatic accessibility check. ⏱ 15 min
+- [ ] 🟡 **Visible focus rings** and text contrast check.
+- [ ] 🟡 **Keyboard focus trap** in all dialogs.
+- [ ] 🟡 **Skip link** to the prompt box and feed.
+- [ ] 🟡 **Don't tab through 400 tiles** (arrow-key navigation).
+- [ ] 🟡 **Announce queue position changes.**
+- [ ] 🟡 **Status colors with icons,** not color alone.
+- [ ] ⚪ **Pause autoplay video** for reduced motion (show poster + play).
+- [ ] ⚪ **Tooltips with shortcut hints.**
+- [ ] ⚪ **One place for all text** to ease translation.
+- [ ] ⚪ **Format dates and times** for the user's locale.
+- [ ] ⚪ **Text alternative for the timer ring.**
+- [ ] ⚪ **Language and direction setting.**
+- [ ] ⚪ **"1 run / 2 runs"** plural handling.
+
+**18. Speed**
+- [ ] 🟡 **Pause off-screen videos** to save phone batteries. ⏱ 15 min
+- [ ] 🟡 **Measure the app's download size** and set a budget. ⏱ 15 min
+- [ ] 🟡 **Reuse the Higgsfield connection** within one request. ⏱ 15 min
+- [ ] ⚪ **React Compiler** (see Decisions).
+
+**19. Big new ideas**
+- [ ] 🟡 **Audio surface** (voice/music) if the platform adds it.
+- [ ] 🟡 **Talking-head flow:** image + audio → video.
+- [ ] 🟡 **Character library** with `@name` in prompts.
+- [ ] 🟡 **Style library** applied in one click.
+- [ ] 🟡 **Brand kit** (logo, colors, fonts, style words) used by templates. ⏱ 15 min
+- [ ] 🟡 **Real template gallery** where each one loads a prompt, model and settings.
+- [ ] 🟡 **"Recipes" page** built from your best starred runs.
+- [ ] 🟡 **Shot list view** for a project, printable.
+- [ ] 🟡 **Reference-pack presets** (front, side, back of a character).
+- [ ] 🟡 **Schedule a batch** at a quiet hour *(skip unless asked)*.
+- [ ] 🟡 **Experiments tab:** same prompt across models/settings with times and ratings. ⏱ 15 min
+- [ ] ⚪ **Command-line version** to run batch jobs from a text file. ⏱ 1 hr
+- [ ] ⚪ **Mood board:** drag tiles onto a free canvas.
+- [ ] ⚪ **Notify URL** when a run finishes *(needs server)*.
+- [ ] ⚪ **Public API to submit prompts** *(security review first)*.
+- [ ] ⚪ **Team mode:** shared key kept on the server *(changes core rules; ask first)*.
+- [ ] ⚪ **Project templates** ("Product ad", "Social reel").
+- [ ] ⚪ **Fullscreen slideshow** of a project.
+- [ ] ⚪ **Plug-in point** for custom tile-menu actions.
+
+**20. Behind the scenes (tests, docs, cleanup) — Setup & running the app**
+- [ ] 🟡 **Document deployment** (Vercel, Docker, own server), including HTTPS cookie behavior. ⏱ 15 min
+- [ ] 🟡 **Add a Dockerfile.** ⏱ 15 min
+- [ ] 🟡 **Structured server logs** with timings. ⏱ 15 min
+- [ ] 🟡 **Opt-in error reporting** with a "Send diagnostics" button. ⏱ 15 min
+
+**20. Behind the scenes (tests, docs, cleanup) — Cleanup**
+- [ ] ⚪ **Shrink the favicon.** ⏱ 5 min
+- [ ] ⚪ **Shrink large model icons.** ⏱ 5 min
+
+---
+
+## Done
+
+_Finished work, kept as it was._
 
 - [x] **[H]** One transient status error permanently fails a running generation. `getGenerationStatuses` turns any thrown `PlatformError` (a 502, a 429, a dropped connection) into `{ requestId, error }` (`generation/actions.ts:60-72`); `deliver()` then rejects that waiter at once (`generation/poll.ts:94`) and `useRuns` marks the run `failed` (`lib/studio/use-runs.ts:43-47`). The job is still running (and billed) on the platform, but the tile says failed and polling stops. Only treat 4xx other than 429 (unknown request, bad key) as terminal; count consecutive transient errors per request and give up after ~3 rounds, exactly as `MAX_MISSES` already does for whole-round failures.
 - [x] **[H]** Only one generation can run at a time. `handleGenerate` returns while `generating` is true (`layouts/studio.tsx:387`), `useRuns.submit` has its own `submitting` lock (`use-runs.ts:76`), and the dock switches to Cancel for the whole queue. Yet `poll.ts` is built to watch many requests in one server action. Video models take minutes, so the user is stuck staring at one tile. Allow N concurrent runs (cap at 2 and show "2 running"), drop the global `generating` gate, keep the short `submitting` lock only around the submit call itself.
@@ -594,27 +730,3 @@ Effort: **XS** under 5 min · **S** about 15 min · **M** about an hour · **L**
 - [x] **[L]** Pre-commit hook (`lint-staged` + typecheck) *(A plain `.githooks/pre-commit` running typecheck and lint, enabled by the `prepare` script; no lint-staged dependency.)* so findings like unused deps don't recur.
 - [x] **[L]** Dependabot/Renovate config; the 16.4.0 -> 16.4.3 security bump in the log shows this is manual today.
 - [x] **[L]** Add `pnpm dlx knip` to CI *(Pinned and limited to files, dependencies and unlisted; `knip.json` ignores the known leftovers listed under Skipped > Dead code, so remove those entries when that cleanup lands.)* to catch dead files/exports (would have caught the stores/plane items).
-
----
-
-## Issues needing review (earlier pass, decisions still open)
-
-_Kept verbatim; each says why it was not done and what decision is needed._
-
-
-- **API key verification on save** (Planned > Generation reliability, [L]). Not done. The plan probes `GET /requests/<random uuid>/status` and treats 401/403 as "bad key", but I can't confirm the platform answers an unknown request id with 404 rather than 403 (no key or `HF_API_BASE_URL` here). If it returns 403 for unknown ids, the check would block every valid key from being saved. Decision needed: confirm the platform's behavior (or name a cheap authenticated endpoint) and I'll wire it into `savePlatformCredentials`.
-
-- **Replace scaffold placeholders with real media** (Planned > Docs, tests, repo, [L]). Not done. `public/presets/studio-1..4.svg`, the starter `TEMPLATES` in `components/studio/template-picker.tsx` and `HERO_FALLBACKS` in `layouts/studio.tsx` are still the scaffold's. Replacing them needs real, on-brand outputs: generating them spends Higgsfield credits and needs your brand direction. Decision needed: (a) tell me the product/brand and approve spending credits on example media, (b) supply the media, or (c) remove the Explore tab and hero fallbacks until there is content.
-
-- **Disable settings combinations a model rejects** (Planned > Models and settings, [M]). Not done. Catalog entries only describe each setting on its own (`enum`/`range`/`boolean`); nothing says which combinations the platform refuses (for example resolution with duration), so there is nothing to grey out. Decision needed: list the known-invalid combinations per model (or point me at the platform docs) and I will add a `constraints` field to `ModelEntry` and disable options in the picker and dialog.
-
-- **Auto-convert HEIC to JPEG before upload** (Planned > Assets and references, [L]). Not done. Browsers other than Safari cannot decode HEIC, so this needs a WASM decoder dependency (for example `heic2any`/`libheif-js`, roughly 1 MB+). Decision needed: approve adding that dependency (lazy-loaded), or keep the current clear refusal message ("Export the photo as JPEG or PNG first").
-- **Auto-downscale oversized images to the model's max input size** (Planned > Assets and references, [L]). Not done. No catalog entry declares a maximum input resolution or file size, so there is no target to downscale to. Decision needed: the per-model (or global) max edge/size, and whether to add an `inputMaxEdge` field to `ModelEntry`.
-
-- **Cache thumbnails in IndexedDB** (Planned > Performance, [M]). Not done. Result media is served cross-origin from the platform CDN, so the browser cannot draw video frames to a canvas (tainted canvas) and a `fetch` of the bytes depends on the CDN sending CORS headers, which I can't verify without a key. Decision needed: confirm the CDN sends `Access-Control-Allow-Origin` (then I will cache image thumbnails), or accept no offline thumbnails.
-- **Turn on `reactCompiler` and measure re-renders** (Planned > Performance, [L]). Not done. It needs `babel-plugin-react-compiler` as a new dependency and a profiling session in a browser against real data, which I can't do here. Decision needed: approve the dependency and run the React profiler on the gallery before/after, or drop the item.
-
-- **Playwright smoke test for the verification scenarios** (Planned > Code quality, [M]). Not done. It needs `@playwright/test` plus a multi-hundred-MB browser download, and the cancel / content-filter scenarios need a live platform key or a mocked platform server. Decision needed: approve the dependency and say whether to mock the platform (a small local fake behind `HF_API_BASE_URL`) or run against the real one.
-- **Generate a models table in the README from the catalog** (Planned > Code quality, [L]). Not done. The catalog is TypeScript with `@/` imports, so a plain Node script can't load it; it needs `tsx` or a build step. Decision needed: approve `tsx` as a dev dependency (or accept a vitest-driven generator).
-- **Lighthouse/axe run in CI** (Planned > Code quality, [L]). Not done. It needs a built server in CI plus a score threshold policy. Decision needed: which pages and what minimum scores should fail the build.
-- **Audit `prompt-box.tsx` for prop drilling / replace the event-bus idea** (Planned > Code quality, [L]). Not done: the item is a design review rather than a concrete change. Decision needed: say which props bother you, or drop the item.
