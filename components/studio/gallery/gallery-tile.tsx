@@ -189,6 +189,39 @@ function StillMedia({
   )
 }
 
+/* Poster-less videos each fetch a first frame; at most this many do at once so a
+   page of video tiles cannot open dozens of connections and decoders. The rest
+   wait as placeholders and take a slot as others finish unmounting. */
+const MAX_STILL_VIDEOS = 6
+const slotHolders = new Set<symbol>()
+const slotListeners = new Set<() => void>()
+const notifySlots = () => slotListeners.forEach((listener) => listener())
+
+function useVideoSlot(wanted: boolean): boolean {
+  const [id] = useState(() => Symbol("video-slot"))
+  const [tick, setTick] = useState(0)
+  // Slots are claimed in effects, one tile after another, so the cap holds even
+  // when many tiles mount in the same render.
+  useEffect(() => {
+    const retry = () => setTick((n) => n + 1)
+    slotListeners.add(retry)
+    return () => {
+      slotListeners.delete(retry)
+      if (slotHolders.delete(id)) notifySlots()
+    }
+  }, [id])
+  useEffect(() => {
+    if (!wanted) {
+      if (slotHolders.delete(id)) notifySlots()
+    } else if (!slotHolders.has(id) && slotHolders.size < MAX_STILL_VIDEOS) {
+      slotHolders.add(id)
+      setTick((n) => n + 1) // eslint-disable-line react-hooks/set-state-in-effect -- show the video now that it holds a slot
+    }
+  }, [wanted, id, tick])
+  // Reading module state in render is safe: it only ever changes via the effects above, which re-render.
+  return wanted && slotHolders.has(id)
+}
+
 /** Poster by default; plays muted on hover/focus; honours reduced motion. */
 /** At most one tile video plays at a time; starting one stops the last. */
 let playingVideo: HTMLVideoElement | null = null
@@ -217,7 +250,8 @@ function HoverVideo({
   const showVideo = !hasPoster || (active && loaded)
   // With a poster the tile is just an image until hovered; no player is created
   // (or downloaded) for the hundreds of videos that are never pointed at.
-  const mountVideo = hasPoster ? active : armed
+  const slot = useVideoSlot(!hasPoster && armed)
+  const mountVideo = hasPoster ? active : slot
 
   useEffect(() => {
     const v = ref.current
@@ -553,4 +587,16 @@ function GalleryTileComponent({
   )
 }
 
-export const GalleryTile = memo(GalleryTileComponent)
+/** Layout hands over a fresh rect object on every pass; compare what is in it. */
+function sameProps(a: GalleryTileProps, b: GalleryTileProps): boolean {
+  const keys = Object.keys({ ...a, ...b }) as (keyof GalleryTileProps)[]
+  return keys.every((key) =>
+    key === "rect"
+      ? a.rect.x === b.rect.x &&
+        a.rect.width === b.rect.width &&
+        a.rect.height === b.rect.height
+      : a[key] === b[key]
+  )
+}
+
+export const GalleryTile = memo(GalleryTileComponent, sameProps)

@@ -1,6 +1,14 @@
 "use client"
 
-import { Fragment, useEffect, useState, type ReactNode } from "react"
+import {
+  Fragment,
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  type ReactNode,
+} from "react"
 import { Check, Download, FolderInput, Loader2, Trash2 } from "lucide-react"
 
 import { usePreferences } from "@/generation/stores/preferences"
@@ -97,6 +105,93 @@ export function JustifiedGallery({
     ? (items.find((i) => i.id === viewing.itemId) ??
       items.find((i) => i.runId === viewing.runId))
     : undefined
+  // Tiles get handlers that never change identity, so memoised tiles only
+  // re-render when their own item or position changes. The latest props are
+  // read when a handler runs.
+  const latest = useRef({
+    onDelete,
+    onCancel,
+    onRecheck,
+    onVariation,
+    onStar,
+    onMeasured,
+    onUseAsReference,
+    onSaveAsReference,
+    onMove,
+  })
+  useEffect(() => {
+    latest.current = {
+      onDelete,
+      onCancel,
+      onRecheck,
+      onVariation,
+      onStar,
+      onMeasured,
+      onUseAsReference,
+      onSaveAsReference,
+      onMove,
+    }
+  })
+  const [hasDelete, hasCancel, hasRecheck, hasVariation, hasStar] = [
+    !!onDelete,
+    !!onCancel,
+    !!onRecheck,
+    !!onVariation,
+    !!onStar,
+  ]
+  const [hasMeasured, hasUse, hasSave, hasMove] = [
+    !!onMeasured,
+    !!onUseAsReference,
+    !!onSaveAsReference,
+    !!onMove,
+  ]
+  const handlers = useMemo(
+    () => ({
+      onDelete: hasDelete
+        ? (i: GalleryItem) => latest.current.onDelete?.(i)
+        : undefined,
+      onCancel: hasCancel
+        ? (i: GalleryItem) => latest.current.onCancel?.(i)
+        : undefined,
+      onRecheck: hasRecheck
+        ? (i: GalleryItem) => latest.current.onRecheck?.(i)
+        : undefined,
+      onVariation: hasVariation
+        ? (i: GalleryItem) => latest.current.onVariation?.(i)
+        : undefined,
+      onStar: hasStar
+        ? (i: GalleryItem) => latest.current.onStar?.(i)
+        : undefined,
+      onMeasured: hasMeasured
+        ? (i: GalleryItem, aspect: number) =>
+            latest.current.onMeasured?.(i, aspect)
+        : undefined,
+      onUseAsReference: hasUse
+        ? (i: GalleryItem) => latest.current.onUseAsReference?.(i)
+        : undefined,
+      onSaveAsReference: hasSave
+        ? (i: GalleryItem) => latest.current.onSaveAsReference?.(i)
+        : undefined,
+      onMove: hasMove
+        ? (i: GalleryItem) => latest.current.onMove?.([i])
+        : undefined,
+    }),
+    [
+      hasDelete,
+      hasCancel,
+      hasRecheck,
+      hasVariation,
+      hasStar,
+      hasMeasured,
+      hasUse,
+      hasSave,
+      hasMove,
+    ]
+  )
+  const openItem = useCallback(
+    (i: GalleryItem) => setViewing({ itemId: i.id, runId: i.runId }),
+    []
+  )
   const firstRowY = gallery.layout.rows.find((row) => row.type !== "header")?.y
   const viewBottom = gallery.scrollTop + gallery.viewportHeight
   // The heading of the day group scrolled to the top of the viewport.
@@ -211,6 +306,7 @@ export function JustifiedGallery({
 
       <div
         ref={viewportRef}
+        data-resizing={gallery.resizing ? "" : undefined}
         className="relative min-h-0 flex-1 overflow-y-auto [overscroll-behavior:contain]"
       >
         {gallery.itemCount === 0 ? (
@@ -252,19 +348,9 @@ export function JustifiedGallery({
                     top={row.y}
                     tier={tier}
                     reducedMotion={reducedMotion}
-                    onDelete={onDelete}
-                    onCancel={onCancel}
-                    onRecheck={onRecheck}
-                    onVariation={onVariation}
-                    onStar={onStar}
-                    onMeasured={onMeasured}
-                    onUseAsReference={onUseAsReference}
-                    onSaveAsReference={onSaveAsReference}
+                    {...handlers}
                     enter={entering && row.y === firstRowY}
-                    onOpen={(i) => setViewing({ itemId: i.id, runId: i.runId })}
-                    {...(onMove
-                      ? { onMove: (i: GalleryItem) => onMove([i]) }
-                      : {})}
+                    onOpen={openItem}
                   />
                   {selecting ? (
                     <button

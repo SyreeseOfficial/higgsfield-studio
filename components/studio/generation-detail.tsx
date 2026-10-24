@@ -399,7 +399,7 @@ export function GenerationDetailModal({
               </div>
             ) : null}
             {detailRows.length > 0 ? (
-              <dl className="grid grid-cols-[auto_1fr] gap-x-4 gap-y-1 text-sm">
+              <dl className="grid grid-cols-[auto_1fr] gap-x-4 gap-y-1 text-sm [contain-intrinsic-size:auto_240px] [content-visibility:auto]">
                 {detailRows.map((row) => {
                   const text =
                     row.copy ??

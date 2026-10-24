@@ -173,19 +173,19 @@ Pictures, videos and audio you give the AI as input.
 
 ## 18. Speed
 
-- [ ] 🟡 **Smoother layout on resize.** ⏱ 15 min
-- [ ] 🟡 **Skip rendering off-screen tiles** while keeping loaded media. ⏱ 15 min
-- [ ] 🟡 **Don't recompute lists** on every poll tick. ⏱ 15 min
+- [x] 🟡 **Smoother layout on resize.** ⏱ 15 min
+- [x] 🟡 **Skip rendering off-screen tiles** while keeping loaded media. ⏱ 15 min
+- [x] 🟡 **Don't recompute lists** on every poll tick. ⏱ 15 min
 - [ ] 🟡 **Split the two biggest files** (886 and 816 lines) into smaller pieces. ⏱ 15 min
-- [ ] 🟡 **Only update the part of the gallery that changed.** ⏱ 15 min
+- [x] 🟡 **Only update the part of the gallery that changed.** ⏱ 15 min
 - [ ] 🟡 **Load rarely used windows only when opened.** ⏱ 15 min
 - [ ] 🟡 **Preload images only near the screen.** ⏱ 15 min
 - [ ] 🟡 **Store small thumbnails** for instant reopening.
-- [ ] 🟡 **Cap simultaneous videos** at a hard limit.
+- [x] 🟡 **Cap simultaneous videos** at a hard limit.
 - [ ] 🟡 **Do heavy file work** (fingerprinting, metadata stripping) in the background.
-- [ ] 🟡 **Only re-render the tile that changed.**
+- [x] 🟡 **Only re-render the tile that changed.**
 - [ ] ⚪ **Analyze the bundle once** and lazy-load more windows.
-- [ ] ⚪ **Skip off-screen parts** of the detail window.
+- [x] ⚪ **Skip off-screen parts** of the detail window.
 - [ ] ⚪ **Load first-row images first,** others later.
 - [ ] ⚪ **Cache static files** offline.
 

@@ -19,7 +19,7 @@ Source of truth for details: [FINDINGS.md](FINDINGS.md). Do one phase at a time.
 | 7 | Prompt box & references | 9 | ☑ (HEIC ⛔) |
 | 8 | Gallery, cost & usage | 8 | ☑ (3 ⛔) |
 | 9 | First-run & visual polish | 7 | ☑ (1 ⛔) |
-| 10 | Speed: rendering | 7 | ☐ |
+| 10 | Speed: rendering | 7 | ☑ |
 | 11 | Speed: loading & bundle | 7 | ☐ |
 | 12 | Tests: pure logic | 9 | ☐ |
 | 13 | Tests: infrastructure & fake server | 7 | ☐ |
@@ -125,13 +125,13 @@ Goal: one click = at most one paid job; one slow call never freezes the app.
 - [ ] ⛔ "Check key" button → see Blocked (needs the API-key check answer)
 
 ## Phase 10 — Speed: rendering
-- [ ] Smoother layout on resize
-- [ ] Skip rendering off-screen tiles (keep loaded media)
-- [ ] Don't recompute lists every poll tick
-- [ ] Only update the changed part of the gallery
-- [ ] Only re-render the tile that changed
-- [ ] Hard cap on simultaneous videos
-- [ ] Skip off-screen parts of the detail window
+- [x] Smoother layout on resize
+- [x] Skip rendering off-screen tiles (keep loaded media)
+- [x] Don't recompute lists every poll tick
+- [x] Only update the changed part of the gallery
+- [x] Only re-render the tile that changed
+- [x] Hard cap on simultaneous videos
+- [x] Skip off-screen parts of the detail window
 
 ## Phase 11 — Speed: loading & bundle
 - [ ] Load rarely used windows only when opened

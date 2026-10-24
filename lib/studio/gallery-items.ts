@@ -51,7 +51,23 @@ function tileFacts(run: RunRecord) {
 }
 
 /** One feed tile per result URL; a running or failed run is a single placeholder tile. */
+const itemCache = new WeakMap<
+  RunRecord,
+  { day: number; items: GalleryItem[] }
+>()
+
+/** Tiles for one run. A record that did not change gives back the same tile objects, so React
+    can skip every tile whose run is untouched when another one finishes. */
 export function runToGalleryItems(run: RunRecord): GalleryItem[] {
+  const day = new Date().setHours(0, 0, 0, 0) // the "Today" label depends on it
+  const cached = itemCache.get(run)
+  if (cached?.day === day) return cached.items
+  const items = buildGalleryItems(run)
+  itemCache.set(run, { day, items })
+  return items
+}
+
+function buildGalleryItems(run: RunRecord): GalleryItem[] {
   const facts = tileFacts(run)
   const base = {
     ...facts,

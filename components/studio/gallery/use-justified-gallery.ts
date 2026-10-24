@@ -48,6 +48,8 @@ export interface UseJustifiedGalleryResult {
   setDensity: (level: number) => void
   itemCount: number
   loadingMore: boolean
+  /** True while the window is being resized (and shortly after): tiles track the pointer instead of easing. */
+  resizing: boolean
 }
 
 export function useJustifiedGallery(
@@ -63,6 +65,7 @@ export function useJustifiedGallery(
   const [width, setWidth] = useState(0)
   const [density, setDensityState] = useState(DEFAULT_DENSITY)
   const [viewportHeight, setViewportHeight] = useState(0)
+  const [resizing, setResizing] = useState(false)
   // Snapshot scroll position only when the rendered row window changes.
   const [range, setRange] = useState({ startRow: 0, endRow: 0, scrollTop: 0 })
 
@@ -106,14 +109,28 @@ export function useJustifiedGallery(
   useLayoutEffect(() => {
     const el = viewportRef.current
     if (el == null || typeof ResizeObserver === "undefined") return
+    // One layout pass per frame, and none for sub-pixel changes.
+    let raf = 0
+    let settle: ReturnType<typeof setTimeout> | undefined
     const ro = new ResizeObserver(() => {
-      setWidth(el.clientWidth)
-      setViewportHeight(el.clientHeight)
+      cancelAnimationFrame(raf)
+      raf = requestAnimationFrame(() => {
+        const next = el.clientWidth
+        setWidth((prev) => (Math.abs(prev - next) < 1 ? prev : next))
+        setViewportHeight(el.clientHeight)
+        setResizing(true)
+        clearTimeout(settle)
+        settle = setTimeout(() => setResizing(false), 200)
+      })
     })
     ro.observe(el)
     setWidth(el.clientWidth)
     setViewportHeight(el.clientHeight)
-    return () => ro.disconnect()
+    return () => {
+      ro.disconnect()
+      cancelAnimationFrame(raf)
+      clearTimeout(settle)
+    }
   }, [])
 
   // After any re-layout (width / density / items), recompute the window and
@@ -225,5 +242,6 @@ export function useJustifiedGallery(
     setDensity,
     itemCount: allItems.length,
     loadingMore,
+    resizing,
   }
 }

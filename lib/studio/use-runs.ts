@@ -1,6 +1,6 @@
 "use client"
 
-import { useCallback, useEffect, useRef, useState } from "react"
+import { useCallback, useEffect, useMemo, useRef, useState } from "react"
 
 import { cancelGeneration, submitGeneration } from "@/generation/actions"
 import { getModel } from "@/generation/catalog"
@@ -549,14 +549,22 @@ export function useRuns({ onAuthError }: { onAuthError?: () => void } = {}) {
     )
   }, [])
 
-  const running = records.filter((r) => r.status === "running")
+  // Memoised: a new array every render would rebuild the whole gallery layout
+  // on unrelated state changes (a countdown tick, a notice).
+  const running = useMemo(
+    () => records.filter((r) => r.status === "running"),
+    [records]
+  )
   // Waiting placeholders lead the list, newest first, each numbered by queue place.
-  const waiting = queue
-    .map((q, i) => ({ ...q.record, queued: i + 1 }))
-    .reverse()
+  const allRecords = useMemo(() => {
+    const waiting = queue
+      .map((q, i) => ({ ...q.record, queued: i + 1 }))
+      .reverse()
+    return waiting.length ? [...waiting, ...records] : records
+  }, [queue, records])
 
   return {
-    records: waiting.length ? [...waiting, ...records] : records,
+    records: allRecords,
     running,
     queuedCount: queue.length,
     variation,
