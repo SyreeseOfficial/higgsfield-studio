@@ -23,6 +23,8 @@ end. Rendering the shipped examples is not completion.
   zustand stores. Browser code never sees the platform key.
 - `lib/studio/` — browser persistence (IndexedDB history, zustand projects and
   uploads) and the `useRuns` controller.
+- `docs/` (architecture, run lifecycle, errors, privacy, storage, adding a model), `tests/` (vitest, never hits the real API), `scripts/`, `styles/`.
+- `PHASES.md` is the phase plan (done), `FINDINGS.md` the backlog, `CHANGELOG.md` the release notes.
 
 ## Runtime boundaries — preserve these
 
@@ -58,7 +60,7 @@ end. Rendering the shipped examples is not completion.
 
 - Copy, presets, metadata, navigation and errors describe the user's product
   rather than this scaffold.
-- Every `/presets/placeholder-*.svg` and mock template in
+- Every `/presets/studio-*.svg` and mock template in
   `components/studio/template-picker.tsx` is replaced with real, on-brand
   media at the component's aspect ratio, then the placeholders are deleted.
 - Every visible control performs its named action or is removed. No inert

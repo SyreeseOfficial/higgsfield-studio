@@ -6,10 +6,10 @@ when adapting; replace their content, not their presence:
 
 1. **Projects-first sidebar** (`StudioSidebar`): Home, All Generations, the
    project list with rename/delete, the key status row. Collapsible.
-2. **Atmosphere**: `HERO_GLOW` radial glow and `HERO_DOTS` dot-field masked by
+2. **Atmosphere** (constants live in `studio-views.tsx`): `HERO_GLOW` radial glow and `HERO_DOTS` dot-field masked by
    `HERO_DOTS_MASK` behind the hero. Tune colours, keep the depth.
 3. **`HeroComposition`**: three latest ready outputs, falling back to
-   `/presets/placeholder-*.svg` until the product has real media.
+   `/presets/studio-*.svg` until the product has real media.
 4. **`StudioPromptBox` dock**: mode rail (surfaces), one headline setting pill,
    the settings dialog pill, one mixed reference picker, compact media chips,
    model-appropriate frame/source slots, and the lime Generate CTA that turns

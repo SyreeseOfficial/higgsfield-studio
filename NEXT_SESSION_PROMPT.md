@@ -1,13 +1,13 @@
-Read PHASES.md and FINDINGS.md. Find the first phase not marked ☑ (resume any ◐ phase).
-Work on that ONE phase only:
+All 16 phases in PHASES.md are done. Only the items under "Blocked on you" remain, and each needs my answer first:
 
-1. Read CLAUDE.md/AGENTS.md rules and the code each item touches before editing.
-2. Do every unticked item in the phase. Skip items tagged ⛔ (they need my answer).
-3. Tests must be free: never call the real Higgsfield API or spend credits.
-4. Tick finished items in BOTH PHASES.md and FINDINGS.md; set the phase status to ☑ in the table.
-5. Run `pnpm typecheck` and `pnpm build`. Both must pass (no `any`, `@ts-ignore`, `@ts-expect-error`).
-6. If all pass: commit (clear message) and push. Then move on to the next phase and repeat.
-7. If you hit an error, a question, or need me: stop and ask. Move the item to
-   "Waiting on your decision" in FINDINGS.md and tag it ⛔ in PHASES.md.
+- Check the API key when it is saved (needs Higgsfield's response to a safe test request)
+- Credit balance and pre-run warning (needs the balance endpoint, is it free?)
+- Session spend counter (needs credit prices per model)
+- "Not charged" note on failed runs (needs to know which failures are refunded)
+- Run-controller and screen tests (approve the jsdom + @testing-library/react dev add-on)
+- Auto-convert iPhone photos (HEIC): approve the ~1 MB add-on, or keep the current message
+- Replace placeholder media (needs brand direction and images)
+- Store small thumbnails (needs confirmation that Higgsfield's servers allow it)
 
-Never hand-edit generation/catalog/models.generated.ts. Don't commit unrelated changes.
+Read CLAUDE.md/AGENTS.md first. Ask me which one to start. Tests must be free: never call the real Higgsfield API.
+Run `pnpm typecheck` and `pnpm build`; both must pass.
